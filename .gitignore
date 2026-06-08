@@ -1,0 +1,5 @@
+# Local editor / preview tooling
+.claude/
+
+# OS cruft
+.DS_Store
