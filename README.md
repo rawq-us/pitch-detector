@@ -1,37 +1,53 @@
 # 🎛️ Pitch Studio
 
-A single-file, in-browser music workstation: a pitch detector, a playable keyboard, an arpeggiator, a drum machine, and a beat-aligned timeline arranger — plus MIDI export, saveable sessions, and live spectrum visualizers. No build step, no dependencies, no samples (all sound is synthesized with the Web Audio API).
+A single-file, in-browser music workstation: a pitch detector, a playable keyboard, an arpeggiator, a drum machine, and a beat-aligned timeline arranger — with per-track effects, a master EQ, voice recording, MIDI export, audio bounce/stems, saveable sessions, and live spectrum visualizers. No build step, no dependencies, no samples (all sound is synthesized with the Web Audio API).
+
+**▶️ Live app:** https://rawq-us.github.io/pitch-detector/
 
 ## Features
 
 ### Pitch detection & keyboard
-- **Microphone pitch detection** via normalized autocorrelation with parabolic interpolation; shows the detected note, frequency, a cents-off tuner needle, and highlights the matching key.
-- **Virtual keyboard** A1 → C6 with white/black keys, mouse/touch **glissando** (drag across keys), and computer-keyboard play (`a s d f g h j k l` white, `w e t y u o p` black).
-- **In-tune playback** — equal temperament, A4 = 440 Hz — with selectable tone: sine / triangle / square / saw.
-- **Keys & modes** — pick a root and one of the seven diatonic modes (Ionian → Locrian); in-key notes and the root are tinted on the keyboard, color-coded per mode.
+- **Microphone pitch detection** via normalized autocorrelation; shows the detected note, frequency, a cents-off tuner needle, and highlights the matching key.
+- **Scale-aware guess:** under the detected note it shows the **nearest in-key note** for the current key/mode and how many cents off you are.
+- **Virtual keyboard** A1 → C6 with white/black keys, mouse/touch **glissando**, and computer-keyboard play (`a s d f g h j k l` white, `w e t y u o p` black).
+- **In-tune playback** — equal temperament, A4 = 440 Hz.
+- **Keys & modes** — root + the seven diatonic modes (Ionian → Locrian); in-key notes and the root are tinted per mode.
+
+### Synth
+- Oscillator tone: sine / triangle / square / saw.
+- **State-variable filter** (low/high/band-pass, cutoff + resonance) and a full **ADSR amp envelope**. Moving filter controls updates held notes live.
 
 ### Arpeggiator
-- Build a note sequence by clicking keys in "Add notes" mode (rests supported), preview it looping, then add it to the timeline as a clip.
-- Rate selector (1/4, 1/8, 1/8 triplet, 1/16) tied to the global project tempo.
+- Build a note sequence by clicking keys (rests supported), preview it looping, then add it to the timeline as a clip. Rate: 1/4, 1/8, 1/8 triplet, 1/16.
 
-### Beat machine (8-piece synth kit)
-- Synthesized **Kick, Snare, Closed Hat, Open Hat, Clap, Low Tom, Hi Tom, Cymbal**.
-- Tap pads to audition, program a 16-step grid, or **live-record** pad taps into the grid while previewing. Add the pattern to the timeline as a beat clip.
+### Beat machine (18-piece synth kit)
+- Kick, snare, hats, clap, 3 toms, rim, cowbell, shaker, 2 congas, clave, tamb, crash, ride, snap — all synthesized.
+- **6×6 = 36 performance pads** (top 18 = kit, bottom 18 = an octave up). Tap to audition or **live-record** into the grid.
+- A 16th-note step grid whose **Length is set in bars/measures** and re-fits to the time signature (with a `?` tooltip explaining the math and a live steps/seconds readout).
 
 ### Timeline / arrangement
-- Multi-track layers (multiple arp tracks + beat tracks); clips show their content and **duration as width**.
-- **Drag clips** to reposition — snaps to the beat grid. Each clip has a **⟳ loop badge**: click it to set how many beats the pattern loops for.
+- Multi-track layers (multiple arp, beat, and voice tracks); clips show content + **duration as width**.
+- **Drag clips** to reposition — snaps to the beat. Each non-voice clip has a **⟳ loop badge** to set how many beats it loops for.
 - **Bar/beat guides** with a **time-signature** selector (4/4, 3/4, 2/4, 6/8, 5/4, 7/8, 12/8) and a global **Project BPM** (default 90).
-- **Cycle region**: drag across the ruler to set a loop; toggle looping on/off; reset to the whole piece. Numeric (seconds) length field.
+- **Cycle region** (drag the ruler), loop on/off, numeric (seconds) length field.
 - Master transport scheduled on the Web Audio clock (sample-accurate, drift-free).
 
+### Effects & mixing
+- **Per-track FX rack** (opened from each track's **FX** button): Level, Drive, Chorus, Phaser, Delay (tempo-syncable), Reverb (convolution), Compressor — processed in series, independently per layer.
+- **Master EQ**: 3-band (low shelf / mid peak / high shelf) + master level. The master bus is EQ-only.
+
+### Voice recording
+- A **Voice track** type records mic snippets via `MediaRecorder`. Clips play in the transport, are stored as Blobs **in the IndexedDB session**, excluded from MIDI, and included in the audio bounce.
+
 ### Visualizers
-- **Synth EQ** above the keyboard — frequency spectrum + oscilloscope overlay, so the four oscillator shapes are visible at a glance.
-- **Master EQ** beside the timeline — the whole session's combined output.
+- **Synth EQ** above the keyboard — spectrum + oscilloscope overlay (compare the four oscillator shapes).
+- **Master EQ visualizer** beside the timeline — the whole session's output.
 
 ### Export & sessions
-- **Export MIDI** — writes a Standard MIDI File (format 1): arp tracks on melodic channels, drums on the GM percussion channel, with tempo and time-signature meta. Respects per-clip loop lengths.
-- **Sessions** — save/load named sessions (label + description) to an in-browser **IndexedDB** store, with a stored format version for forward compatibility.
+- **Export MIDI** — Standard MIDI File (format 1): arp tracks on melodic channels, drums on GM channel 10, with tempo + time-signature meta. Respects per-clip loop lengths.
+- **Bounce WAV** — renders the entire arrangement (synth, drums, voice, per-track FX, master EQ) offline to a 16-bit WAV.
+- **Export stems** — each track rendered individually (with its own inserts, pre-master-EQ) as separate WAVs.
+- **Sessions** — save/load named sessions (label + description) in IndexedDB, with a stored format version. Synth, master EQ, and per-track FX are all persisted.
 
 ## Running
 
@@ -43,14 +59,15 @@ python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
-Click **Enable mic** and allow access to use pitch detection. Everything else works without the mic.
+Click **Enable mic** for pitch detection / voice recording; everything else works without it.
 
 ## How it works
 
-- **Note → frequency:** `f = 440 · 2^((midi − 69) / 12)`
-- **Frequency → note:** `midi = 69 + 12·log₂(f / 440)`; the fractional part × 100 gives cents off.
-- **Audio graph:** synth voices → synth analyser → master gain → master analyser → output; drums route straight to the master gain. The analysers drive the two EQ displays.
-- **Scheduling:** a 25 ms look-ahead scheduler queues note/drum events ~120 ms ahead on the audio clock for tight timing.
-- **Safari:** a silent-buffer "unlock" plus an inaudible keep-warm tone are started on the first gesture so audio fires instantly.
+- **Note → frequency:** `f = 440 · 2^((midi − 69) / 12)`; **frequency → note:** `midi = 69 + 12·log₂(f / 440)`.
+- **Audio graph:** each track → its insert FX chain → master gain → master EQ → analyser → output; live keyboard → synth bus → master.
+- **Beat length:** a bar = `numerator` beats; the 16th-note grid has `16/denominator` steps per beat, so `beats × steps-per-beat` steps per bar; each step = `(60/BPM)/4` s.
+- **Scheduling:** a 25 ms look-ahead scheduler queues events ~120 ms ahead on the audio clock.
+- **Bounce/stems:** rendered via `OfflineAudioContext` and encoded to WAV in-browser.
+- **Safari:** a silent-buffer "unlock" + inaudible keep-warm tone start on the first gesture so audio fires instantly.
 
 Built as a single `index.html` — open it, read it, hack it.
