@@ -26,15 +26,20 @@ A single-file, in-browser music workstation: a pitch detector, a playable keyboa
 - A 16th-note step grid whose **Length is set in bars/measures** and re-fits to the time signature (with a `?` tooltip explaining the math and a live steps/seconds readout).
 
 ### Timeline / arrangement
-- Multi-track layers (multiple arp, beat, and voice tracks); clips show content + **duration as width**.
-- **Drag clips** to reposition — snaps to the beat. Each non-voice clip has a **⟳ loop badge** to set how many beats it loops for.
-- **Bar/beat guides** with a **time-signature** selector (4/4, 3/4, 2/4, 6/8, 5/4, 7/8, 12/8) and a global **Project BPM** (default 90).
+- Multi-track layers (multiple arp, beat, and voice tracks; starts with one of each); clips show content + **duration as width**.
+- **Drag clips** to reposition — snaps to the beat. Each non-voice clip has a **⟳ loop badge** to set how many beats it loops for. Per-track **FX ▸** and **✕ layer** buttons.
+- **Two-row ruler**: top = **seconds**, bottom = **bars · beats** (what clips snap to), with row labels so the axis is unambiguous.
+- **Time-signature** selector (4/4, 3/4, 2/4, 6/8, 5/4, 7/8, 12/8) and a global **Project BPM** (default 90).
+- **Count-in**: a Off / 1 / 2-bar pre-roll before position 0 — on Play the playhead starts in the pre-roll and a metronome counts you in, landing beat 1 exactly at 0.
 - **Cycle region** (drag the ruler), loop on/off, numeric (seconds) length field.
 - Master transport scheduled on the Web Audio clock (sample-accurate, drift-free).
 
 ### Effects & mixing
-- **Per-track FX rack** (opened from each track's **FX** button): Level, Drive, Chorus, Phaser, Delay (tempo-syncable), Reverb (convolution), Compressor — processed in series, independently per layer.
+- **Per-layer FX rack** (opened from each track's **FX** button, in a modal): Level, Drive, Chorus, Phaser, Delay (tempo-syncable), Reverb (convolution), Compressor — each with an **On/Off** toggle that keeps your settings when bypassed; processed in series, independently per layer.
 - **Master EQ**: 3-band (low shelf / mid peak / high shelf) + master level. The master bus is EQ-only.
+
+### Built-in demo
+- On first run (empty session DB) the app installs and loads **"Bach Prelude in C — Trap"**: BWV 846 on the arp layer over a trap beat, with per-layer effects. It's saved to your sessions so you can reload it anytime.
 
 ### Voice recording
 - A **Voice track** type records mic snippets via `MediaRecorder`. Clips play in the transport, are stored as Blobs **in the IndexedDB session**, excluded from MIDI, and included in the audio bounce.
