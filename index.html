@@ -52,9 +52,12 @@
   .in-tune .needle { background: var(--accent); }
 
   .keyboard-shell { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; overflow: hidden; }
-  .keyboard { position: relative; display: flex; height: 200px; width: 100%; user-select: none; touch-action: none; }
+  .kbd-row { display: flex; align-items: stretch; gap: 8px; }
+  .kbd-scroll { flex: 1; overflow-x: auto; overflow-y: hidden; min-width: 0; }
+  .kbd-jump { flex: none; width: 42px; font-size: 18px; line-height: 1; padding: 0; }
+  .keyboard { position: relative; display: flex; height: 200px; width: max-content; user-select: none; touch-action: none; }
   .key { position: relative; border: 1px solid #0c0e14; border-radius: 0 0 6px 6px; cursor: pointer; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 8px; font-size: 10px; transition: background 0.05s; }
-  .key.white { flex: 1 1 0; min-width: 0; background: var(--white-key); color: #6b7280; z-index: 1; }
+  .key.white { width: 36px; flex: none; background: var(--white-key); color: #6b7280; z-index: 1; }
   .key.white.active { background: var(--white-key-active); }
   .key.black { width: 28px; height: 122px; background: var(--black-key); color: #cbd5e1; margin: 0 -14px; z-index: 2; border-radius: 0 0 5px 5px; }
   .key.black.active { background: var(--black-key-active); }
@@ -124,6 +127,22 @@
   #oscAddBtn { font-size: 12px; padding: 7px 12px; color: var(--accent-2); border-style: dashed; }
   .osc-rm { font-size: 11px; color: var(--muted); padding: 2px 9px; margin-left: auto; }
   .osc-rm:hover { color: var(--flat); border-color: var(--flat); }
+  /* synth-keys structure */
+  .divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+  .divider.subtle { border-top-color: #20242f; margin: 14px 0; }
+  .subcard { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .kb-perf { display: flex; align-items: stretch; gap: 16px; flex-wrap: wrap; }
+  .perf-col { display: flex; flex-direction: column; gap: 8px; }
+  .perf-col.grow { flex: 1; min-width: 300px; }
+  .perf-sep { width: 1px; background: var(--border); align-self: stretch; }
+  .sublabel { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
+  .dim { text-transform: none; letter-spacing: 0; color: var(--muted); font-weight: 400; }
+  .tr-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .tr-hint { margin: 2px 0 0; }
+  .subhead { margin: 0 0 10px; }
+  .kbd-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+  .kbd-foot .hint { margin: 0; }
+  .kbd-mode { display: flex; align-items: center; gap: 8px; }
   .key.tpos { outline: 3px solid var(--accent-2); outline-offset: -3px; }
   .iconbtn { font-size: 17px; padding: 7px 12px; line-height: 1; }
   /* collapsible + draggable sections */
@@ -300,14 +319,6 @@
         <option value="locrian">Locrian</option>
       </select>
     </div>
-    <div class="group"><label for="waveSel">Tone</label>
-      <select id="waveSel">
-        <option value="sine">Sine</option>
-        <option value="triangle">Triangle</option>
-        <option value="square">Square</option>
-        <option value="sawtooth">Saw</option>
-      </select>
-    </div>
     <div class="spacer"></div>
     <div class="group"><label>&nbsp;</label><button id="micBtn" class="primary">🎤 Enable mic</button></div>
   </div>
@@ -331,28 +342,18 @@
   <!-- ===== Synth — keys (keyboard + oscilloscope + arp transpose) ===== -->
   <div class="panel csec" data-key="synthkeys" data-title="Synth — keys">
     <div class="eq-strip"><canvas id="synthEq"></canvas><span class="eq-tag">Synth oscilloscope — live output waveform</span></div>
-    <div class="keyboard" id="keyboard"></div>
-    <div class="hint" id="legend"></div>
-    <div class="row" style="margin-top:14px; align-items:flex-end">
-      <div class="group"><label>Keyboard does</label>
-        <div class="seg"><button id="kbPlayBtn" class="seg-on">▶ Play notes</button><button id="kbTransBtn">⇅ Transpose arp</button></div>
-      </div>
-      <div class="spacer"></div>
-      <div class="group" style="align-items:flex-end"><label>Arp transpose — selected layer</label>
-        <div class="row" style="gap:6px; align-items:center; justify-content:flex-end">
-          <button id="trMinusOct">−12</button><button id="trMinus">−1</button>
-          <span class="readout" id="trOut" style="min-width:150px; text-align:center">— select an arp layer</span>
-          <button id="trPlus">+1</button><button id="trPlusOct">+12</button>
-          <button id="trReset">Reset</button>
-        </div>
-      </div>
+    <div class="kbd-row">
+      <button class="kbd-jump" id="kbdLeft" title="Jump down an octave">◀</button>
+      <div class="kbd-scroll" id="kbdScroll"><div class="keyboard" id="keyboard"></div></div>
+      <button class="kbd-jump" id="kbdRight" title="Jump up an octave">▶</button>
     </div>
-    <div class="hint" style="margin-top:8px">In <b>Transpose</b> mode, click a key to jump the selected arp to that offset from C4. Arrow keys: ←/→ ±1 semitone, ↑/↓ ±octave.</div>
-  </div>
+    <div class="kbd-foot">
+      <div class="kbd-mode"><span class="sublabel">Keyboard</span><div class="seg"><button id="kbPlayBtn" class="seg-on">▶ Play notes</button><button id="kbTransBtn">⇅ Transpose arp</button></div></div>
+      <div class="hint" id="legend"></div>
+    </div>
 
-  <!-- ===== Synth (filter + envelope) ===== -->
-  <div class="panel csec" data-key="synthsound">
-    <h2>Synth — filter &amp; envelope</h2>
+    <hr class="divider">
+    <h2 class="subhead">Synth — filter &amp; envelope</h2>
     <div class="row">
       <div class="group"><label for="filtTypeSel">Filter</label>
         <select id="filtTypeSel">
@@ -368,13 +369,14 @@
       <div class="knob"><label>Sustain <span id="susOut">0.70</span></label><input id="susR" type="range" min="0" max="1" step="0.01" value="0.7" /></div>
       <div class="knob"><label>Release <span id="relOut">0.25s</span></label><input id="relR" type="range" min="0" max="2" step="0.01" value="0.25" /></div>
     </div>
-    <h2 style="margin:16px 0 10px">Oscillators <span style="text-transform:none;letter-spacing:0;color:var(--muted);font-weight:400">— OSC 2 detune = doubling · OSC 3 semitones = harmony (e.g. +6 tritone)</span></h2>
+    <hr class="divider subtle">
+    <h2 class="subhead">Oscillators <span class="dim">— OSC 2 detune = doubling · OSC 3 semitones = harmony (e.g. +6 tritone)</span></h2>
     <div id="oscRows"></div>
   </div>
 
-  <!-- ===== Arp editor ===== -->
+  <!-- ===== Arpeggiator ===== -->
   <div class="panel csec" data-key="arp">
-    <h2>Arp editor</h2>
+    <h2>Arpeggiator</h2>
     <div class="row">
       <div class="group"><label for="rateSel">Rate</label>
         <select id="rateSel">
@@ -393,6 +395,14 @@
       <div class="group"><label>&nbsp;</label><button id="arpAddBtn" class="primary">＋ Add arp clip → timeline</button></div>
     </div>
     <div class="seq" id="seq"></div>
+    <hr class="divider subtle">
+    <div class="tr-row">
+      <span class="sublabel">Transpose <span class="dim">— selected arp layer</span></span>
+      <button id="trMinusOct">−12</button><button id="trMinus">−1</button>
+      <span class="readout" id="trOut" style="min-width:150px; text-align:center">— select an arp layer</span>
+      <button id="trPlus">+1</button><button id="trPlusOct">+12</button><button id="trReset">Reset</button>
+    </div>
+    <div class="hint">Set the <b>Keyboard</b> to <b>Transpose arp</b> (above the keys), then click a key to jump the selected arp to that offset from C4. Arrow keys: ←/→ ±1 semitone, ↑/↓ ±octave.</div>
   </div>
 
   <!-- ===== Beat machine ===== -->
@@ -509,7 +519,7 @@ const midiToFreq = (m) => A4 * Math.pow(2, (m - A4_MIDI) / 12);
 const freqToMidiFloat = (f) => 69 + 12 * Math.log2(f / A4);
 function noteName(midi){ const name = NOTE_NAMES[((midi%12)+12)%12]; const octave = Math.floor(midi/12)-1; return {name, octave, full: name+octave}; }
 const isBlack = (m) => NOTE_NAMES[((m%12)+12)%12].includes("#");
-const MIDI_LOW = 33, MIDI_HIGH = 84;
+const MIDI_LOW = 21, MIDI_HIGH = 108; // full 88-key piano (A0 → C8)
 const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
 
 /* ============================== Audio engine ============================== */
@@ -636,7 +646,7 @@ function spawnOscs(ctx, midi, clipWave, dest){
   const oscs=[];
   synthParams.oscs.forEach((o,i)=>{
     const osc=ctx.createOscillator();
-    osc.type = (i===0) ? (clipWave||waveSel.value) : (o.wave||"sawtooth");
+    osc.type = (i===0 && clipWave) ? clipWave : (o.wave||"sine");
     osc.frequency.value = midiToFreq(midi + (o.octave||0)*12 + (o.semis||0));
     osc.detune.value = o.detune||0;
     const g=ctx.createGain(); g.gain.value = (o.level==null?1:o.level); osc.connect(g);
@@ -726,7 +736,6 @@ function playDrumAt(idx, t, pitch, ctx2, dest2){
 }
 
 /* ============================== DOM refs ============================== */
-const waveSel = document.getElementById("waveSel");
 const rootSel = document.getElementById("rootSel");
 const modeSel = document.getElementById("modeSel");
 
@@ -741,6 +750,12 @@ function buildKeyboard(){
     el.appendChild(lab); keyboardEl.appendChild(el); keyEls.set(m, el);
   }
 }
+// octave-jump buttons + scroll helpers for the full 88-key keyboard
+const kbdScroll=document.getElementById("kbdScroll");
+function octaveW(){ const w=document.querySelector(".key.white"); return (w?w.getBoundingClientRect().width:36)*7; }
+function centerKeyboard(midi){ const k=keyEls.get(midi||60); if(k&&kbdScroll) kbdScroll.scrollLeft=Math.max(0, k.offsetLeft - kbdScroll.clientWidth/2 + k.offsetWidth/2); }
+document.getElementById("kbdLeft").addEventListener("click",()=>kbdScroll.scrollBy({left:-octaveW(),behavior:"smooth"}));
+document.getElementById("kbdRight").addEventListener("click",()=>kbdScroll.scrollBy({left:octaveW(),behavior:"smooth"}));
 let pointerDown = false, dragMidi = null, kbMode = "play"; // "play" | "transpose"
 function midiAtPoint(x,y){ const el = document.elementFromPoint(x,y); if (el && el.classList && el.classList.contains("key")) return parseInt(el.dataset.midi,10); return null; }
 function setDragNote(m){
@@ -828,7 +843,13 @@ function detectLoop(){
   highlightDetected(midi);
 }
 function clearDetected(){ if (lastDetectedMidi!=null && keyEls.has(lastDetectedMidi)) keyEls.get(lastDetectedMidi).classList.remove("detected"); lastDetectedMidi=null; }
-function highlightDetected(midi){ if (midi===lastDetectedMidi) return; clearDetected(); if (keyEls.has(midi)){ keyEls.get(midi).classList.add("detected"); lastDetectedMidi=midi; } }
+function highlightDetected(midi){
+  if (midi===lastDetectedMidi) return; clearDetected();
+  if (keyEls.has(midi)){
+    const k=keyEls.get(midi); k.classList.add("detected"); lastDetectedMidi=midi;
+    if (kbdScroll){ const l=k.offsetLeft, r=l+k.offsetWidth; if (l<kbdScroll.scrollLeft || r>kbdScroll.scrollLeft+kbdScroll.clientWidth) kbdScroll.scrollTo({left:Math.max(0,l-kbdScroll.clientWidth/2), behavior:"smooth"}); }
+  }
+}
 
 /* ============================== Computer keyboard ============================== */
 const KEY_MAP={}; "awsedftgyhujkolp;".split("").forEach((ch,i)=>{ KEY_MAP[ch]=60+i; });
@@ -906,7 +927,7 @@ rateSel.addEventListener("change", updateMsReadout);
 arpAddBtn.addEventListener("click",()=>{
   if (!sequence.length){ flash(arpAddBtn,"Build a sequence first"); return; }
   const track = ensureTrack("arp");
-  addClip(track, { id:++clipSeq, steps: sequence.map(s=>({...s})), rate: parseFloat(rateSel.value)||2, wave: waveSel.value });
+  addClip(track, { id:++clipSeq, steps: sequence.map(s=>({...s})), rate: parseFloat(rateSel.value)||2, wave: synthParams.oscs[0].wave });
 });
 
 /* ============================== Beat machine ============================== */
@@ -1400,7 +1421,7 @@ function serializeProject(){
   return {
     version: FORMAT_VERSION, bpm: project.bpm, timeSig: {...project.timeSig},
     lengthSec: project.lengthSec, loop: {...project.loop}, loopEnabled: project.loopEnabled, countInBars: project.countInBars,
-    synth: {...synthParams}, masterEq: {...masterEqParams},
+    synth: {...synthParams}, masterEq: {...masterEqParams}, layout: currentLayout(),
     tracks: project.tracks.map(function(t){
       return {
         type: t.type, name: t.name, transpose: t.transpose||0, fx: JSON.parse(JSON.stringify(t.fx||fxDefaults())),
@@ -1429,6 +1450,7 @@ function loadProject(data){
   (data.tracks||[]).forEach(t=>{ const tr={id:++trackSeq,type:t.type,name:t.name,clips:[],fx:mergeFx(t.fx),transpose:t.transpose||0}; (t.clips||[]).forEach(c=>{ const clip={id:++clipSeq,start:c.start,lengthBeats:c.lengthBeats}; if (t.type==="arp"){ clip.rate=c.rate; clip.wave=c.wave; clip.steps=(c.steps||[]).map(s=>({...s})); } else if (t.type==="voice"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if (clip.blob) toDecode.push(clip); } else { clip.grid=(c.grid||DRUMS.map(()=>new Array(16).fill(false))).map(r=>r.slice()); } tr.clips.push(clip); }); project.tracks.push(tr); });
   selectedTrackId=project.tracks[0]?.id||null;
   project.tracks.forEach(ensureTrackChain);
+  if (data.layout && typeof applySectionLayout==="function"){ applySectionLayout(data.layout); saveLayout(); }
   updateLoopButtons(); updateMsReadout(); renderTimeline();
   // decode voice clips asynchronously, then refresh
   if (toDecode.length){ const ctx=getCtx(); Promise.all(toDecode.map(async clip=>{ clip.buffer=await decodeBlob(clip.blob, ctx); if (clip.buffer) clip.audioDur=clip.buffer.duration; })).then(renderTimeline); }
@@ -1605,8 +1627,7 @@ function buildOscUI(){
   const host=document.getElementById("oscRows"); if(!host) return; host.innerHTML="";
   synthParams.oscs.forEach((o,i)=>{
     const row=document.createElement("div"); row.className="osc-row on"; row.style.borderLeftColor=OSC_COLORS[i];
-    const wave = i===0 ? '<span class="osc-wave-note">wave = Tone</span>'
-      : '<select data-osc="'+i+'" data-k="wave">'+["sine","triangle","square","sawtooth"].map(w=>'<option value="'+w+'"'+(o.wave===w?" selected":"")+'>'+w+'</option>').join("")+'</select>';
+    const wave = '<select data-osc="'+i+'" data-k="wave">'+["sine","triangle","square","sawtooth"].map(w=>'<option value="'+w+'"'+(o.wave===w?" selected":"")+'>'+w+'</option>').join("")+'</select>';
     const rm = i===0 ? '' : '<button class="osc-rm" data-osc="'+i+'" title="Remove this oscillator">✕</button>';
     row.innerHTML =
       '<span class="osc-name" style="color:'+OSC_COLORS[i]+'">OSC '+(i+1)+'</span>'+ wave +
@@ -1625,7 +1646,7 @@ function buildOscUI(){
   host.addEventListener("input", onChange);
   host.addEventListener("change", onChange);
   host.addEventListener("click",(e)=>{
-    if (e.target.id==="oscAddBtn"){ if(synthParams.oscs.length<3){ synthParams.oscs.push({...OSC_PRESETS[synthParams.oscs.length]}); buildOscUI(); } return; }
+    if (e.target.id==="oscAddBtn"){ if(synthParams.oscs.length<3){ const p={...OSC_PRESETS[synthParams.oscs.length], wave: synthParams.oscs[0].wave}; synthParams.oscs.push(p); buildOscUI(); } return; }
     const rm=e.target.closest(".osc-rm"); if(rm){ synthParams.oscs.splice(+rm.dataset.osc,1); buildOscUI(); }
   });
 })();
@@ -1724,21 +1745,25 @@ modeSel.addEventListener("change", applyScaleHighlight);
 buildKeyboard(); applyScaleHighlight(); buildPads(); renderGrid(); renderSequence(); updateMsReadout(); updateBeatLen(); updateLoopButtons(); syncSynthUI(); buildOscUI(); syncMasterEqUI();
 addTrack("arp"); addTrack("beat"); addTrack("voice"); selectedTrackId=project.tracks[0].id; renderTimeline();
 // ===== Collapsible + draggable sections (order/state persisted) =====
-const LAYOUT_KEY="pitchStudioLayout_v1";
-const DEFAULT_ORDER=["soundkey","pitch","synthkeys","arp","timeline","synthsound","beat","eq"];
-const DEFAULT_COLLAPSED=["synthsound","beat","eq"];
+const LAYOUT_KEY="pitchStudioLayout_v2";
+const DEFAULT_ORDER=["soundkey","pitch","timeline","synthkeys","arp","beat","eq"];
+const DEFAULT_COLLAPSED=["beat","eq"];
 function loadLayout(){ try { return JSON.parse(localStorage.getItem(LAYOUT_KEY)); } catch(e){ return null; } }
-function saveLayout(){
-  const order=[...document.querySelectorAll(".csec")].map(s=>s.dataset.key);
-  const collapsed=[...document.querySelectorAll(".csec.collapsed")].map(s=>s.dataset.key);
-  try { localStorage.setItem(LAYOUT_KEY, JSON.stringify({order,collapsed})); } catch(e){}
+function currentLayout(){ return { order:[...document.querySelectorAll(".csec")].map(s=>s.dataset.key), collapsed:[...document.querySelectorAll(".csec.collapsed")].map(s=>s.dataset.key) }; }
+function saveLayout(){ try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(currentLayout())); } catch(e){} }
+function applySectionLayout(layout){
+  const wrap=document.querySelector(".wrap");
+  const order=(layout&&layout.order&&layout.order.length)?layout.order:DEFAULT_ORDER;
+  order.forEach(k=>{ const s=document.querySelector('.csec[data-key="'+k+'"]'); if(s) wrap.appendChild(s); });
+  const collapsed=(layout&&layout.collapsed)?layout.collapsed:DEFAULT_COLLAPSED;
+  document.querySelectorAll(".csec").forEach(s=>setCollapsed(s, collapsed.includes(s.dataset.key)));
 }
 function setCollapsed(sec, c){ sec.classList.toggle("collapsed",c); const b=sec.querySelector(":scope > .sec-head > .sec-toggle"); if(b){ b.textContent=c?"+":"–"; b.title=c?"Expand":"Minimize"; } }
 let dragSec=null;
 function makeCollapsible(sec){
   const movable=["row","detector"], moved=[];
   movable.forEach(cl=>{ if(sec.classList.contains(cl)){ sec.classList.remove(cl); moved.push(cl); } });
-  const h2=sec.querySelector(":scope > h2"); const title=h2?h2.textContent:(sec.dataset.title||"Section"); if(h2) h2.remove();
+  const h2=sec.querySelector(":scope > h2"); const title = sec.dataset.title ? sec.dataset.title : (h2?h2.textContent:"Section"); if (h2 && !sec.dataset.title) h2.remove();
   const body=document.createElement("div"); body.className=("sec-body "+moved.join(" ")).trim();
   while(sec.firstChild) body.appendChild(sec.firstChild);
   const head=document.createElement("div"); head.className="sec-head"; head.draggable=true;
@@ -1751,13 +1776,8 @@ function makeCollapsible(sec){
   sec.addEventListener("dragover",(e)=>{ if(!dragSec||dragSec===sec) return; e.preventDefault(); const r=sec.getBoundingClientRect(); const before=(e.clientY < r.top + r.height/2); sec.parentNode.insertBefore(dragSec, before?sec:sec.nextSibling); });
 }
 document.querySelectorAll(".csec").forEach(makeCollapsible);
-(function applyLayout(){
-  const wrap=document.querySelector(".wrap"); const saved=loadLayout();
-  const order=(saved&&saved.order&&saved.order.length)?saved.order:DEFAULT_ORDER;
-  order.forEach(k=>{ const s=document.querySelector('.csec[data-key="'+k+'"]'); if(s) wrap.appendChild(s); });
-  const collapsed=(saved&&saved.collapsed)?saved.collapsed:DEFAULT_COLLAPSED;
-  document.querySelectorAll(".csec").forEach(s=>setCollapsed(s, collapsed.includes(s.dataset.key)));
-})();
+centerKeyboard(60);
+applySectionLayout(loadLayout());
 initDemo();
 </script>
 </body>

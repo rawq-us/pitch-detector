@@ -9,7 +9,7 @@ A single-file, in-browser music workstation: a pitch detector, a playable keyboa
 ### Pitch detection & keyboard
 - **Microphone pitch detection** via normalized autocorrelation; shows the detected note, frequency, a cents-off tuner needle, and highlights the matching key.
 - **Scale-aware guess:** under the detected note it shows the **nearest in-key note** for the current key/mode and how many cents off you are.
-- **Virtual keyboard** A1 → C6 with white/black keys, mouse/touch **glissando**, and computer-keyboard play (`a s d f g h j k l` white, `w e t y u o p` black).
+- **Full 88-key keyboard** (A0 → C8) with fixed-size keys (won't shrink), horizontal scroll, and ◀/▶ octave-jump buttons; auto-scrolls to the detected note. Mouse/touch **glissando** and computer-keyboard play (`a s d f g h j k l` white, `w e t y u o p` black).
 - **In-tune playback** — equal temperament, A4 = 440 Hz.
 - **Keys & modes** — root + the seven diatonic modes (Ionian → Locrian); in-key notes and the root are tinted per mode.
 
@@ -23,7 +23,8 @@ A single-file, in-browser music workstation: a pitch detector, a playable keyboa
 - A transpose stepper (−12 / −1 / +1 / +12 / Reset) and arrow keys (←/→ ±1, ↑/↓ ±octave), applied per selected arp layer.
 
 ### Layout
-- Every section is **collapsible** (minimize/expand) and **drag-reorderable** by its header; order and collapsed-state persist (localStorage). The app opens focused on the core flow (sound & key → pitch detector → keyboard/arp), with sound-design, beats, and master EQ collapsed by default.
+- Every section is **collapsible** (minimize/expand) and **drag-reorderable** by its header; order and collapsed-state persist in **localStorage and in saved sessions**. The app opens focused on the core flow (sound & key → pitch detector → timeline → synth — keys → arpeggiator), with beats and master EQ collapsed by default.
+- The **Synth — keys** section groups the oscilloscope, keyboard (with the Play/Transpose mode toggle), filter & envelope, and oscillators. The **Arpeggiator** holds sequence building plus the per-layer transpose stepper.
 
 ### Arpeggiator
 - Build a note sequence by clicking keys (rests supported), preview it looping, then add it to the timeline as a clip. Rate: 1/4, 1/8, 1/8 triplet, 1/16.
