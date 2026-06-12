@@ -62,7 +62,7 @@ An homage to Apple's discontinued **Music Memos**, rebuilt for the browser — r
   - **Key & mode guess** across all 12 roots × the 7 diatonic modes, with confidence.
   - **Mode-aware chords** — chroma template matching that scores the **diatonic chords of your key/mode first**; outside-key guesses render amber with a `?`. Click any chord chip to audition and correct it.
   - **Melody with tuning coloration** — every detected note carries its cents deviation from the nearest in-mode pitch and paints the waveform: **teal** ±10¢, **amber** 10–35¢, **red** >35¢ or outside the mode. See exactly where you drifted in a take.
-  - **Lyrics** — in-browser Whisper transcription (transformers.js, word-level timestamps, WebGPU with WASM fallback, optional translate-to-English), fully editable; or just type them.
+  - **Lyrics** — in-browser Whisper transcription (transformers.js, word-level timestamps, WebGPU with WASM fallback, optional translate-to-English), fully editable; or just type them. Transcription is **forced to a single language** (defaults to your browser's language) so the model doesn't hunt for languages that aren't there — with an explicit **Auto — multilingual / mixed** option for songs that genuinely mix languages (e.g. Spanglish). The choice is saved per memo.
 - **Memo editor modal** — Music Memos-style canvas: chord band, tuning-colored waveform, note ribbons, timed lyric row; play with a moving playhead, click to seek, nudge the downbeat, re-analyze in any of the 84 key/mode combinations, and push the detected **key or BPM to the project** with one click.
 - **Portable export bundle** (one zip, drops straight into Logic/GarageBand/Audacity/anything):
   - `*.wav` — the take, 24-bit PCM
@@ -102,7 +102,7 @@ Click **Enable mic** for pitch detection / voice recording; everything else work
 - **Scheduling:** a 25 ms look-ahead scheduler queues events ~120 ms ahead on the audio clock.
 - **Bounce/stems:** rendered via `OfflineAudioContext` and encoded to WAV in-browser.
 - **Memo analysis:** one STFT pass (8192-point FFT, soft-assigned chroma + spectral flux) feeds an Ellis-style DP beat tracker and per-beat chord templates; melody comes from an FFT-based autocorrelation (unbiased, parabolic-interpolated — accurate to a couple of cents) on a 2× decimated copy. All of it in a Blob Web Worker, ~2.5 s for a 90 s take.
-- **Lyrics:** Whisper (`whisper-tiny_timestamped`, ~40 MB, cached by the browser after first use) via transformers.js in a module worker — local inference, nothing uploaded.
+- **Lyrics:** Whisper (`whisper-tiny_timestamped`, ~40–50 MB, cached by the browser after first use) via transformers.js in a module worker — local inference, nothing uploaded. On WebGPU it loads fp32-encoder/q4-decoder weights (q8 mis-decodes on WebGPU); WASM uses q8.
 - **Safari:** a silent-buffer "unlock" + inaudible keep-warm tone start on the first gesture so audio fires instantly.
 
 Built as a single `index.html` — open it, read it, hack it.
