@@ -271,7 +271,7 @@
 <body>
 <div class="wrap">
   <h1>🎛️ Pitch Studio</h1>
-  <div class="sub">Arrange arps &amp; beats on a beat-aligned timeline · play in-tune tones · detect pitch · export MIDI &amp; save sessions.</div>
+  <div class="sub">Arrange arps &amp; beats on a beat-aligned timeline · play in-tune tones · detect pitch · record annotated memos (chords · notes · tempo · lyrics) · export MIDI &amp; save sessions.</div>
 
   <!-- ===== Timeline (top) ===== -->
   <div class="panel csec" data-key="timeline">
@@ -943,7 +943,7 @@ window.addEventListener("keydown",(e)=>{
 window.addEventListener("keyup",(e)=>{ const m=KEY_MAP[e.key.toLowerCase()]; if (m==null) return; heldKeys.delete(e.key); stopNote(m); if (keyEls.has(m)) keyEls.get(m).classList.remove("active"); });
 
 /* ============================== Project / timing ============================== */
-const FORMAT_VERSION = 1;
+const FORMAT_VERSION = 2; // v2: memo layer (analysis, lyrics) + clip loopFill
 const project = { bpm:90, timeSig:{num:4,den:4}, lengthSec:32, loop:{start:0,end:32}, loopEnabled:true, countInBars:1, tracks:[] };
 let trackSeq=0, clipSeq=0, selectedTrackId=null, currentLabel="Untitled session";
 const PX_PER_SEC = 28;
@@ -1682,6 +1682,7 @@ function drawMemoModalCanvas(playT){
   const cur=(playT!=null)?playT:(memoSeekT||0);
   if (cur>0){ c.fillStyle=(playT!=null)?"#ffffff":"rgba(255,255,255,0.45)"; c.fillRect(Math.round(X(cur)),0,2,h); }
 }
+window.addEventListener("resize",()=>{ if (memoModalClip && memoModal.style.display!=="none") drawMemoModalCanvas(); });
 memoCanvas.addEventListener("pointerdown",(e)=>{
   const clip=memoModalClip; if (!clip) return;
   const r=memoCanvas.getBoundingClientRect();
