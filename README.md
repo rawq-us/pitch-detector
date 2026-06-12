@@ -63,7 +63,7 @@ An homage to Apple's discontinued **Music Memos**, rebuilt for the browser — r
   - **Key & mode guess** across all 12 roots × the 7 diatonic modes, with confidence.
   - **Mode-aware chords** — chroma template matching that scores the **diatonic chords of your key/mode first**; outside-key guesses render amber with a `?`. Click any chord chip to audition and correct it.
   - **Melody with tuning coloration** — every detected note carries its cents deviation from the nearest in-mode pitch and paints the waveform: **teal** ±10¢, **amber** 10–35¢, **red** >35¢ or outside the mode. See exactly where you drifted in a take.
-  - **Lyrics** — in-browser Whisper transcription (transformers.js, word-level timestamps, WebGPU with WASM fallback, optional translate-to-English), fully editable; or just type them. Transcription is **forced to a single language** (defaults to your browser's language) so the model doesn't hunt for languages that aren't there — with an explicit **Auto — multilingual / mixed** option for songs that genuinely mix languages (e.g. Spanglish). The choice is saved per memo. An **Accuracy** selector offers three model tiers — Fast (~50 MB), Better (~80 MB), Best (~250 MB) — A/B-tested against real vocals with known lyrics (consecutive-word accuracy: 30% / 45% / 49%); Better is the sweet spot and is no slower than Fast. Your tier choice is remembered.
+  - **Lyrics** — in-browser Whisper transcription (transformers.js, word-level timestamps, WebGPU with WASM fallback, optional translate-to-English), fully editable; or just type them. Transcription is **forced to a single language** (defaults to your browser's language) so the model doesn't hunt for languages that aren't there — with an explicit **Auto — multilingual / mixed** option for songs that genuinely mix languages (e.g. Spanglish). The choice is saved per memo. A **Model picker** offers A/B-tested tiers — Fast (~50 MB), Better (~80 MB), Best (~250 MB), benchmarked on real vocals with known lyrics — plus **Experimental** entries (Moonshine, Distil) and **custom Hugging Face model ids** so new models can be trialed without code changes. Your choice is remembered.
 - **Memo editor modal** — Music Memos-style canvas: chord band, tuning-colored waveform, note ribbons, timed lyric row; play with a moving playhead, click to seek, nudge the downbeat, re-analyze in any of the 84 key/mode combinations, and push the detected **key or BPM to the project** with one click.
 - **Portable export bundle** (one zip, drops straight into Logic/GarageBand/Audacity/anything):
   - `*.wav` — the take, 24-bit PCM
@@ -82,6 +82,20 @@ An homage to Apple's discontinued **Music Memos**, rebuilt for the browser — r
 - **Bounce WAV** — renders the entire arrangement (synth, drums, voice, per-track FX, master EQ) offline to a 16-bit WAV.
 - **Export stems** — each track rendered individually (with its own inserts, pre-master-EQ) as separate WAVs.
 - **Sessions** — save/load named sessions (label + description) in IndexedDB, with a stored format version. Synth, master EQ, and per-track FX are all persisted.
+
+## Project docs & tests
+
+- [docs/PRODUCT.md](docs/PRODUCT.md) — purpose, goals, non-goals, quality bar
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — map of the single-file app and the memo pipelines
+- [docs/DECISIONS.md](docs/DECISIONS.md) — the decision log: every non-obvious choice and hard-won root cause
+- [docs/TESTING.md](docs/TESTING.md) — test strategy: Node suite, browser smoke, real-audio benchmarks
+- [CLAUDE.md](CLAUDE.md) — constraints & conventions for AI-assisted development
+
+```bash
+npm test   # ~4 s: DSP acceptance + export-format + page-contract tests (runs in CI on every push)
+```
+
+The suite lifts the self-contained analysis worker and export builders out of `index.html` and asserts them against synthesized ground-truth audio — exact chords, exact cents, exact tempo.
 
 ## Running
 

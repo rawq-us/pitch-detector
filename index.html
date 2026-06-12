@@ -555,12 +555,8 @@
     <div class="row" style="margin-bottom:8px">
       <button id="memoTranscribe">📝 Transcribe lyrics (AI, in-browser)</button>
       <div class="group"><label for="memoLangSel">Language</label><select id="memoLangSel" title="Forcing a single language avoids garbled multilingual guesses — pick Auto only for mixed-language songs (e.g. Spanglish)"></select></div>
-      <div class="group"><label for="memoModelSel">Accuracy</label>
-        <select id="memoModelSel" title="Bigger models hear lyrics better but download more (one time, cached). A/B-tested on real vocals: Better is ~1.5× more accurate than Fast and just as quick.">
-          <option value="fast">Fast (~50 MB)</option>
-          <option value="better">Better (~80 MB)</option>
-          <option value="best">Best (~250 MB)</option>
-        </select>
+      <div class="group"><label for="memoModelSel">Model</label>
+        <select id="memoModelSel" title="Speech-to-text model. Recommended tiers are A/B-tested on real vocals (bigger = more accurate, one-time cached download). Experimental and custom entries let you trial other transformers.js-compatible models."></select>
       </div>
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer"><input type="checkbox" id="memoTranslate" style="width:auto" /> translate to English</label>
       <span class="readout" id="memoTransStatus"></span>
@@ -1938,13 +1934,42 @@ memoLangSel.addEventListener("change",()=>{ if (memoModalClip) memoModalClip.lyr
    (bigram accuracy: tiny 30% · base 45% · small 49%). All keep word timestamps
    and the full ~100-language support; downloads are one-time (browser-cached). */
 const MEMO_STT_MODELS={
-  fast:  { id:"onnx-community/whisper-tiny_timestamped",  fallback:"onnx-community/whisper-tiny",  mb:"~50 MB"  },
-  better:{ id:"onnx-community/whisper-base_timestamped",  fallback:"onnx-community/whisper-base",  mb:"~80 MB"  },
-  best:  { id:"onnx-community/whisper-small_timestamped", fallback:"onnx-community/whisper-small", mb:"~250 MB" },
+  fast:  { id:"onnx-community/whisper-tiny_timestamped",  fallback:"onnx-community/whisper-tiny",  mb:"~50 MB",  label:"Fast — Whisper tiny (~50 MB)"   },
+  better:{ id:"onnx-community/whisper-base_timestamped",  fallback:"onnx-community/whisper-base",  mb:"~80 MB",  label:"Better — Whisper base (~80 MB)" },
+  best:  { id:"onnx-community/whisper-small_timestamped", fallback:"onnx-community/whisper-small", mb:"~250 MB", label:"Best — Whisper small (~250 MB)" },
+  moonshine:{ id:"onnx-community/moonshine-base-ONNX", mb:"~60 MB",  label:"Moonshine base (~60 MB · English · phrase timing)" },
+  distil:   { id:"onnx-community/distil-small.en",     mb:"~170 MB", label:"Distil small (~170 MB · English · phrase timing)" },
 };
 const memoModelSel=document.getElementById("memoModelSel");
-try { const saved=localStorage.getItem("pitchStudioSttModel"); if (saved&&MEMO_STT_MODELS[saved]) memoModelSel.value=saved; } catch(_){}
-memoModelSel.addEventListener("change",()=>{ try { localStorage.setItem("pitchStudioSttModel", memoModelSel.value); } catch(_){} });
+function sttCustomList(){ try { return JSON.parse(localStorage.getItem("pitchStudioSttCustom"))||[]; } catch(_){ return []; } }
+function buildMemoModelSel(){
+  const cur=memoModelSel.value;
+  let html='<optgroup label="Recommended — A/B-tested">';
+  ["fast","better","best"].forEach(k=>{ html+='<option value="'+k+'">'+MEMO_STT_MODELS[k].label+'</option>'; });
+  html+='</optgroup><optgroup label="Experimental">';
+  ["moonshine","distil"].forEach(k=>{ html+='<option value="'+k+'">'+MEMO_STT_MODELS[k].label+'</option>'; });
+  html+='</optgroup>';
+  const customs=sttCustomList();
+  if (customs.length){ html+='<optgroup label="Custom">'; customs.forEach(id=>{ html+='<option value="custom:'+escapeHtml(id)+'">'+escapeHtml(id)+'</option>'; }); html+='</optgroup>'; }
+  html+='<option value="add-custom">＋ Add custom model (Hugging Face id)…</option>';
+  memoModelSel.innerHTML=html;
+  memoModelSel.value=cur&&[...memoModelSel.options].some(o=>o.value===cur)?cur:"fast";
+}
+buildMemoModelSel();
+try { const saved=localStorage.getItem("pitchStudioSttModel"); if (saved&&[...memoModelSel.options].some(o=>o.value===saved)) memoModelSel.value=saved; } catch(_){}
+function sttTier(){
+  const v=memoModelSel.value;
+  if (v.startsWith("custom:")) return { id:v.slice(7), mb:"size varies", label:v.slice(7) };
+  return MEMO_STT_MODELS[v]||MEMO_STT_MODELS.fast;
+}
+memoModelSel.addEventListener("change",()=>{
+  if (memoModelSel.value==="add-custom"){
+    const id=(prompt("Hugging Face model id of a transformers.js-compatible ASR model\n(e.g. onnx-community/whisper-large-v3-turbo_timestamped):")||"").trim();
+    if (id){ const list=sttCustomList(); if (!list.includes(id)) list.push(id); try { localStorage.setItem("pitchStudioSttCustom", JSON.stringify(list)); } catch(_){} buildMemoModelSel(); memoModelSel.value="custom:"+id; }
+    else { buildMemoModelSel(); }
+  }
+  try { localStorage.setItem("pitchStudioSttModel", memoModelSel.value); } catch(_){}
+});
 let whWorker=null, whJobSeq=0;
 function getWhisperWorker(){
   if (whWorker) return whWorker;
@@ -1963,18 +1988,26 @@ function getWhisperWorker(){
     '   // q8 weights mis-decode on WebGPU (precision bug → multilingual gibberish); use fp32 encoder + q4 decoder there\n'+
     '   const dtype=device==="webgpu"?{encoder_model:"fp32",decoder_model_merged:"q4"}:"q8";\n'+
     '   const opts={dtype,device,progress_callback:(p)=>{ if(p&&p.status==="progress"&&p.file&&String(p.file).indexOf(".onnx")>=0) postMessage({id:d.id,status:"Downloading model ("+(d.mb||"")+")… "+Math.round(p.progress||0)+"%"}); }};\n'+
+    '   // load cascade: model as configured → fallback model → plain q8/wasm (covers models with different component layouts)\n'+
     '   try{ P={pipe:await m.pipeline("automatic-speech-recognition",d.model,opts), wordTs:true}; }\n'+
-    '   catch(_){ P={pipe:await m.pipeline("automatic-speech-recognition",d.fallback||d.model,opts), wordTs:false}; }\n'+
+    '   catch(_){ try{ P={pipe:await m.pipeline("automatic-speech-recognition",d.fallback||d.model,opts), wordTs:false}; }\n'+
+    '   catch(_2){ P={pipe:await m.pipeline("automatic-speech-recognition",d.model,{dtype:"q8",device:"wasm",progress_callback:opts.progress_callback}), wordTs:false}; } }\n'+
     '   pipes[d.model]=P;\n'+
     '  }\n'+
     '  postMessage({id:d.id,status:"Transcribing… (local, in your browser)"});\n'+
     '  const audio=new Float32Array(d.audio);\n'+
     '  const base={chunk_length_s:30,stride_length_s:5,task:d.translate?"translate":"transcribe"};\n'+
     '  if(d.lang&&d.lang!=="auto") base.language=d.lang;\n'+
-    '  let out;\n'+
-    '  try{ out=await P.pipe(audio,Object.assign({return_timestamps:P.wordTs?"word":true},base)); }\n'+
-    '  catch(_){ P.wordTs=false; out=await P.pipe(audio,Object.assign({return_timestamps:true},base)); }\n'+
-    '  postMessage({id:d.id,ok:true,wordLevel:P.wordTs,text:out.text||"",chunks:(out.chunks||[]).map(c=>({text:c.text,t0:c.timestamp&&c.timestamp[0],t1:c.timestamp&&c.timestamp[1]}))});\n'+
+    '  // inference cascade: word timestamps → segment timestamps → no language/task (English-only models reject those)\n'+
+    '  const tries=[Object.assign({return_timestamps:P.wordTs?"word":true},base), Object.assign({return_timestamps:true},base)];\n'+
+    '  { const o=Object.assign({return_timestamps:true},base); delete o.language; delete o.task; tries.push(o); }\n'+
+    '  let out=null, lastErr=null;\n'+
+    '  for (const o of tries){ try{ out=await P.pipe(audio,o); if (o.return_timestamps!=="word") P.wordTs=false; break; }catch(err){ lastErr=err; } }\n'+
+    '  if(!out) throw lastErr;\n'+
+    '  let chunks=(out.chunks||[]).map(c=>({text:c.text,t0:c.timestamp&&c.timestamp[0],t1:c.timestamp&&c.timestamp[1]}));\n'+
+    '  // models with no timestamp support (e.g. Moonshine) return text but no chunks — keep the text as one slice-wide phrase\n'+
+    '  if(!chunks.length && out.text && String(out.text).trim()) chunks=[{text:String(out.text).trim(), t0:0, t1:audio.length/16000}];\n'+
+    '  postMessage({id:d.id,ok:true,wordLevel:P.wordTs&&(out.chunks||[]).length>0,text:out.text||"",chunks});\n'+
     ' }catch(err){ postMessage({id:d.id,ok:false,error:String((err&&err.message)||err)}); }\n'+
     '};\n';
   whWorker=new Worker(URL.createObjectURL(new Blob([src],{type:"text/javascript"})),{type:"module"});
@@ -2025,7 +2058,7 @@ async function memoTranscribe(){
     const w=getWhisperWorker();
     const translate=document.getElementById("memoTranslate").checked;
     const lang=memoLangSel.value; clip.lyricsLang=lang;
-    const tier=MEMO_STT_MODELS[memoModelSel.value]||MEMO_STT_MODELS.fast;
+    const tier=sttTier();
     let words=[], anyWordLevel=false, failed=0;
     for (let s=0;s<nParts;s++){
       const part=audio.slice(cuts[s],cuts[s+1]), off=cuts[s]/SR;
@@ -2253,6 +2286,7 @@ function memoWorkerMain(){
     const n=flux.length, fps=sr/H;
     if (n<Math.round(fps)) return {beats:[], fluxN:flux};
     let mu=0; for (let i=0;i<n;i++) mu+=flux[i]; mu/=n;
+    if (!(mu>1e-9)) return {beats:[], fluxN:flux}; // silence: no onsets to track — let the caller fall back to a grid
     let sd=0; for (let i=0;i<n;i++) sd+=(flux[i]-mu)*(flux[i]-mu); sd=Math.sqrt(sd/n)||1;
     const f=new Float32Array(n); for (let i=0;i<n;i++) f[i]=Math.max(0,(flux[i]-mu)/sd);
     const minLag=Math.max(2,Math.round(fps*60/220)), maxLag=Math.min(n-2, Math.round(fps*60/50));
