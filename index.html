@@ -563,8 +563,8 @@
   </div>
 </div>
 
-<!-- chord edit popup -->
-<div id="chordPopup" class="popup" style="display:none">
+<!-- chord edit popup (opens above the memo modal, so it must out-stack it) -->
+<div id="chordPopup" class="popup" style="display:none; z-index:130">
   <label>Chord</label>
   <div class="row" style="gap:6px;flex-wrap:nowrap"><select id="chordRootSel"></select><select id="chordQualSel"></select><button id="chordDel" class="mini" title="Remove this chord span">✕</button></div>
 </div>
