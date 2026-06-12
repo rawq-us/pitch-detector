@@ -1199,6 +1199,16 @@ function renderTimeline(){
       rec.addEventListener("click",(e)=>{ e.stopPropagation(); track.type==="voice"?toggleVoiceRec(track):toggleMemoRec(track); });
       acts.appendChild(rec);
     }
+    if (track.type==="memo"){
+      const imp=document.createElement("button"); imp.className="del fxbtn"; imp.textContent="⬆ Import"; imp.title="Import an audio file (WAV/MP3/M4A/OGG…) as a memo and analyze it";
+      imp.addEventListener("click",(e)=>{ e.stopPropagation(); memoImportTo(track); });
+      acts.appendChild(imp);
+    }
+    if (track.type==="voice"){
+      const cv=document.createElement("button"); cv.className="del fxbtn"; cv.textContent="→📝"; cv.title="Convert this voice layer to an annotated memo layer (chords · notes · tempo · lyrics)";
+      cv.addEventListener("click",(e)=>{ e.stopPropagation(); convertVoiceTrack(track); });
+      acts.appendChild(cv);
+    }
     const del=document.createElement("button"); del.className="del del-layer"; del.textContent="🗑 delete"; del.title="Delete this layer and its clips";
     del.addEventListener("click",(e)=>{ e.stopPropagation(); if(!confirm("Delete the \""+track.name+"\" layer"+(track.clips.length?(" and its "+track.clips.length+" clip(s)"):"")+"?")) return; project.tracks=project.tracks.filter(t=>t.id!==track.id); if (selectedTrackId===track.id) selectedTrackId=project.tracks[0]?.id||null; renderTimeline(); });
     acts.appendChild(del); head.appendChild(acts);
@@ -1504,6 +1514,42 @@ function addMemoClip(track, buffer, startSec, trimToMemo){
   return clip;
 }
 
+/* ---- import audio files as memos / convert voice layers to memos ---- */
+let memoImportTrack=null;
+const memoFileInput=document.createElement("input");
+memoFileInput.type="file"; memoFileInput.accept="audio/*"; memoFileInput.multiple=true; memoFileInput.style.display="none";
+document.body.appendChild(memoFileInput);
+function memoImportTo(track){ memoImportTrack=track; memoFileInput.value=""; memoFileInput.click(); }
+memoFileInput.addEventListener("change", async ()=>{
+  const track=memoImportTrack; memoImportTrack=null;
+  if (!track || !memoFileInput.files.length) return;
+  const ctx=getCtx();
+  for (const f of [...memoFileInput.files]){
+    try {
+      const buf=await ctx.decodeAudioData(await f.arrayBuffer());
+      addMemoClip(track, buf); // places after the last clip, grows the session, analyzes
+    } catch(e){ alert("Couldn't decode \""+f.name+"\" — unsupported or corrupt audio file."); }
+  }
+});
+async function convertVoiceTrack(track){
+  if (track.type!=="voice") return;
+  if (recording && recTrack===track){ alert("Stop recording on this layer first."); return; }
+  const ctx=getCtx();
+  for (const clip of track.clips){ if (!clip.buffer && clip.blob) clip.buffer=await decodeBlob(clip.blob, ctx); }
+  const lost=track.clips.filter(c=>!c.buffer).length;
+  if (lost && !confirm(lost+" clip(s) on this layer can't be decoded and would be dropped. Convert anyway?")) return;
+  track.type="memo";
+  if (/^Voice /.test(track.name)) track.name=track.name.replace(/^Voice /,"Memo ");
+  track.clips=track.clips.filter(c=>c.buffer);
+  track.clips.forEach(clip=>{
+    clip.blob=audioBufferToWav24(clip.buffer); // lossless rewrap of the decoded PCM as 24-bit WAV
+    clip.audioDur=clip.buffer.duration;
+    clip.analysis=null; clip.lyricsText=clip.lyricsText||""; clip.lyricsWords=null; clip.analysisKey="auto"; clip.analyzing=false;
+  });
+  renderTimeline();
+  track.clips.forEach(analyzeMemoClip);
+}
+
 /* ---- analysis worker plumbing ---- */
 let memoWorker=null, memoJobSeq=0; const memoJobs=new Map();
 function getMemoWorker(){
@@ -1530,7 +1576,12 @@ function analyzeMemoClip(clip){
   const k=clip.analysisKey||"auto";
   if (k==="project"){ forceRoot=parseInt(rootSel.value,10); forceMode=modeSel.value; }
   else if (k!=="auto"){ const p=k.split("|"); forceRoot=parseInt(p[0],10); forceMode=p[1]; }
-  const pcm=clip.buffer.getChannelData(0).slice(0);
+  // analyze a mono mixdown (imported files can be stereo; playback keeps all channels)
+  const nCh=clip.buffer.numberOfChannels, pcm=clip.buffer.getChannelData(0).slice(0);
+  if (nCh>1){
+    for (let c=1;c<nCh;c++){ const d=clip.buffer.getChannelData(c); for (let i=0;i<pcm.length;i++) pcm[i]+=d[i]; }
+    for (let i=0;i<pcm.length;i++) pcm[i]/=nCh;
+  }
   getMemoWorker().postMessage({ id, pcm:pcm.buffer, sr:clip.buffer.sampleRate, scales:SCALES, names:NOTE_NAMES, bpb:beatsPerBar(), fallbackBpm:project.bpm, forceRoot, forceMode }, [pcm.buffer]);
 }
 

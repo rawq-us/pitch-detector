@@ -57,6 +57,7 @@ A single-file, in-browser music workstation: a pitch detector, a playable keyboa
 An homage to Apple's discontinued **Music Memos**, rebuilt for the browser — record an idea and see the *whole take* mapped, not just a moment-in-time pitch readout:
 
 - **Raw-PCM recording** via `AudioWorklet` (no lossy Opus step — stored as **24-bit WAV**). While recording, the **session length follows the take** (grows live, bar-aligned) and settles to the memo's end when you stop — no more bumping into the 32-second default. Pair it with the **∞ Fill session** loop mode on arp/beat clips for a dumb backing track to play against.
+- **⬆ Import audio files** (WAV/MP3/M4A/OGG — anything the browser decodes; stereo is mixed down for analysis, kept for playback) straight into a memo layer and analyze them after the fact. And any existing **voice layer converts to a memo layer** (the **→📝** button on its header) — clips are losslessly rewrapped as 24-bit WAV and get the full analysis treatment.
 - **Whole-take analysis** runs in a Web Worker after recording (re-run anytime, in any key):
   - **Tempo map** — spectral-flux onsets + dynamic-programming beat tracking. A beat-by-beat map like Music Memos (it follows you as you rush/drag), not a single BPM guess. Bar lines come from a nudgeable downbeat.
   - **Key & mode guess** across all 12 roots × the 7 diatonic modes, with confidence.
