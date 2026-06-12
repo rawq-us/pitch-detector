@@ -14,8 +14,16 @@ A single-file, in-browser music workstation: a pitch detector, a playable keyboa
 - **Keys & modes** — root + the seven diatonic modes (Ionian → Locrian); in-key notes and the root are tinted per mode.
 
 ### Synth
-- Oscillator tone: sine / triangle / square / saw.
+- **Multi-oscillator** voice: starts with one oscillator; add up to 3, each with its own waveform, octave, semitone interval (e.g. +6 tritone), detune (doubling), level, and pan.
 - **State-variable filter** (low/high/band-pass, cutoff + resonance) and a full **ADSR amp envelope**. Moving filter controls updates held notes live.
+- A **live oscilloscope** of the real synth output (no faked/idealized shapes).
+
+### Arp transpose & keyboard modes
+- The on-screen keyboard switches between **Play notes** and **Transpose arp**; in Transpose mode each key jumps the selected arp layer to that offset from C4.
+- A transpose stepper (−12 / −1 / +1 / +12 / Reset) and arrow keys (←/→ ±1, ↑/↓ ±octave), applied per selected arp layer.
+
+### Layout
+- Every section is **collapsible** (minimize/expand) and **drag-reorderable** by its header; order and collapsed-state persist (localStorage). The app opens focused on the core flow (sound & key → pitch detector → keyboard/arp), with sound-design, beats, and master EQ collapsed by default.
 
 ### Arpeggiator
 - Build a note sequence by clicking keys (rests supported), preview it looping, then add it to the timeline as a clip. Rate: 1/4, 1/8, 1/8 triplet, 1/16.
