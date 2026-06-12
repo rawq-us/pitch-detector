@@ -1,6 +1,6 @@
 # 🎛️ Pitch Studio
 
-A single-file, in-browser music workstation: a pitch detector, a playable keyboard, an arpeggiator, a drum machine, and a beat-aligned timeline arranger — with per-track effects, a master EQ, voice recording, MIDI export, audio bounce/stems, saveable sessions, and live spectrum visualizers. No build step, no dependencies, no samples (all sound is synthesized with the Web Audio API).
+A single-file, in-browser music workstation: a pitch detector, a playable keyboard, an arpeggiator, a drum machine, an **annotated memo recorder** (Music Memos-style whole-take analysis: chords, notes, tempo map, lyrics), and a beat-aligned timeline arranger — with per-track effects, a master EQ, voice recording, MIDI export, audio bounce/stems, saveable sessions, and live spectrum visualizers. No build step, no dependencies, no samples (all sound is synthesized with the Web Audio API).
 
 **▶️ Live app:** https://rawq-us.github.io/pitch-detector/
 
@@ -36,7 +36,7 @@ A single-file, in-browser music workstation: a pitch detector, a playable keyboa
 
 ### Timeline / arrangement
 - Multi-track layers (multiple arp, beat, and voice tracks; starts with one of each); clips show content + **duration as width**.
-- **Drag clips** to reposition — snaps to the beat. Each non-voice clip has a **⟳ loop badge** to set how many beats it loops for. Per-track **FX ▸** and **✕ layer** buttons.
+- **Drag clips** to reposition — snaps to the beat. Each non-voice clip has a **⟳ loop badge** to set how many beats it loops for, or **∞ Fill session** to repeat it to the end of the piece (a backing track while recording memos). Per-track **FX ▸** and **✕ layer** buttons.
 - **Two-row ruler**: top = **seconds**, bottom = **bars · beats** (what clips snap to), with row labels so the axis is unambiguous.
 - **Time-signature** selector (4/4, 3/4, 2/4, 6/8, 5/4, 7/8, 12/8) and a global **Project BPM** (default 90).
 - **Count-in**: a Off / 1 / 2-bar pre-roll before position 0 — on Play the playhead starts in the pre-roll and a metronome counts you in, landing beat 1 exactly at 0.
@@ -52,6 +52,26 @@ A single-file, in-browser music workstation: a pitch detector, a playable keyboa
 
 ### Voice recording
 - A **Voice track** type records mic snippets via `MediaRecorder`. Clips play in the transport, are stored as Blobs **in the IndexedDB session**, excluded from MIDI, and included in the audio bounce.
+
+### Annotated memo layer 📝
+An homage to Apple's discontinued **Music Memos**, rebuilt for the browser — record an idea and see the *whole take* mapped, not just a moment-in-time pitch readout:
+
+- **Raw-PCM recording** via `AudioWorklet` (no lossy Opus step — stored as **24-bit WAV**). While recording, the **session length follows the take** (grows live, bar-aligned) and settles to the memo's end when you stop — no more bumping into the 32-second default. Pair it with the **∞ Fill session** loop mode on arp/beat clips for a dumb backing track to play against.
+- **⬆ Import audio files** (WAV/MP3/M4A/OGG — anything the browser decodes; stereo is mixed down for analysis, kept for playback) straight into a memo layer and analyze them after the fact. And any existing **voice layer converts to a memo layer** (the **→📝** button on its header) — clips are losslessly rewrapped as 24-bit WAV and get the full analysis treatment.
+- **Whole-take analysis** runs in a Web Worker after recording (re-run anytime, in any key):
+  - **Tempo map** — spectral-flux onsets + dynamic-programming beat tracking. A beat-by-beat map like Music Memos (it follows you as you rush/drag), not a single BPM guess. Bar lines come from a nudgeable downbeat.
+  - **Key & mode guess** across all 12 roots × the 7 diatonic modes, with confidence.
+  - **Mode-aware chords** — chroma template matching that scores the **diatonic chords of your key/mode first**; outside-key guesses render amber with a `?`. Click any chord chip to audition and correct it.
+  - **Melody with tuning coloration** — every detected note carries its cents deviation from the nearest in-mode pitch and paints the waveform: **teal** ±10¢, **amber** 10–35¢, **red** >35¢ or outside the mode. See exactly where you drifted in a take.
+  - **Lyrics** — in-browser Whisper transcription (transformers.js, word-level timestamps, WebGPU with WASM fallback, optional translate-to-English), fully editable; or just type them. Transcription is **forced to a single language** (defaults to your browser's language) so the model doesn't hunt for languages that aren't there — with an explicit **Auto — multilingual / mixed** option for songs that genuinely mix languages (e.g. Spanglish). The choice is saved per memo.
+- **Memo editor modal** — Music Memos-style canvas: chord band, tuning-colored waveform, note ribbons, timed lyric row; play with a moving playhead, click to seek, nudge the downbeat, re-analyze in any of the 84 key/mode combinations, and push the detected **key or BPM to the project** with one click.
+- **Portable export bundle** (one zip, drops straight into Logic/GarageBand/Audacity/anything):
+  - `*.wav` — the take, 24-bit PCM
+  - `*.mid` — SMF format 1 with the **per-beat tempo map**, key signature, **chord markers**, the detected melody, a playable chord track, and **timed lyric meta events** (karaoke-style)
+  - `lyrics.lrc` + `lyrics.txt` — timestamped and plain lyrics
+  - `chords-labels.txt`, `notes-labels.txt`, `lyrics-labels.txt` — **Audacity label tracks** (File → Import → Labels)
+  - `analysis.json` — the full analysis, lossless
+- Memo audio plays in the transport, lands in **bounce and stems**, the detected melody joins the global MIDI export, and everything (audio, analysis, lyrics) persists in saved sessions.
 
 ### Visualizers
 - **Synth EQ** above the keyboard — spectrum + oscilloscope overlay (compare the four oscillator shapes).
@@ -82,6 +102,8 @@ Click **Enable mic** for pitch detection / voice recording; everything else work
 - **Beat length:** a bar = `numerator` beats; the 16th-note grid has `16/denominator` steps per beat, so `beats × steps-per-beat` steps per bar; each step = `(60/BPM)/4` s.
 - **Scheduling:** a 25 ms look-ahead scheduler queues events ~120 ms ahead on the audio clock.
 - **Bounce/stems:** rendered via `OfflineAudioContext` and encoded to WAV in-browser.
+- **Memo analysis:** one STFT pass (8192-point FFT, soft-assigned chroma + spectral flux) feeds an Ellis-style DP beat tracker and per-beat chord templates; melody comes from an FFT-based autocorrelation (unbiased, parabolic-interpolated — accurate to a couple of cents) on a 2× decimated copy. All of it in a Blob Web Worker, ~2.5 s for a 90 s take.
+- **Lyrics:** Whisper (`whisper-tiny_timestamped`, ~40–50 MB, cached by the browser after first use) via transformers.js in a module worker — local inference, nothing uploaded. On WebGPU it loads fp32-encoder/q4-decoder weights (q8 mis-decodes on WebGPU); WASM uses q8.
 - **Safari:** a silent-buffer "unlock" + inaudible keep-warm tone start on the first gesture so audio fires instantly.
 
 Built as a single `index.html` — open it, read it, hack it.
