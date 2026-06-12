@@ -44,7 +44,9 @@ first-ever run caught a real bug (silence → fake 224.7 BPM).
 
 Serve locally (`npm start`), then:
 
-1. First-run: demo loads ("Bach Prelude in C — Trap"), Play works.
+1. First-run: demo loads ("Bach Prelude in C — Trap"), Play works — and
+   **Stop actually silences everything**, including long audio clips
+   (voice/memo buffer sources, not just scheduled synth notes).
 2. Add a memo layer (＋📝) → Rec (or ⬆ Import a file) → waveform + chips
    appear after analysis; session length grew to the take.
 3. Open the memo editor: zoom (buttons + ctrl+scroll), Play with playhead,

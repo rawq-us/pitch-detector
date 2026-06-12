@@ -1315,7 +1315,7 @@ loopPopupInput.addEventListener("keydown",(e)=>{ if (e.key==="Enter"){ closeLoop
 document.addEventListener("pointerdown",(e)=>{ if (loopPopup.style.display!=="none" && !loopPopup.contains(e.target) && !e.target.classList.contains("cloop")) closeLoopPopup(); });
 
 /* ============================== Master transport ============================== */
-const transport={ playing:false, timer:null, raf:null, startCtx:0, evIdx:0, iter:0, events:[], loopStart:0, loopLen:0 };
+const transport={ playing:false, timer:null, raf:null, startCtx:0, evIdx:0, iter:0, events:[], loopStart:0, loopLen:0, srcs:new Set() };
 function forEachClipEvent(cb){
   const spq=quarterSec();
   for (const tr of project.tracks){
@@ -1365,7 +1365,7 @@ function transportScheduler(){
       const tr=(e.track&&e.track.type==="arp")?(e.track.transpose||0):0;
       if (e.kind==="note") playNoteAt(e.midi+tr,evCtx,e.dur,e.wave,ctx,dest);
       else if (e.kind==="drum") playDrumAt(e.drum,evCtx,1,ctx,dest);
-      else if (e.kind==="voice" && e.buffer){ const s=ctx.createBufferSource(); s.buffer=e.buffer; s.connect(dest); s.start(evCtx); }
+      else if (e.kind==="voice" && e.buffer){ const s=ctx.createBufferSource(); s.buffer=e.buffer; s.connect(dest); s.onended=()=>transport.srcs.delete(s); transport.srcs.add(s); s.start(evCtx); }
     }
     transport.evIdx++;
     if (transport.evIdx>=ev.length){ transport.evIdx=0; transport.iter++; if (!project.loopEnabled) break; }
@@ -1387,6 +1387,9 @@ function transportStop(){
   transport.playing=false;
   if (transport.timer) clearInterval(transport.timer); if (transport.raf) cancelAnimationFrame(transport.raf);
   transport.timer=transport.raf=null; tlPlayhead.style.display="none";
+  // audio clips (voice/memo) are long-running buffer sources — kill any that are still sounding
+  transport.srcs.forEach(s=>{ try { s.onended=null; s.stop(); } catch(_){} });
+  transport.srcs.clear();
   playBtn.textContent="▶ Play"; playBtn.classList.add("primary"); playBtn.classList.remove("danger");
 }
 
