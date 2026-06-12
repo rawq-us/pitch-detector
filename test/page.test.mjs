@@ -21,7 +21,7 @@ test("required element ids exist in the markup", () => {
     // memo editor
     "memoModal","memoCanvas","memoChips","memoSummary","memoKeySel","memoReanalyze",
     "memoPlayBtn","memoZoomIn","memoZoomOut","memoZoomReset","memoUseKey","memoUseBpm",
-    "memoLangSel","memoModelSel","memoTranscribe","memoTranslate","memoLyrics","memoExport",
+    "memoLangSel","memoModelSel","memoTranscribe","memoOutputSel","memoOutputGroup","memoLyrics","memoExport",
     "chordPopup","chordRootSel","chordQualSel",
   ];
   for (const id of ids) assert.ok(html.includes('id="' + id + '"'), "missing #" + id);

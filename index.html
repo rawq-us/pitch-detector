@@ -552,14 +552,19 @@
     <h2 class="subhead">Chords <span class="dim">— click a chip to audition &amp; correct it</span></h2>
     <div class="memo-chips" id="memoChips"></div>
     <h2 class="subhead">Lyrics</h2>
-    <div class="row" style="margin-bottom:8px">
-      <button id="memoTranscribe">📝 Transcribe lyrics (AI, in-browser)</button>
-      <div class="group"><label for="memoLangSel">Language</label><select id="memoLangSel" title="Forcing a single language avoids garbled multilingual guesses — pick Auto only for mixed-language songs (e.g. Spanglish)"></select></div>
+    <div class="row" style="margin-bottom:8px; align-items:flex-end">
+      <div class="group"><label>&nbsp;</label><button id="memoTranscribe" title="AI speech-to-text, run locally in your browser — nothing is uploaded">📝 Transcribe lyrics</button></div>
+      <div class="group"><label for="memoLangSel">Language</label><select id="memoLangSel" title="The language being sung/spoken. Forcing one language avoids garbled multilingual guesses — pick Auto only for mixed-language songs (e.g. Spanglish)"></select></div>
       <div class="group"><label for="memoModelSel">Model</label>
-        <select id="memoModelSel" title="Speech-to-text model. Recommended tiers are A/B-tested on real vocals (bigger = more accurate, one-time cached download). Experimental and custom entries let you trial other transformers.js-compatible models."></select>
+        <select id="memoModelSel" style="max-width:240px" title="Speech-to-text model. Recommended tiers are A/B-tested on real vocals (bigger = more accurate, one-time cached download). Experimental and custom entries let you trial other transformers.js-compatible models."></select>
       </div>
-      <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);cursor:pointer"><input type="checkbox" id="memoTranslate" style="width:auto" /> translate to English</label>
-      <span class="readout" id="memoTransStatus"></span>
+      <div class="group" id="memoOutputGroup"><label for="memoOutputSel">Output</label>
+        <select id="memoOutputSel" title="Whisper can translate while it transcribes. English is the only translation target the model supports — hidden when the language is already English.">
+          <option value="original">As sung (original)</option>
+          <option value="english">English translation</option>
+        </select>
+      </div>
+      <div class="group"><label>&nbsp;</label><span class="readout" id="memoTransStatus" style="line-height:36px"></span></div>
     </div>
     <textarea id="memoLyrics" class="memo-lyr" placeholder="Type lyrics here, or use Transcribe to draft them from the audio…"></textarea>
     <div class="memo-foot">
@@ -1698,6 +1703,7 @@ function openMemoModal(track, clip){
   document.getElementById("memoTitle").textContent=track.name+" — annotated memo";
   memoKeySel.value=clip.analysisKey||"auto";
   memoLangSel.value=clip.lyricsLang||uaLang();
+  syncMemoOutput();
   memoLyricsEl.value=clip.lyricsText||"";
   memoTransStatus.textContent="";
   memoModal.style.display="flex";
@@ -1929,7 +1935,14 @@ function uaLang(){ const l=((navigator.languages&&navigator.languages[0])||navig
   html+='<option value="auto">Auto — multilingual / mixed</option>';
   memoLangSel.innerHTML=html; memoLangSel.value=uaLang();
 })();
-memoLangSel.addEventListener("change",()=>{ if (memoModalClip) memoModalClip.lyricsLang=memoLangSel.value; });
+const memoOutputSel=document.getElementById("memoOutputSel");
+function syncMemoOutput(){ // translating English→English is a no-op, so hide the choice entirely
+  const en=memoLangSel.value==="en";
+  document.getElementById("memoOutputGroup").style.display=en?"none":"";
+  if (en) memoOutputSel.value="original";
+}
+memoLangSel.addEventListener("change",()=>{ if (memoModalClip) memoModalClip.lyricsLang=memoLangSel.value; syncMemoOutput(); });
+syncMemoOutput();
 /* Transcription quality tiers — A/B-tested against real vocals with known lyrics
    (bigram accuracy: tiny 30% · base 45% · small 49%). All keep word timestamps
    and the full ~100-language support; downloads are one-time (browser-cached). */
@@ -1937,8 +1950,8 @@ const MEMO_STT_MODELS={
   fast:  { id:"onnx-community/whisper-tiny_timestamped",  fallback:"onnx-community/whisper-tiny",  mb:"~50 MB",  label:"Fast — Whisper tiny (~50 MB)"   },
   better:{ id:"onnx-community/whisper-base_timestamped",  fallback:"onnx-community/whisper-base",  mb:"~80 MB",  label:"Better — Whisper base (~80 MB)" },
   best:  { id:"onnx-community/whisper-small_timestamped", fallback:"onnx-community/whisper-small", mb:"~250 MB", label:"Best — Whisper small (~250 MB)" },
-  moonshine:{ id:"onnx-community/moonshine-base-ONNX", mb:"~60 MB",  label:"Moonshine base (~60 MB · English · phrase timing)" },
-  distil:   { id:"onnx-community/distil-small.en",     mb:"~170 MB", label:"Distil small (~170 MB · English · phrase timing)" },
+  moonshine:{ id:"onnx-community/moonshine-base-ONNX", mb:"~60 MB",  label:"Moonshine base (~60 MB)" },
+  distil:   { id:"onnx-community/distil-small.en",     mb:"~170 MB", label:"Distil small (~170 MB)"  },
 };
 const memoModelSel=document.getElementById("memoModelSel");
 function sttCustomList(){ try { return JSON.parse(localStorage.getItem("pitchStudioSttCustom"))||[]; } catch(_){ return []; } }
@@ -1946,7 +1959,7 @@ function buildMemoModelSel(){
   const cur=memoModelSel.value;
   let html='<optgroup label="Recommended — A/B-tested">';
   ["fast","better","best"].forEach(k=>{ html+='<option value="'+k+'">'+MEMO_STT_MODELS[k].label+'</option>'; });
-  html+='</optgroup><optgroup label="Experimental">';
+  html+='</optgroup><optgroup label="Experimental — English only · phrase timing">';
   ["moonshine","distil"].forEach(k=>{ html+='<option value="'+k+'">'+MEMO_STT_MODELS[k].label+'</option>'; });
   html+='</optgroup>';
   const customs=sttCustomList();
@@ -2056,7 +2069,7 @@ async function memoTranscribe(){
     cuts.push(audio.length);
     const nParts=cuts.length-1;
     const w=getWhisperWorker();
-    const translate=document.getElementById("memoTranslate").checked;
+    const translate=memoOutputSel.value==="english" && memoLangSel.value!=="en";
     const lang=memoLangSel.value; clip.lyricsLang=lang;
     const tier=sttTier();
     let words=[], anyWordLevel=false, failed=0;
