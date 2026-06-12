@@ -227,15 +227,15 @@
   .tl-clip.memo .m-busy { position: absolute; left: 0; right: 0; top: 16px; height: 56px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #5eead4; background: rgba(13,17,23,0.55); z-index: 2; pointer-events: none; }
   .tl-recghost { position: absolute; top: 4px; height: 86px; border: 1px dashed var(--flat); background: rgba(248,113,113,0.14); border-radius: 7px; z-index: 2; pointer-events: none; color: var(--flat); font-size: 10px; padding: 4px 6px; white-space: nowrap; overflow: hidden; }
   /* Memo editor modal */
-  .memo-box { width: min(920px, 94vw); }
+  .modal-box.memo-box { width: 96vw; max-width: 96vw; height: 94vh; max-height: 94vh; }
   .memo-sum { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
   .memo-badge { font-size: 12px; padding: 3px 10px; border-radius: 999px; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); }
   .memo-badge b { color: #5eead4; font-weight: 600; }
-  .memo-canvas-wrap { position: relative; background: #0b1413; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 8px; }
-  .memo-canvas-wrap canvas { width: 100%; height: 260px; display: block; cursor: crosshair; }
+  .memo-canvas-wrap { position: relative; background: #0b1413; border: 1px solid var(--border); border-radius: 10px; overflow-x: auto; overflow-y: hidden; margin-bottom: 8px; touch-action: pan-x; }
+  .memo-canvas-wrap canvas { width: 100%; height: 42vh; min-height: 240px; display: block; cursor: crosshair; }
   .memo-legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--muted); margin: 0 0 14px; }
   .memo-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 4px; vertical-align: -1px; }
-  .memo-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+  .memo-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; max-height: 18vh; overflow-y: auto; }
   .memo-chips .chip { font-size: 12px; padding: 3px 9px; border-radius: 6px; background: #134e4a; color: #5eead4; cursor: pointer; border: 1px solid transparent; }
   .memo-chips .chip:hover { border-color: #5eead4; }
   .memo-chips .chip.guess { background: #423a13; color: #fbbf24; }
@@ -300,6 +300,7 @@
           <option value="2">2 bars</option>
         </select>
       </div>
+      <div class="group"><label>Zoom</label><div class="tr-row"><button id="tlZoomOut" class="mini" title="Zoom out">−</button><button id="tlZoomReset" class="mini" title="Back to 100%">100%</button><button id="tlZoomIn" class="mini" title="Zoom in">＋</button></div></div>
       <div class="group"><label>Cycle region</label><span class="readout" id="loopReadout">—</span></div>
     </div>
     <div class="row" style="margin-bottom:12px">
@@ -535,6 +536,7 @@
       <div class="group"><label>&nbsp;</label><button id="memoReanalyze">↻ Re-analyze</button></div>
       <div class="group"><label>Downbeat</label><div class="tr-row"><button id="memoDbL" class="mini">◀</button><button id="memoDbR" class="mini">▶</button></div></div>
       <div class="group"><label>&nbsp;</label><button id="memoPlayBtn">▶ Play memo</button></div>
+      <div class="group"><label>Zoom <span class="dim">— pinch or ctrl+scroll works too</span></label><div class="tr-row"><button id="memoZoomOut" class="mini">−</button><button id="memoZoomReset" class="mini" title="Back to 100% (fit)">100%</button><button id="memoZoomIn" class="mini">＋</button></div></div>
       <div class="spacer"></div>
       <div class="group"><label>&nbsp;</label><button id="memoUseKey" title="Set the project key & mode to this memo's key">Use key in project</button></div>
       <div class="group"><label>&nbsp;</label><button id="memoUseBpm" title="Set the project BPM to this memo's tracked tempo">Use BPM in project</button></div>
@@ -947,7 +949,8 @@ window.addEventListener("keyup",(e)=>{ const m=KEY_MAP[e.key.toLowerCase()]; if 
 const FORMAT_VERSION = 2; // v2: memo layer (analysis, lyrics) + clip loopFill
 const project = { bpm:90, timeSig:{num:4,den:4}, lengthSec:32, loop:{start:0,end:32}, loopEnabled:true, countInBars:1, tracks:[] };
 let trackSeq=0, clipSeq=0, selectedTrackId=null, currentLabel="Untitled session";
-const PX_PER_SEC = 28;
+let PX_PER_SEC = 28;            // timeline zoom (px per second); 28 = 100%
+const TL_PPS_DEF = 28;
 const quarterSec   = () => 60/project.bpm;                          // duration of a quarter note
 const beatUnitSec  = () => quarterSec() * (4/project.timeSig.den);  // one notated beat
 const beatsPerBar  = () => project.timeSig.num;
@@ -1157,7 +1160,7 @@ function renderTimeline(){
   tlRuler.style.width = W+"px"; tlRuler.innerHTML="";
   const bu=beatUnitSec(), bpb=beatsPerBar();
   const secRow=document.createElement("div"); secRow.className="tl-rrow sec"; secRow.style.width=W+"px";
-  const secStep = project.lengthSec>60 ? 5 : (project.lengthSec>30 ? 2 : 1);
+  const secStep = [1,2,5,10,15,30,60].find(s=>s>=70/PX_PER_SEC)||60; // ~70 px between second labels at any zoom
   for (let s=0; s<=project.lengthSec+1e-6; s+=secStep){
     const tk=document.createElement("div"); tk.className="tl-tick sec"; tk.style.left=(origin+s*PX_PER_SEC)+"px"; tk.textContent=s+"s";
     secRow.appendChild(tk);
@@ -1166,11 +1169,13 @@ function renderTimeline(){
   // count-in beat numbers shown in the pre-roll
   if (origin>0){ const cib=project.countInBars*bpb; for(let i=0;i<cib;i++){ const tk=document.createElement("div"); tk.className="tl-tick countin"; tk.style.left=(origin-(cib-i)*bu*PX_PER_SEC)+"px"; tk.textContent=(i%bpb)+1; beatRow.appendChild(tk); } }
   const totalBeats=Math.floor(project.lengthSec/bu + 1e-6);
+  const beatPxR=bu*PX_PER_SEC, labelEvery=Math.max(1, Math.ceil(26/(bpb*beatPxR))); // declutter when zoomed out
   for (let b=0; b<=totalBeats; b++){
     const t=b*bu; if (t>project.lengthSec+1e-6) break;
     const isBar=(b%bpb)===0;
+    if (!isBar && beatPxR<5) continue;
     const tk=document.createElement("div"); tk.className="tl-tick"+(isBar?" bar":""); tk.style.left=(origin+t*PX_PER_SEC)+"px";
-    if (isBar) tk.textContent = (b/bpb + 1);
+    if (isBar && ((b/bpb)%labelEvery)===0) tk.textContent = (b/bpb + 1);
     beatRow.appendChild(tk);
   }
   tlRuler.appendChild(secRow); tlRuler.appendChild(beatRow);
@@ -1393,6 +1398,52 @@ document.getElementById("countInSel").addEventListener("change",(e)=>{ project.c
 addArpTrackBtn.addEventListener("click",()=>addTrack("arp"));
 addBeatTrackBtn.addEventListener("click",()=>addTrack("beat"));
 
+/* ---- timeline zoom (buttons · ctrl/cmd+scroll · touch pinch) ---- */
+function setTimelineZoom(pps, anchorPx){
+  pps=clamp(pps, 4, 280);
+  if (Math.abs(pps-PX_PER_SEC)<0.01) return;
+  const ax=(anchorPx!=null)?anchorPx:tlScroll.clientWidth/2;
+  const sec=(tlScroll.scrollLeft+ax-originPx())/PX_PER_SEC; // timeline second under the anchor
+  PX_PER_SEC=pps;
+  renderTimeline();
+  tlScroll.scrollLeft=Math.max(0, originPx()+sec*PX_PER_SEC-ax);
+  const b=document.getElementById("tlZoomReset"); if (b) b.textContent=Math.round(PX_PER_SEC/TL_PPS_DEF*100)+"%";
+}
+document.getElementById("tlZoomIn").addEventListener("click",()=>setTimelineZoom(PX_PER_SEC*1.4));
+document.getElementById("tlZoomOut").addEventListener("click",()=>setTimelineZoom(PX_PER_SEC/1.4));
+document.getElementById("tlZoomReset").addEventListener("click",()=>setTimelineZoom(TL_PPS_DEF));
+tlScroll.addEventListener("wheel",(e)=>{
+  if (!e.ctrlKey && !e.metaKey) return; // trackpad pinch arrives as ctrl+wheel
+  e.preventDefault();
+  const r=tlScroll.getBoundingClientRect();
+  setTimelineZoom(PX_PER_SEC*Math.exp(-clamp(e.deltaY,-70,70)*0.01), e.clientX-r.left);
+},{passive:false});
+// generic two-finger pinch helper (used by the timeline and the memo editor canvas)
+function attachPinch(el, getZ, setZ, onTwo){
+  const pts=new Map(); let d0=0, z0=1, cx=0;
+  el.addEventListener("pointerdown",(e)=>{
+    if (e.pointerType!=="touch") return;
+    pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if (pts.size===2){
+      const [a,b]=[...pts.values()];
+      d0=Math.hypot(a.x-b.x,a.y-b.y)||1; z0=getZ();
+      cx=(a.x+b.x)/2-el.getBoundingClientRect().left;
+      if (onTwo) onTwo();
+    }
+  }, true);
+  el.addEventListener("pointermove",(e)=>{
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if (pts.size===2 && d0){
+      const [a,b]=[...pts.values()];
+      setZ(z0*(Math.hypot(a.x-b.x,a.y-b.y)||1)/d0, cx);
+      e.preventDefault();
+    }
+  }, {passive:false});
+  ["pointerup","pointercancel"].forEach(ev=>el.addEventListener(ev,(e)=>{ pts.delete(e.pointerId); if (pts.size<2) d0=0; }, true));
+}
+attachPinch(tlScroll, ()=>PX_PER_SEC, (z,cx)=>setTimelineZoom(z,cx), ()=>{ drag=null; loopDrag=null; });
+
 /* ---------- Voice recording (MediaRecorder -> Blob) ---------- */
 const addVoiceTrackBtn=document.getElementById("addVoiceTrackBtn");
 let mediaRec=null, recChunks=[], recording=false, recStream=null, recTrack=null;
@@ -1612,7 +1663,7 @@ function drawMemoWave(canvas, clip){
 function buildMemoClipEl(el, track, clip, dur){
   el.innerHTML='<div class="m-chords"></div><canvas height="56"></canvas><div class="m-lyrics"></div><div class="m-edit" title="Open the memo editor">✎ memo</div><div class="cdel">✕</div>'+(clip.analyzing?'<div class="m-busy">analyzing…</div>':'');
   const wPx=Math.max(16, Math.round(dur*PX_PER_SEC-2));
-  const cv=el.querySelector("canvas"); cv.width=wPx; cv.height=56; cv.style.width=wPx+"px";
+  const cv=el.querySelector("canvas"); cv.width=Math.min(16000,wPx); cv.height=56; cv.style.width=wPx+"px";
   if (clip.buffer) drawMemoWave(cv, clip);
   const chDiv=el.querySelector(".m-chords");
   if (clip.analysis&&clip.analysis.chords) clip.analysis.chords.forEach(s=>{
@@ -1639,6 +1690,8 @@ let memoModalTrack=null, memoModalClip=null, memoSeekT=0;
 function modeLabel(mode){ return mode ? mode.charAt(0).toUpperCase()+mode.slice(1) : "?"; }
 function openMemoModal(track, clip){
   memoModalTrack=track; memoModalClip=clip; memoSeekT=0;
+  memoZoom=1; memoCanvas.parentElement.scrollLeft=0;
+  const zr=document.getElementById("memoZoomReset"); if (zr) zr.textContent="100%";
   document.getElementById("memoTitle").textContent=track.name+" — annotated memo";
   memoKeySel.value=clip.analysisKey||"auto";
   memoLangSel.value=clip.lyricsLang||uaLang();
@@ -1678,10 +1731,23 @@ function renderMemoChips(){
   });
 }
 function syncMemoModal(){ if (!memoModalClip) return; renderMemoSummary(); renderMemoChips(); drawMemoModalCanvas(); }
+let memoZoom=1;
+function setMemoZoom(z, anchorPx){
+  const wrap=memoCanvas.parentElement, baseW=Math.max(100, wrap.clientWidth||800);
+  z=clamp(z, 1, Math.max(1, 16000/baseW)); // canvases cap out around 16k px wide
+  if (Math.abs(z-memoZoom)<0.005) return;
+  const ax=(anchorPx!=null)?anchorPx:wrap.clientWidth/2;
+  const frac=(wrap.scrollLeft+ax)/Math.max(1, baseW*memoZoom);
+  memoZoom=z;
+  drawMemoModalCanvas();
+  wrap.scrollLeft=Math.max(0, frac*baseW*memoZoom-ax);
+  const b=document.getElementById("memoZoomReset"); if (b) b.textContent=Math.round(memoZoom*100)+"%";
+}
 function drawMemoModalCanvas(playT){
   const clip=memoModalClip; if (!clip) return;
-  const wrap=memoCanvas.parentElement, w=wrap.clientWidth||800, h=260;
-  if (memoCanvas.width!==w) memoCanvas.width=w;
+  const wrap=memoCanvas.parentElement, baseW=Math.max(100, wrap.clientWidth||800);
+  const w=Math.min(16000, Math.round(baseW*memoZoom)), h=Math.max(220, memoCanvas.clientHeight||300);
+  if (memoCanvas.width!==w){ memoCanvas.width=w; memoCanvas.style.width=w+"px"; }
   if (memoCanvas.height!==h) memoCanvas.height=h;
   const c=memoCanvas.getContext("2d"); c.clearRect(0,0,w,h);
   const a=clip.analysis, dur=clip.audioDur||1;
@@ -1698,11 +1764,13 @@ function drawMemoModalCanvas(playT){
   }
   // beat / bar grid from the memo's own tempo map
   if (a&&a.beats&&a.beats.length){
-    const bpb=a.beatsPerBar||4, db=a.downbeat||0; let bar=1;
+    const bpb=a.beatsPerBar||4, db=a.downbeat||0; let bar=1, lastLab=-1e9;
+    const beatPx=a.beats.length>1 ? X(a.beats[1])-X(a.beats[0]) : 999;
     a.beats.forEach((t,i)=>{
       const x=Math.round(X(t)); const isBar=(((i-db)%bpb)+bpb)%bpb===0;
+      if (!isBar && beatPx<4) return; // declutter beat lines when zoomed out
       c.fillStyle=isBar?"rgba(230,233,239,0.4)":"rgba(230,233,239,0.12)"; c.fillRect(x, chordH, 1, waveH);
-      if (isBar){ c.fillStyle="rgba(154,163,178,0.8)"; c.font="9px sans-serif"; c.fillText(String(bar++), x+3, chordH+10); }
+      if (isBar){ const lbl=String(bar++); if (x-lastLab>=20){ c.fillStyle="rgba(154,163,178,0.8)"; c.font="9px sans-serif"; c.fillText(lbl, x+3, chordH+10); lastLab=x; } }
     });
   }
   // note trace (Music Memos-style piano-roll ribbon)
@@ -1736,6 +1804,16 @@ function drawMemoModalCanvas(playT){
   if (cur>0){ c.fillStyle=(playT!=null)?"#ffffff":"rgba(255,255,255,0.45)"; c.fillRect(Math.round(X(cur)),0,2,h); }
 }
 window.addEventListener("resize",()=>{ if (memoModalClip && memoModal.style.display!=="none") drawMemoModalCanvas(); });
+document.getElementById("memoZoomIn").addEventListener("click",()=>setMemoZoom(memoZoom*1.5));
+document.getElementById("memoZoomOut").addEventListener("click",()=>setMemoZoom(memoZoom/1.5));
+document.getElementById("memoZoomReset").addEventListener("click",()=>setMemoZoom(1));
+memoCanvas.parentElement.addEventListener("wheel",(e)=>{
+  if (!e.ctrlKey && !e.metaKey) return; // trackpad pinch arrives as ctrl+wheel
+  e.preventDefault();
+  const r=memoCanvas.parentElement.getBoundingClientRect();
+  setMemoZoom(memoZoom*Math.exp(-clamp(e.deltaY,-70,70)*0.01), e.clientX-r.left);
+},{passive:false});
+attachPinch(memoCanvas.parentElement, ()=>memoZoom, (z,cx)=>setMemoZoom(z,cx));
 memoCanvas.addEventListener("pointerdown",(e)=>{
   const clip=memoModalClip; if (!clip) return;
   const r=memoCanvas.getBoundingClientRect();
@@ -1758,7 +1836,17 @@ function memoTogglePlay(){
   s.start(0, memoPlayOff); memoPlaySrc=s; memoPlayT0=ctx.currentTime;
   s.onended=()=>{ if (memoPlaySrc===s) memoStopPlay(); };
   const b=document.getElementById("memoPlayBtn"); b.textContent="■ Stop"; b.classList.add("danger");
-  const tick=()=>{ if (!memoPlaySrc) return; drawMemoModalCanvas(memoPlayOff+(ctx.currentTime-memoPlayT0)); memoPlayRaf=requestAnimationFrame(tick); };
+  const tick=()=>{
+    if (!memoPlaySrc) return;
+    const cur=memoPlayOff+(ctx.currentTime-memoPlayT0);
+    drawMemoModalCanvas(cur);
+    if (memoZoom>1.01){ // keep the playhead in view when zoomed in
+      const wrap=memoCanvas.parentElement;
+      const px=cur/(clip.audioDur||1)*memoCanvas.width;
+      wrap.scrollLeft=clamp(px-wrap.clientWidth/2, 0, Math.max(0, memoCanvas.width-wrap.clientWidth));
+    }
+    memoPlayRaf=requestAnimationFrame(tick);
+  };
   tick();
 }
 document.getElementById("memoPlayBtn").addEventListener("click",memoTogglePlay);
@@ -2251,7 +2339,15 @@ function memoWorkerMain(){
       else { flush(); cur={ t0:fr.t, tEnd:fr.t, ms:[fr.midi], run:fr.midi, cf:fr.conf }; }
     });
     flush();
-    return notes;
+    // realistic fidelity for sung/played lines: re-join same-pitch fragments split by
+    // tiny dropouts, then drop blips too short to be intentional notes
+    const merged=[];
+    notes.forEach(n=>{
+      const p=merged[merged.length-1];
+      if (p && p.midi===n.midi && (n.start-(p.start+p.dur))<0.08){ p.dur=+(((n.start+n.dur)-p.start)).toFixed(3); if (n.conf>p.conf) p.conf=n.conf; }
+      else merged.push(n);
+    });
+    return merged.filter(n=>n.dur>=0.13);
   }
   function detectChords(chroma, rmsArr, beatBounds, H, W, sr, useRoot, scale){
     const QUALS=[ {q:"",iv:[0,4,7]}, {q:"m",iv:[0,3,7]}, {q:"dim",iv:[0,3,6]}, {q:"7",iv:[0,4,7,10]}, {q:"maj7",iv:[0,4,7,11]}, {q:"m7",iv:[0,3,7,10]} ];
@@ -2298,6 +2394,33 @@ function memoWorkerMain(){
       const last=out[out.length-1];
       if (last && last.root===p.root && last.quality===p.quality && Math.abs(last.end-beatBounds[i])<1e-3){ last.end=+beatBounds[i+1].toFixed(3); if (p.conf>last.conf) last.conf=+p.conf.toFixed(2); }
       else out.push({ start:+beatBounds[i].toFixed(3), end:+beatBounds[i+1].toFixed(3), root:p.root, quality:p.quality, conf:+p.conf.toFixed(2), diatonic:p.diatonic });
+    }
+    // realistic harmonic rhythm: songs don't change chords every beat. Merge same-root
+    // neighbours (B → Bmaj7 flicker), then absorb/drop spans shorter than ~2 beats.
+    const ivs=[]; for (let i=1;i<beatBounds.length;i++) ivs.push(beatBounds[i]-beatBounds[i-1]);
+    ivs.sort((x,y)=>x-y);
+    const minSpan=Math.max(1.0, (ivs[ivs.length>>1]||0.5)*1.9);
+    const touching=(a,b)=>Math.abs(a.end-b.start)<1e-3;
+    let changed=true;
+    while (changed && out.length>1){
+      changed=false;
+      for (let i=0;i<out.length-1;i++){
+        const a=out[i], b=out[i+1];
+        if (a.root===b.root && touching(a,b)){
+          if (b.conf>a.conf){ a.quality=b.quality; a.conf=b.conf; a.diatonic=b.diatonic; }
+          a.end=b.end; out.splice(i+1,1); changed=true; break;
+        }
+      }
+      if (changed) continue;
+      let si=-1, sd=1e9;
+      for (let i=0;i<out.length;i++){ const d=out[i].end-out[i].start; if (d<minSpan && d<sd){ sd=d; si=i; } }
+      if (si<0) break;
+      const s=out[si], prev=out[si-1], next=out[si+1];
+      const tp=prev&&touching(prev,s), tn=next&&touching(s,next);
+      if (tp && (!tn || (prev.end-prev.start)>=(next.end-next.start))){ prev.end=s.end; out.splice(si,1); }
+      else if (tn){ next.start=s.start; out.splice(si,1); }
+      else out.splice(si,1); // an isolated stab between silences — too short to call a chord
+      changed=true;
     }
     return out;
   }
