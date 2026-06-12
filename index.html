@@ -1877,26 +1877,56 @@ async function resampleTo16k(buffer){
   const s=o.createBufferSource(); s.buffer=buffer; s.connect(o.destination); s.start(0);
   const r=await o.startRendering(); return r.getChannelData(0).slice(0);
 }
+function whisperJob(w, payload, onStatus){
+  const id=++whJobSeq;
+  return new Promise((resolve,reject)=>{
+    const h=(e)=>{ const d=e.data; if (d.id!==id) return;
+      if (d.status){ if (onStatus) onStatus(d.status); return; }
+      w.removeEventListener("message",h);
+      d.ok ? resolve(d) : reject(new Error(d.error||"transcription failed"));
+    };
+    w.addEventListener("message",h);
+    w.addEventListener("error",(ev)=>{ w.removeEventListener("message",h); reject(new Error("Worker error: "+(ev.message||"failed to load"))); },{once:true});
+    w.postMessage(Object.assign({id},payload),[payload.audio]);
+  });
+}
 async function memoTranscribe(){
   const clip=memoModalClip; if (!clip||!clip.buffer) return;
   const btn=document.getElementById("memoTranscribe");
   btn.disabled=true; memoTransStatus.textContent="Preparing audio…";
   try {
     const audio=await resampleTo16k(clip.buffer);
-    const w=getWhisperWorker(), id=++whJobSeq;
+    /* Long-form: slice the song ourselves (~28 s windows, cut at the quietest spot near each
+       boundary) and transcribe each slice as a single chunk. transformers.js's internal
+       chunk-stitching silently drops everything after a chunk it can't align (typical at an
+       instrumental break), which truncated full songs at the first chorus. */
+    const SR=16000, TARGET=28*SR, SEARCH=3*SR, HOP=SR/10;
+    const cuts=[0];
+    while (audio.length-cuts[cuts.length-1] > TARGET+SEARCH){
+      const around=cuts[cuts.length-1]+TARGET;
+      let best=around, bv=Infinity;
+      for (let p=around-SEARCH;p<=around+SEARCH;p+=HOP){
+        const a=Math.max(0,p|0), b=Math.min(audio.length,a+1600);
+        let s=0; for (let i=a;i<b;i++) s+=audio[i]*audio[i];
+        if (s<bv){ bv=s; best=a; }
+      }
+      cuts.push(best);
+    }
+    cuts.push(audio.length);
+    const nParts=cuts.length-1;
+    const w=getWhisperWorker();
     const translate=document.getElementById("memoTranslate").checked;
     const lang=memoLangSel.value; clip.lyricsLang=lang;
-    const res=await new Promise((resolve,reject)=>{
-      const h=(e)=>{ const d=e.data; if (d.id!==id) return;
-        if (d.status){ memoTransStatus.textContent=d.status; return; }
-        w.removeEventListener("message",h);
-        d.ok ? resolve(d) : reject(new Error(d.error||"transcription failed"));
-      };
-      w.addEventListener("message",h);
-      w.addEventListener("error",(ev)=>{ w.removeEventListener("message",h); reject(new Error("Worker error: "+(ev.message||"failed to load"))); },{once:true});
-      w.postMessage({id, audio:audio.buffer, translate, lang},[audio.buffer]);
-    });
-    let words=(res.chunks||[]).map(c=>({ start:+(c.t0||0), end:+(c.t1!=null?c.t1:(c.t0||0)), text:String(c.text||"").trim() })).filter(x=>x.text);
+    let words=[], anyWordLevel=false, failed=0;
+    for (let s=0;s<nParts;s++){
+      const part=audio.slice(cuts[s],cuts[s+1]), off=cuts[s]/SR;
+      const tag=nParts>1?(" · part "+(s+1)+"/"+nParts):"";
+      try {
+        const res=await whisperJob(w,{audio:part.buffer, translate, lang},(st)=>{ memoTransStatus.textContent=st+tag; });
+        anyWordLevel=anyWordLevel||!!res.wordLevel;
+        (res.chunks||[]).forEach(c=>{ const t=String(c.text||"").trim(); if (t) words.push({ start:off+(+c.t0||0), end:off+(+(c.t1!=null?c.t1:(c.t0||0))||0), text:t }); });
+      } catch(err){ failed++; if (nParts===1) throw err; }
+    }
     // collapse hallucination loops (Whisper repeats a phrase forever on non-speech): keep 2 copies max
     for (let n=1;n<=8;n++){
       let i=2*n;
@@ -1907,9 +1937,9 @@ async function memoTranscribe(){
       }
     }
     clip.lyricsWords=words.length?words:null;
-    clip.lyricsText=res.wordLevel ? words.map(w=>w.text).join(" ") : String(res.text||"").trim();
+    clip.lyricsText=words.map(x=>x.text).join(" ");
     memoLyricsEl.value=clip.lyricsText;
-    memoTransStatus.textContent=words.length ? ("✓ "+words.length+(res.wordLevel?" words":" phrases")) : (clip.lyricsText?"✓ done":"✓ done — no speech found");
+    memoTransStatus.textContent=(words.length ? ("✓ "+words.length+(anyWordLevel?" words":" phrases")) : "✓ done — no speech found")+(failed?(" · "+failed+" part(s) failed"):"");
     renderTimeline(); drawMemoModalCanvas();
   } catch(err){
     memoTransStatus.textContent="✗ "+String(err.message||err).slice(0,140)+" — you can still type lyrics below.";
