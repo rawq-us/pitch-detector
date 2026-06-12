@@ -67,11 +67,14 @@ runs it on every push and PR.
 ## Release process
 
 1. `npm test` green; verify in the browser preview (see docs/TESTING.md).
-2. Commit to `main` (or merge a feature branch with `--no-ff`).
-3. `git tag -a vX.Y.Z -m "…" && git push origin main vX.Y.Z`
-4. `gh release create vX.Y.Z --title "…" --notes "…"` — notes describe
+2. **Bump the version in BOTH places**: `APP_VERSION` in index.html and
+   `version` in package.json (a test fails if they diverge). The version
+   renders next to the tagline — it's how anyone tells what build is live.
+3. Commit to `main` (or merge a feature branch with `--no-ff`).
+4. `git tag -a vX.Y.Z -m "…" && git push origin main vX.Y.Z`
+5. `gh release create vX.Y.Z --title "…" --notes "…"` — notes describe
    user-visible changes AND root causes of fixes.
-5. Pages deploys automatically; verify `https://rawq-us.github.io/pitch-detector/`
+6. Pages deploys automatically; verify `https://rawq-us.github.io/pitch-detector/`
    serves the change (curl + grep for a new symbol).
 
 ## Top gotchas (full list in docs/DECISIONS.md)

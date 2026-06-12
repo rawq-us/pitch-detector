@@ -40,3 +40,11 @@ test("core functions the tests and features depend on are present", () => {
 test("session format version is declared", () => {
   assert.match(src, /const FORMAT_VERSION = \d+/);
 });
+
+test("APP_VERSION matches package.json and is shown on the page", () => {
+  const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  const m = src.match(/const APP_VERSION="([^"]+)"/);
+  assert.ok(m, "APP_VERSION constant missing");
+  assert.equal(m[1], pkg.version, "index.html APP_VERSION and package.json version must be bumped together");
+  assert.ok(html.includes('id="appVersion"'), "version element missing from the page");
+});
