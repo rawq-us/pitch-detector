@@ -16,8 +16,15 @@ test("required element ids exist in the markup", () => {
   const ids = [
     // transport & layers
     "bpmInput","tsSel","lenInput","playBtn","tlZoomIn","tlZoomOut","tlZoomReset",
-    "addArpTrackBtn","addBeatTrackBtn","addVoiceTrackBtn","addMemoTrackBtn",
+    "addArpTrackBtn","addBeatTrackBtn","addSamplerTrackBtn","addVoiceTrackBtn","addMemoTrackBtn",
     "exportBtn","loopPopup","loopFillBtn",
+    // synth glide
+    "glideR",
+    // sample-beat section
+    "sampBank","sampGridBody","sampBarsSel","sampAddBtn","sampModePlay","sampModeEdit","sampSizeOut","sampPadDetail",
+    // song package + AI composer
+    "songModal","songTitle","songGenre","songCover","songLyrics","songExportBtn",
+    "aiComposeBtn","aiModal","aiProvider","aiModel","aiKey","aiIdea","aiComposeRun",
     // memo editor
     "memoModal","memoCanvas","memoChips","memoSummary","memoKeySel","memoReanalyze",
     "memoPlayBtn","memoZoomIn","memoZoomOut","memoZoomReset","memoUseKey","memoUseBpm",
@@ -33,6 +40,10 @@ test("core functions the tests and features depend on are present", () => {
     "addMemoClip","analyzeMemoClip","startMemoRec","stopMemoRec","convertVoiceTrack",
     "serializeProject","loadProject","buildMidi","renderMix","setTimelineZoom","setMemoZoom",
     "getWhisperWorker","memoTranscribe","sttTier",
+    // new in v1.8: sampler, glide, song package, AI composer
+    "samplerClipEvents","spawnOscs","buildId3","memoSrt","songMetadataJson","wavBytes16",
+    "encodeSongAudio","exportSongPackage","applyProjectSpec","aiParseSpec",
+    "aiProjectSummary","applyProjectOps","applySectionLayout","popOutSection","saveAutosave","bindKnob",
   ];
   for (const n of names) assert.ok(src.includes("function " + n) || src.includes(n + "("), "missing " + n);
 });

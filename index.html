@@ -9,7 +9,7 @@
     --bg: #0f1117; --panel: #1a1d27; --panel-2: #232735; --text: #e6e9ef; --muted: #9aa3b2;
     --accent: #4ade80; --accent-2: #38bdf8; --flat: #f87171; --inscale: #2dd4bf;
     --white-key: #f4f6fb; --white-key-active: #bdf0d0; --black-key: #1b1e27; --black-key-active: #2f7d52;
-    --border: #2c3140; --arp-clip: #6366f1; --beat-clip: #f59e0b;
+    --border: #2c3140; --arp-clip: #6366f1; --beat-clip: #f59e0b; --sampler-clip: #a855f7;
   }
   * { box-sizing: border-box; }
   body { margin: 0; -webkit-user-select: none; -moz-user-select: none; user-select: none; -webkit-touch-callout: none; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -103,11 +103,28 @@
   .knob { display: flex; flex-direction: column; gap: 4px; min-width: 120px; }
   .knob label { font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; }
   .knob label span { color: var(--text); }
+  /* editable value readouts (type to set a precise value) */
+  .kv { display: inline-flex; align-items: center; gap: 3px; }
+  .kv i { font-style: normal; color: var(--muted); font-size: 10px; }
+  input.kval { width: 52px; font-size: 11px; text-align: center; padding: 2px 3px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 5px; color: var(--text); }
+  input.kval:focus { border-color: var(--accent-2); outline: none; }
+  input.kval::-webkit-inner-spin-button { opacity: 0.5; }
+  .osc-knob input.kval { width: 46px; }
   .knob input[type=range] { width: 100%; accent-color: var(--accent-2); cursor: pointer; }
+  /* Vertical level faders (volume / gain / mix / amount). Horizontal sliders stay for
+     pan and frequency/time sweeps — see the "levels vertical, sweeps horizontal" rule. */
+  .knob.vert { min-width: 56px; align-items: center; gap: 6px; }
+  .knob.vert label { flex-direction: column; align-items: center; text-align: center; gap: 1px; order: 2; }
+  .knob.vert input[type=range] { writing-mode: vertical-lr; direction: rtl; width: 26px; height: 92px; order: 1; }
+  .osc-knob.vert { align-items: center; }
+  .osc-knob.vert input[type=range] { writing-mode: vertical-lr; direction: rtl; width: 24px; height: 64px; }
+  .row.knobrow { align-items: flex-end; flex-wrap: wrap; gap: 16px; }
+  .row.knobrow .knob:not(.vert) { align-self: flex-end; }
   .fx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
-  .fx { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 8px; opacity: 0.55; transition: opacity 0.15s, border-color 0.15s; }
+  .fx { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; display: flex; flex-direction: row; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; opacity: 0.55; transition: opacity 0.15s, border-color 0.15s; }
   .fx.on { opacity: 1; border-color: var(--accent-2); }
-  .fx-head { display: flex; align-items: center; gap: 8px; }
+  .fx .knob:not(.vert) { flex: 1 1 100%; }
+  .fx-head { display: flex; align-items: center; gap: 8px; flex-basis: 100%; }
   .fx-name { font-weight: 700; font-size: 13px; flex: 1; }
   .fx-toggle { font-weight: 700; font-size: 11px; padding: 3px 12px; border-radius: 999px; background: var(--panel); color: var(--muted); border: 1px solid var(--border); min-width: 44px; }
   .fx.on .fx-toggle { background: var(--accent); color: #06301a; border-color: transparent; }
@@ -128,6 +145,33 @@
   #oscAddBtn { font-size: 12px; padding: 7px 12px; color: var(--accent-2); border-style: dashed; }
   .osc-rm { font-size: 11px; color: var(--muted); padding: 2px 9px; margin-left: auto; }
   .osc-rm:hover { color: var(--flat); border-color: var(--flat); }
+
+  /* Pad bank + step grid laid out side by side when the container is wide enough */
+  .padlayout { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+  .padlayout .padside { flex: 1 1 360px; min-width: 280px; }
+  .padlayout .gridside { flex: 2 1 540px; min-width: 320px; }
+  .padlayout .pads { max-width: none; margin: 0 0 10px; }
+  /* Sampler — compact 8×8 pad bank (like the beat machine) + a selected-pad detail strip */
+  .samp-bank { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-bottom: 12px; }
+  .samp-pad { aspect-ratio: 1 / 1; position: relative; display: flex; align-items: center; justify-content: center; text-align: center; background: var(--panel-2); border: 1px solid var(--border); border-radius: 7px; padding: 3px; font-size: 9px; line-height: 1.05; font-weight: 700; cursor: pointer; user-select: none; overflow: hidden; transition: transform 0.04s; }
+  .samp-pad:active { transform: scale(0.93); }
+  .samp-pad.loaded { background: radial-gradient(120% 100% at 20% 90%, rgba(168,85,247,0.28), rgba(0,0,0,0) 60%), linear-gradient(160deg, #272233, #15131c); border-color: var(--sampler-clip); color: #ede9fe; }
+  .samp-pad.sel { outline: 2px solid var(--sampler-clip); outline-offset: -2px; }
+  .samp-pad.dragging { opacity: 0.4; }
+  .samp-pad.dragover { outline: 2px dashed var(--sampler-clip); outline-offset: -2px; }
+  .mini.seg-on { background: var(--accent-2); color: #042233; border-color: transparent; font-weight: 700; }
+  .samp-pad .pnum { position: absolute; top: 2px; left: 4px; font-size: 8px; color: var(--muted); }
+  .samp-pad.loaded .pnum { color: #c4b5fd; }
+  .samp-pad .plus { font-size: 17px; font-weight: 400; color: var(--muted); }
+  .samp-pad .pnm { padding: 0 2px; max-height: 100%; overflow: hidden; word-break: break-word; }
+  .samp-pad .ploopflag { position: absolute; top: 2px; right: 4px; font-size: 9px; color: var(--sampler-clip); }
+  .samp-detail { background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+  .samp-detail .sd-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--muted); }
+  .samp-detail input.pname { flex: 1; min-width: 110px; font-size: 12px; padding: 4px 6px; }
+  .samp-detail input[type=range] { flex: 1; min-width: 90px; accent-color: var(--sampler-clip); }
+  .samp-detail button { font-size: 11px; padding: 4px 9px; }
+  .samp-detail .empty-hint { color: var(--muted); font-size: 11px; }
+  .samp-loopbtn.on { background: var(--sampler-clip); color: #fff; border-color: transparent; }
   /* synth-keys structure */
   .divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
   .divider.subtle { border-top-color: #20242f; margin: 14px 0; }
@@ -155,6 +199,9 @@
   .sec-title { flex: 1; font-size: 13px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); font-weight: 600; }
   .sec-toggle { flex: none; width: 28px; height: 24px; padding: 0; font-size: 15px; line-height: 1; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); border-radius: 6px; cursor: pointer; }
   .sec-toggle:hover { border-color: var(--accent-2); color: var(--text); }
+  .sec-pop { display: inline-flex; align-items: center; justify-content: center; }
+  .sec-pop svg { display: block; }
+  .sec-pop:hover { color: var(--accent-2); }
   .csec.collapsed .sec-body { display: none; }
   .csec.collapsed .sec-head { margin-bottom: 0; }
   .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
@@ -200,6 +247,7 @@
   .tl-head .badge { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; padding: 1px 5px; border-radius: 4px; }
   .badge.arp { background: var(--arp-clip); color: #fff; }
   .badge.beat { background: var(--beat-clip); color: #3a2400; }
+  .badge.sampler { background: var(--sampler-clip); color: #fff; }
   .tl-head .del { font-size: 10px; color: var(--muted); margin-top: 2px; align-self: flex-start; background: none; border: none; padding: 0; cursor: pointer; }
   .tl-head .del:hover { color: var(--flat); }
   .tl-head-acts { display: flex; gap: 10px; margin-top: 2px; }
@@ -208,6 +256,8 @@
   .tl-clip { position: absolute; top: 6px; height: 46px; border-radius: 7px; cursor: grab; overflow: hidden; color: #fff; font-size: 11px; padding: 5px 7px; user-select: none; box-shadow: 0 2px 6px rgba(0,0,0,0.35); z-index: 2; }
   .tl-clip.arp { background: linear-gradient(180deg, #7c83f7, var(--arp-clip)); }
   .tl-clip.beat { background: linear-gradient(180deg, #f7b34d, var(--beat-clip)); color: #3a2400; }
+  .tl-clip.sampler { background: linear-gradient(180deg, #c084fc, var(--sampler-clip)); }
+  .tl-lane.sampler { background: rgba(168,85,247,0.05); }
   .tl-clip.voice { background: linear-gradient(180deg, #f472b6, #db2777); }
   .tl-lane.voice { background: rgba(236,72,153,0.05); }
   .badge.voice { background: #db2777; color: #fff; }
@@ -256,7 +306,8 @@
   .popup input { width: 110px; }
 
   .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 100; }
-  .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px; width: min(580px,92vw); max-height: 82vh; overflow: auto; }
+  .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; width: 96vw; max-width: 1500px; height: 94vh; max-height: 94vh; overflow: auto; }
+  .modal-box .modal-inner { max-width: 1100px; margin: 0 auto; }   /* keep form-style modals readable inside the wide box */
   .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
   .modal-head button { background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; }
   .modal-save { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -306,8 +357,10 @@
     <div class="row" style="margin-bottom:12px">
       <div class="group"><label>&nbsp;</label><button id="addArpTrackBtn" class="iconbtn" title="Add arp layer">＋🎹</button></div>
       <div class="group"><label>&nbsp;</label><button id="addBeatTrackBtn" class="iconbtn" title="Add beat layer">＋🥁</button></div>
+      <div class="group"><label>&nbsp;</label><button id="addSamplerTrackBtn" class="iconbtn" title="Add sampler layer (sampled beats &amp; loops)">＋🎛</button></div>
       <div class="group"><label>&nbsp;</label><button id="addVoiceTrackBtn" class="iconbtn" title="Add voice layer">＋🎤</button></div>
       <div class="group"><label>&nbsp;</label><button id="addMemoTrackBtn" class="iconbtn" title="Add annotated memo layer (chords · notes · tempo · lyrics)">＋📝</button></div>
+      <div class="group"><label>&nbsp;</label><button id="aiComposeBtn" class="iconbtn" title="AI Composer — generate arrangement &amp; lyrics into isolated stems">🤖 AI</button></div>
       <div class="group"><label>&nbsp;</label><button id="saveBtn" class="iconbtn" title="Save session">💾</button></div>
       <div class="group"><label>&nbsp;</label><button id="loadBtn" class="iconbtn" title="Load / sessions">📁</button></div>
       <div class="group"><label>&nbsp;</label>
@@ -317,6 +370,7 @@
             <button data-act="midi">Export MIDI</button>
             <button data-act="wav">Bounce WAV</button>
             <button data-act="stems">Export stems</button>
+            <button data-act="song">Song package…</button>
           </div>
         </div>
       </div>
@@ -375,7 +429,7 @@
 
   <!-- ===== Synth — keys (keyboard + oscilloscope + arp transpose) ===== -->
   <div class="panel csec" data-key="synthkeys" data-title="Synth — keys">
-    <div class="eq-strip"><canvas id="synthEq"></canvas><span class="eq-tag">Synth oscilloscope — live output waveform</span></div>
+    <div class="eq-strip"><canvas id="synthEq"></canvas><span class="eq-tag">Synth oscilloscope — output waveshape (filter &amp; envelope)</span></div>
     <div class="kbd-row">
       <button class="kbd-jump" id="kbdLeft" title="Jump down an octave">◀</button>
       <div class="kbd-scroll" id="kbdScroll"><div class="keyboard" id="keyboard"></div></div>
@@ -388,7 +442,7 @@
 
     <hr class="divider">
     <h2 class="subhead">Synth — filter &amp; envelope</h2>
-    <div class="row">
+    <div class="row knobrow">
       <div class="group"><label for="filtTypeSel">Filter</label>
         <select id="filtTypeSel">
           <option value="lowpass">Low-pass</option>
@@ -396,12 +450,13 @@
           <option value="bandpass">Band-pass</option>
         </select>
       </div>
-      <div class="knob"><label>Cutoff <span id="cutoutOut">8000 Hz</span></label><input id="cutoffR" type="range" min="80" max="12000" step="10" value="8000" /></div>
-      <div class="knob"><label>Resonance <span id="resOut">0.8</span></label><input id="resR" type="range" min="0" max="20" step="0.1" value="0.8" /></div>
-      <div class="knob"><label>Attack <span id="atkOut">0.01s</span></label><input id="atkR" type="range" min="0" max="1" step="0.005" value="0.01" /></div>
-      <div class="knob"><label>Decay <span id="decOut">0.12s</span></label><input id="decR" type="range" min="0" max="1" step="0.005" value="0.12" /></div>
-      <div class="knob"><label>Sustain <span id="susOut">0.70</span></label><input id="susR" type="range" min="0" max="1" step="0.01" value="0.7" /></div>
-      <div class="knob"><label>Release <span id="relOut">0.25s</span></label><input id="relR" type="range" min="0" max="2" step="0.01" value="0.25" /></div>
+      <div class="knob vert"><label>Cutoff <span class="kv"><input id="cutoutOut" class="kval" type="number" min="80" max="12000" step="10" value="8000"><i>Hz</i></span></label><input id="cutoffR" type="range" min="80" max="12000" step="10" value="8000" /></div>
+      <div class="knob vert"><label>Resonance <span class="kv"><input id="resOut" class="kval" type="number" min="0" max="20" step="0.1" value="0.8"></span></label><input id="resR" type="range" min="0" max="20" step="0.1" value="0.8" /></div>
+      <div class="knob vert"><label>Attack <span class="kv"><input id="atkOut" class="kval" type="number" min="0" max="1" step="0.005" value="0.01"><i>s</i></span></label><input id="atkR" type="range" min="0" max="1" step="0.005" value="0.01" /></div>
+      <div class="knob vert"><label>Decay <span class="kv"><input id="decOut" class="kval" type="number" min="0" max="1" step="0.005" value="0.12"><i>s</i></span></label><input id="decR" type="range" min="0" max="1" step="0.005" value="0.12" /></div>
+      <div class="knob vert"><label>Sustain <span class="kv"><input id="susOut" class="kval" type="number" min="0" max="1" step="0.01" value="0.7"></span></label><input id="susR" type="range" min="0" max="1" step="0.01" value="0.7" /></div>
+      <div class="knob vert"><label>Release <span class="kv"><input id="relOut" class="kval" type="number" min="0" max="2" step="0.01" value="0.25"><i>s</i></span></label><input id="relR" type="range" min="0" max="2" step="0.01" value="0.25" /></div>
+      <div class="knob vert"><label>Glide <span class="kv"><input id="glideOut" class="kval" type="number" min="0" max="0.5" step="0.005" value="0"><i>s</i></span></label><input id="glideR" type="range" min="0" max="0.5" step="0.005" value="0" /></div>
     </div>
     <hr class="divider subtle">
     <h2 class="subhead">Oscillators <span class="dim">— OSC 2 detune = doubling · OSC 3 semitones = harmony (e.g. +6 tritone)</span></h2>
@@ -426,7 +481,7 @@
       <div class="group"><label>&nbsp;</label><button id="restBtn">+ Rest</button></div>
       <div class="group"><label>&nbsp;</label><button id="arpPrevBtn">▶ Preview</button></div>
       <div class="group"><label>&nbsp;</label><button id="arpClearBtn">Clear</button></div>
-      <div class="group"><label>&nbsp;</label><button id="arpAddBtn" class="primary">＋ Add arp clip → timeline</button></div>
+      <div class="group"><label>&nbsp;</label><button id="arpAddBtn" class="primary">＋ Timeline</button></div>
     </div>
     <div class="seq" id="seq"></div>
     <hr class="divider subtle">
@@ -441,36 +496,75 @@
 
   <!-- ===== Beat machine ===== -->
   <div class="panel csec" data-key="beat">
-    <h2>Beat machine</h2>
-    <div class="pads" id="pads"></div>
-    <div class="pad-legend" id="padLegend"></div>
-    <div class="row" style="margin-bottom:12px">
-      <div class="group"><label for="beatBarsSel">Length <span class="help" id="beatHelp" tabindex="0">?</span></label>
-        <select id="beatBarsSel">
-          <option value="1">1 bar</option>
-          <option value="2">2 bars</option>
-          <option value="4">4 bars</option>
-        </select>
+    <h2>Synth beat</h2>
+    <div class="padlayout">
+      <div class="padside">
+        <div class="pads" id="pads"></div>
+        <div class="pad-legend" id="padLegend"></div>
       </div>
-      <div class="group"><label>Pattern</label><span class="readout" id="beatLenOut">— steps · — s</span></div>
-      <div class="group"><label>&nbsp;</label><button id="liveRecBtn">● Live record</button></div>
-      <div class="group"><label>&nbsp;</label><button id="beatPrevBtn">▶ Preview</button></div>
-      <div class="group"><label>&nbsp;</label><button id="beatClearBtn">Clear grid</button></div>
-      <div class="spacer"></div>
-      <div class="group"><label>&nbsp;</label><button id="beatAddBtn" class="primary">＋ Add beat clip → timeline</button></div>
+      <div class="gridside">
+        <div class="row" style="margin-bottom:12px">
+          <div class="group"><label for="beatBarsSel">Length <span class="help" id="beatHelp" tabindex="0">?</span></label>
+            <select id="beatBarsSel">
+              <option value="1">1 bar</option>
+              <option value="2">2 bars</option>
+              <option value="4">4 bars</option>
+            </select>
+          </div>
+          <div class="group"><label>Pattern</label><span class="readout" id="beatLenOut">— steps · — s</span></div>
+          <div class="group"><label>&nbsp;</label><button id="liveRecBtn">● Live record</button></div>
+          <div class="group"><label>&nbsp;</label><button id="beatPrevBtn">▶ Preview</button></div>
+          <div class="group"><label>&nbsp;</label><button id="beatClearBtn">Clear grid</button></div>
+          <div class="spacer"></div>
+          <div class="group"><label>&nbsp;</label><button id="beatAddBtn" class="primary">＋ Timeline</button></div>
+        </div>
+        <div class="grid-wrap"><table class="gridtable"><tbody id="gridBody"></tbody></table></div>
+      </div>
     </div>
-    <div class="grid-wrap"><table class="gridtable"><tbody id="gridBody"></tbody></table></div>
     <div class="hint">Tap the 6×6 pads to audition (top 18 = kit, bottom 18 = an octave up). Click grid cells to program the pattern; <b>Length</b> sets how many bars it spans. With <b>Live record</b> on while previewing, tapping a kit pad writes to the current step.</div>
+  </div>
+
+  <!-- ===== Sample beat (sampler) ===== -->
+  <div class="panel csec" data-key="sampler">
+    <h2>Sample beat</h2>
+    <div class="row" style="margin-bottom:10px">
+      <div class="group"><label>Pads</label>
+        <div class="tr-row"><button id="sampSizeMinus" class="mini" title="Fewer pads">−</button><span class="readout" id="sampSizeOut" style="min-width:42px;text-align:center">2×2</span><button id="sampSizePlus" class="mini" title="More pads">＋</button></div>
+      </div>
+      <div class="group"><label>Mode</label>
+        <div class="tr-row"><button id="sampModePlay" class="mini seg-on" title="Tap pads to play">▶ Play</button><button id="sampModeEdit" class="mini" title="Load, rename, group & drag pads">✎ Edit</button></div>
+      </div>
+      <div class="group"><label for="sampBarsSel">Length</label>
+        <select id="sampBarsSel"><option value="1">1 bar</option><option value="2">2 bars</option><option value="4">4 bars</option></select>
+      </div>
+      <div class="group"><label>Grid</label><span class="readout" id="sampLenOut">— steps</span></div>
+    </div>
+    <div class="padlayout">
+      <div class="padside">
+        <div class="samp-bank" id="sampBank"></div>
+        <div class="samp-detail" id="sampPadDetail"></div>
+      </div>
+      <div class="gridside">
+        <div class="row" style="margin-bottom:10px">
+          <div class="group"><label>&nbsp;</label><button id="sampPrevBtn">▶ Preview</button></div>
+          <div class="group"><label>&nbsp;</label><button id="sampClearBtn">Clear grid</button></div>
+          <div class="spacer"></div>
+          <div class="group"><label>&nbsp;</label><button id="sampAddBtn" class="primary">＋ Timeline</button></div>
+        </div>
+        <div class="grid-wrap"><table class="gridtable"><tbody id="sampGridBody"></tbody></table></div>
+      </div>
+    </div>
+    <div class="hint"><b>Play</b> mode: tap a pad to audition. <b>Edit</b> mode: click an empty pad to load a sample, click a loaded pad to rename / set volume / mark as a loop / clear, and <b>drag pads to reorder &amp; group</b> them. Program the step grid, then <b>＋ Timeline</b> adds the pattern to a Sampler lane (a loop pad can be dropped on as a continuous loop clip).</div>
   </div>
 
   <!-- ===== Master EQ ===== -->
   <div class="panel csec" data-key="eq">
     <h2>Master EQ</h2>
-    <div class="row">
-      <div class="knob"><label>Low <span id="eqLowOut">0 dB</span></label><input id="eqLowR" type="range" min="-15" max="15" step="0.5" value="0" /></div>
-      <div class="knob"><label>Mid <span id="eqMidOut">0 dB</span></label><input id="eqMidR" type="range" min="-15" max="15" step="0.5" value="0" /></div>
-      <div class="knob"><label>High <span id="eqHighOut">0 dB</span></label><input id="eqHighR" type="range" min="-15" max="15" step="0.5" value="0" /></div>
-      <div class="knob"><label>Master level <span id="eqLevelOut">90%</span></label><input id="eqLevelR" type="range" min="0" max="1.2" step="0.01" value="0.9" /></div>
+    <div class="row knobrow">
+      <div class="knob vert"><label>Low <span id="eqLowOut">0 dB</span></label><input id="eqLowR" type="range" min="-15" max="15" step="0.5" value="0" /></div>
+      <div class="knob vert"><label>Mid <span id="eqMidOut">0 dB</span></label><input id="eqMidR" type="range" min="-15" max="15" step="0.5" value="0" /></div>
+      <div class="knob vert"><label>High <span id="eqHighOut">0 dB</span></label><input id="eqHighR" type="range" min="-15" max="15" step="0.5" value="0" /></div>
+      <div class="knob vert"><label>Master level <span id="eqLevelOut">90%</span></label><input id="eqLevelR" type="range" min="0" max="1.2" step="0.01" value="0.9" /></div>
     </div>
     <div class="hint">The master bus is <b>EQ-only</b> (low shelf ~220 Hz · mid peak ~1 kHz · high shelf ~3.8 kHz). Per-layer effects — <b>level, drive, chorus, phaser, delay, reverb, compressor</b> — live on each track: click <b>FX</b> on a track header to open its rack.</div>
   </div>
@@ -480,42 +574,97 @@
 <div id="fxModal" class="modal" style="display:none">
   <div class="modal-box">
     <div class="modal-head"><b id="fxModalTitle">Track FX</b><button id="fxModalClose">✕</button></div>
-    <div class="knob" style="max-width:none;margin-bottom:14px"><label>Track level <span id="lvlOut">100%</span></label><input id="lvlR" type="range" min="0" max="1.5" step="0.01" value="1" /></div>
+    <div class="knob vert" style="margin-bottom:14px"><label>Track level <span id="lvlOut">100%</span></label><input id="lvlR" type="range" min="0" max="1.5" step="0.01" value="1" /></div>
     <div class="fx-grid">
       <div class="fx" id="fx-drive">
         <div class="fx-head"><span class="fx-name">Drive</span><button class="fx-toggle" data-fx="drive">Off</button></div>
-        <div class="knob"><label>Amount <span id="driveAmtOut">50%</span></label><input id="driveAmt" type="range" min="0" max="1" step="0.01" value="0.5" /></div>
+        <div class="knob vert"><label>Amount <span id="driveAmtOut">50%</span></label><input id="driveAmt" type="range" min="0" max="1" step="0.01" value="0.5" /></div>
       </div>
       <div class="fx" id="fx-chorus">
         <div class="fx-head"><span class="fx-name">Chorus</span><button class="fx-toggle" data-fx="chorus">Off</button></div>
-        <div class="knob"><label>Rate <span id="chRateOut">0.6 Hz</span></label><input id="chRate" type="range" min="0.1" max="6" step="0.1" value="0.6" /></div>
-        <div class="knob"><label>Depth <span id="chDepthOut">4 ms</span></label><input id="chDepth" type="range" min="0.001" max="0.012" step="0.0005" value="0.004" /></div>
-        <div class="knob"><label>Mix <span id="chMixOut">50%</span></label><input id="chMix" type="range" min="0" max="1" step="0.01" value="0.5" /></div>
+        <div class="knob vert"><label>Rate <span id="chRateOut">0.6 Hz</span></label><input id="chRate" type="range" min="0.1" max="6" step="0.1" value="0.6" /></div>
+        <div class="knob vert"><label>Depth <span id="chDepthOut">4 ms</span></label><input id="chDepth" type="range" min="0.001" max="0.012" step="0.0005" value="0.004" /></div>
+        <div class="knob vert"><label>Mix <span id="chMixOut">50%</span></label><input id="chMix" type="range" min="0" max="1" step="0.01" value="0.5" /></div>
       </div>
       <div class="fx" id="fx-phaser">
         <div class="fx-head"><span class="fx-name">Phaser</span><button class="fx-toggle" data-fx="phaser">Off</button></div>
-        <div class="knob"><label>Rate <span id="phRateOut">0.4 Hz</span></label><input id="phRate" type="range" min="0.05" max="4" step="0.05" value="0.4" /></div>
-        <div class="knob"><label>Depth <span id="phDepthOut">800</span></label><input id="phDepth" type="range" min="100" max="2000" step="10" value="800" /></div>
-        <div class="knob"><label>Mix <span id="phMixOut">50%</span></label><input id="phMix" type="range" min="0" max="1" step="0.01" value="0.5" /></div>
+        <div class="knob vert"><label>Rate <span id="phRateOut">0.4 Hz</span></label><input id="phRate" type="range" min="0.05" max="4" step="0.05" value="0.4" /></div>
+        <div class="knob vert"><label>Depth <span id="phDepthOut">800</span></label><input id="phDepth" type="range" min="100" max="2000" step="10" value="800" /></div>
+        <div class="knob vert"><label>Mix <span id="phMixOut">50%</span></label><input id="phMix" type="range" min="0" max="1" step="0.01" value="0.5" /></div>
       </div>
       <div class="fx" id="fx-delay">
         <div class="fx-head"><span class="fx-name">Delay</span><button id="delaySyncBtn" class="mini">sync ♪</button><button class="fx-toggle" data-fx="delay">Off</button></div>
-        <div class="knob"><label>Time <span id="dlTimeOut">300 ms</span></label><input id="dlTime" type="range" min="0.02" max="1.2" step="0.01" value="0.3" /></div>
-        <div class="knob"><label>Feedback <span id="dlFbOut">35%</span></label><input id="dlFb" type="range" min="0" max="0.95" step="0.01" value="0.35" /></div>
-        <div class="knob"><label>Mix <span id="dlMixOut">35%</span></label><input id="dlMix" type="range" min="0" max="1" step="0.01" value="0.35" /></div>
+        <div class="knob vert"><label>Time <span id="dlTimeOut">300 ms</span></label><input id="dlTime" type="range" min="0.02" max="1.2" step="0.01" value="0.3" /></div>
+        <div class="knob vert"><label>Feedback <span id="dlFbOut">35%</span></label><input id="dlFb" type="range" min="0" max="0.95" step="0.01" value="0.35" /></div>
+        <div class="knob vert"><label>Mix <span id="dlMixOut">35%</span></label><input id="dlMix" type="range" min="0" max="1" step="0.01" value="0.35" /></div>
       </div>
       <div class="fx" id="fx-reverb">
         <div class="fx-head"><span class="fx-name">Reverb</span><button class="fx-toggle" data-fx="reverb">Off</button></div>
-        <div class="knob"><label>Decay <span id="rvDecOut">2.0 s</span></label><input id="rvDec" type="range" min="0.2" max="6" step="0.1" value="2" /></div>
-        <div class="knob"><label>Mix <span id="rvMixOut">30%</span></label><input id="rvMix" type="range" min="0" max="1" step="0.01" value="0.3" /></div>
+        <div class="knob vert"><label>Decay <span id="rvDecOut">2.0 s</span></label><input id="rvDec" type="range" min="0.2" max="6" step="0.1" value="2" /></div>
+        <div class="knob vert"><label>Mix <span id="rvMixOut">30%</span></label><input id="rvMix" type="range" min="0" max="1" step="0.01" value="0.3" /></div>
       </div>
       <div class="fx" id="fx-comp">
         <div class="fx-head"><span class="fx-name">Compressor</span><button class="fx-toggle" data-fx="comp">Off</button></div>
-        <div class="knob"><label>Threshold <span id="cpThOut">-18 dB</span></label><input id="cpTh" type="range" min="-60" max="0" step="1" value="-18" /></div>
-        <div class="knob"><label>Ratio <span id="cpRatOut">4:1</span></label><input id="cpRat" type="range" min="1" max="20" step="0.5" value="4" /></div>
+        <div class="knob vert"><label>Threshold <span id="cpThOut">-18 dB</span></label><input id="cpTh" type="range" min="-60" max="0" step="1" value="-18" /></div>
+        <div class="knob vert"><label>Ratio <span id="cpRatOut">4:1</span></label><input id="cpRat" type="range" min="1" max="20" step="0.5" value="4" /></div>
       </div>
     </div>
     <div class="hint">Use each effect's <b>On/Off</b> toggle (your settings are kept when it's off). This chain processes only this layer, in series: Drive → Chorus → Phaser → Delay → Reverb → Compressor.</div>
+  </div>
+</div>
+
+<!-- Sampler editor modal -->
+<!-- Song package export modal -->
+<div id="songModal" class="modal" style="display:none">
+  <div class="modal-box" style="max-width:680px">
+    <div class="modal-head"><b>Export song package</b><button id="songModalClose">✕</button></div>
+    <div class="hint" style="margin-top:0">Bounces a finished track with embedded artwork, genre &amp; metadata, a karaoke (instrumental) mix, synced lyrics (LRC/SRT) ready for Musixmatch, isolated stems, and a manifest — all in one zip. Audio is MP3 where the browser can encode it, otherwise a tagged WAV.</div>
+    <div class="row knobrow" style="gap:12px">
+      <div class="group" style="flex:1"><label for="songTitle">Title</label><input id="songTitle" type="text" placeholder="Song title"></div>
+      <div class="group" style="flex:1"><label for="songArtist">Artist</label><input id="songArtist" type="text" placeholder="Artist"></div>
+    </div>
+    <div class="row knobrow" style="gap:12px">
+      <div class="group" style="flex:1"><label for="songAlbum">Album</label><input id="songAlbum" type="text" placeholder="Album"></div>
+      <div class="group" style="flex:1"><label for="songGenre">Genre</label><input id="songGenre" type="text" placeholder="e.g. Lo-fi Hip Hop"></div>
+      <div class="group" style="width:90px"><label for="songYear">Year</label><input id="songYear" type="text" inputmode="numeric" placeholder="2026"></div>
+    </div>
+    <div class="row knobrow" style="gap:12px">
+      <div class="group" style="width:120px"><label for="songKey">Key</label><input id="songKey" type="text" placeholder="auto"></div>
+      <div class="group" style="flex:1"><label>Cover image</label><input id="songCover" type="file" accept="image/*"></div>
+    </div>
+    <div class="group"><label for="songLyrics">Lyrics <span class="dim">— auto-filled from a memo layer if available</span></label>
+      <textarea id="songLyrics" rows="5" style="width:100%;resize:vertical" placeholder="Lyrics (embedded into the audio + exported as .txt/.lrc/.srt)"></textarea></div>
+    <div style="display:flex;align-items:center;gap:14px;margin-top:12px">
+      <button id="songExportBtn" class="primary">⬇ Export package</button>
+      <span class="readout" id="songStatus" style="flex:1"></span>
+    </div>
+  </div>
+</div>
+
+<!-- AI Composer modal -->
+<div id="aiModal" class="modal" style="display:none">
+  <div class="modal-box" style="max-width:680px">
+    <div class="modal-head"><b>🤖 AI Composer</b><button id="aiModalClose">✕</button></div>
+    <div class="hint" style="margin-top:0">Describe what you want — start a new idea, or <b>edit what you already have</b> ("make the beat busier", "add a bassline in the key", "use my Kick &amp; Snare pads for a trap pattern", "switch to D minor"). The model is sent a summary of your <b>current project</b> (tempo, key, tracks, loaded sampler pad names, lyrics) and replies with edit operations the app applies — building isolated stems with this app's own synth, drum & sampler engine. Bring your own API key — stored only in this browser. The LLM composes/edits; it does not synthesize audio (your recorded/sampled audio is summarized, never uploaded). Optional: an audio-generation endpoint can import a generated stem.</div>
+    <div class="row knobrow" style="gap:12px">
+      <div class="group" style="width:150px"><label for="aiProvider">Provider</label>
+        <select id="aiProvider"><option value="openrouter">OpenRouter</option><option value="huggingface">Hugging Face</option><option value="custom">Custom (OpenAI-compatible)</option></select></div>
+      <div class="group" style="flex:1"><label for="aiModel">Model</label><input id="aiModel" type="text" placeholder="e.g. anthropic/claude-3.5-sonnet"></div>
+    </div>
+    <div class="group" id="aiBaseRow" style="display:none"><label for="aiBaseUrl">Base URL (chat completions)</label><input id="aiBaseUrl" type="text" placeholder="https://your-host/v1/chat/completions" style="width:100%"></div>
+    <div class="group"><label for="aiKey">API key <span class="dim">— stored in this browser only</span></label><input id="aiKey" type="password" placeholder="sk-…" style="width:100%"></div>
+    <div class="group"><label for="aiIdea">Describe the song</label>
+      <textarea id="aiIdea" rows="3" style="width:100%;resize:vertical" placeholder="e.g. dreamy lo-fi hip hop in A minor, ~80 bpm, 16 bars, wistful late-night vibe with a simple arp and a laid-back beat"></textarea></div>
+    <details style="margin:6px 0">
+      <summary class="dim" style="cursor:pointer;font-size:12px">Advanced — audio-generation endpoint (optional)</summary>
+      <div class="group" style="margin-top:8px"><label for="aiAudioUrl">Audio endpoint URL <span class="dim">— POSTs the prompt, expects audio back; imported as a stem</span></label><input id="aiAudioUrl" type="text" placeholder="https://…  (must allow browser CORS)" style="width:100%"></div>
+      <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px"><input type="checkbox" id="aiGenAudio"> also request an audio stem from this endpoint</label>
+    </details>
+    <div style="display:flex;align-items:center;gap:14px;margin-top:12px">
+      <button id="aiComposeRun" class="primary">✨ Generate / Edit</button>
+      <button id="aiSaveCfg" title="Save provider/key for next time">Save settings</button>
+      <span class="readout" id="aiStatus" style="flex:1"></span>
+    </div>
   </div>
 </div>
 
@@ -597,7 +746,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.7.3";
+const APP_VERSION="1.10.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -627,9 +776,15 @@ const OSC_PRESETS = [
   { wave:"sawtooth", octave:0, semis:0, detune:9,  level:0.6, pan:-0.35 },
   { wave:"square",   octave:0, semis:6, detune:-9, level:0.5, pan:0.35 },
 ];
-const synthParams = { filterType:"lowpass", cutoff:8000, resonance:0.8, attack:0.01, decay:0.12, sustain:0.7, release:0.25,
-  oscs:[ {...OSC_PRESETS[0]} ] };   // start with ONE oscillator; add up to 2 more
+const synthParams = { filterType:"lowpass", cutoff:8000, resonance:0.8, glide:0, attack:0.01, decay:0.12, sustain:0.7, release:0.25,
+  oscs:[ {...OSC_PRESETS[0]} ] };   // start with ONE oscillator; add as many more as you like
+  // glide = portamento seconds: each osc starts at the previous note's pitch and slides to the new one
 const OSC_COLORS = ["#4ade80","#38bdf8","#f472b6"];
+// stable per-oscillator color: the first three are hand-picked, the rest walk the
+// hue wheel by the golden angle so any number of oscillators stay visually distinct
+function oscColor(i){ return OSC_COLORS[i] || ("hsl("+Math.round((i*137.508)%360)+",65%,62%)"); }
+// preset used when adding an oscillator beyond the hand-tuned three
+function oscPreset(i){ return OSC_PRESETS[i] || { wave:"sine", octave:0, semis:0, detune:0, level:0.5, pan:0 }; }
 // Per-track insert-FX defaults (drive/level + the modulation/time effects). Each track gets its own copy.
 function fxDefaults(){ return {
   level:  1,
@@ -734,14 +889,26 @@ function resumeAudio(){ try { if (audioCtx && audioCtx.state !== "running") audi
 ["pointerdown","touchend","mouseup","keydown"].forEach(ev=>document.addEventListener(ev, resumeAudio, true));
 
 const activeVoices = new Map();
+let lastLiveMidi = null;   // most recent key pressed — glide origin for the next note
 function createFilter(ctx){ const f=ctx.createBiquadFilter(); f.type=synthParams.filterType; f.frequency.value=synthParams.cutoff; f.Q.value=synthParams.resonance; return f; }
 // Build the oscillator stack for one note into `dest`; returns the started/stoppable oscillators.
-function spawnOscs(ctx, midi, clipWave, dest){
+// startTime anchors the frequency schedule; glideFromMidi (optional) makes each osc slide from
+// that note's pitch to the new one over synthParams.glide seconds (portamento).
+function spawnOscs(ctx, midi, clipWave, dest, startTime, glideFromMidi){
   const oscs=[];
+  const t0 = (startTime!=null) ? startTime : ctx.currentTime;
+  const gl = synthParams.glide||0;
   synthParams.oscs.forEach((o,i)=>{
     const osc=ctx.createOscillator();
     osc.type = (i===0 && clipWave) ? clipWave : (o.wave||"sine");
-    osc.frequency.value = midiToFreq(midi + (o.octave||0)*12 + (o.semis||0));
+    const off = (o.octave||0)*12 + (o.semis||0);
+    const target = midiToFreq(midi + off);
+    if (gl>0.001 && glideFromMidi!=null && glideFromMidi!==midi){
+      osc.frequency.setValueAtTime(Math.max(1, midiToFreq(glideFromMidi + off)), t0);
+      osc.frequency.exponentialRampToValueAtTime(Math.max(1, target), t0 + gl);
+    } else {
+      osc.frequency.setValueAtTime(target, t0);
+    }
     osc.detune.value = o.detune||0;
     const g=ctx.createGain(); g.gain.value = (o.level==null?1:o.level); osc.connect(g);
     if (ctx.createStereoPanner){ const p=ctx.createStereoPanner(); p.pan.value=clamp(o.pan||0,-1,1); g.connect(p).connect(dest); }
@@ -753,8 +920,10 @@ function spawnOscs(ctx, midi, clipWave, dest){
 function playNote(midi){
   const ctx = getCtx(); if (activeVoices.has(midi)) return;
   const filt = createFilter(ctx), env = ctx.createGain(); filt.connect(env).connect(synthBus);
-  const oscs = spawnOscs(ctx, midi, null, filt);
-  const now = ctx.currentTime, peak = 0.22;
+  const now = ctx.currentTime;
+  const oscs = spawnOscs(ctx, midi, null, filt, now, lastLiveMidi);
+  lastLiveMidi = midi;
+  const peak = 0.22;
   const a = Math.max(0.001, synthParams.attack), d = Math.max(0.001, synthParams.decay), s = synthParams.sustain;
   env.gain.setValueAtTime(0.0001, now);
   env.gain.linearRampToValueAtTime(peak, now + a);
@@ -771,10 +940,10 @@ function stopNote(midi){
 }
 // live-update filter on held voices when the user moves the synth controls
 function refreshActiveFilters(){ for (const v of activeVoices.values()){ if (v.filt){ v.filt.type=synthParams.filterType; v.filt.frequency.value=synthParams.cutoff; v.filt.Q.value=synthParams.resonance; } } }
-function playNoteAt(midi, startTime, dur, wave, ctx2, dest2){
+function playNoteAt(midi, startTime, dur, wave, ctx2, dest2, glideFromMidi){
   const ctx = ctx2 || getCtx(); const dest = dest2 || synthBus;
   const filt = createFilter(ctx), env = ctx.createGain(); filt.connect(env).connect(dest);
-  const oscs = spawnOscs(ctx, midi, wave, filt);
+  const oscs = spawnOscs(ctx, midi, wave, filt, startTime, glideFromMidi);
   const peak = 0.2, a = Math.max(0.001, synthParams.attack), d = Math.max(0.001, synthParams.decay),
         s = synthParams.sustain, rel = Math.max(0.02, synthParams.release), sus = Math.max(0.0001, peak*s);
   env.gain.setValueAtTime(0.0001, startTime);
@@ -959,8 +1128,8 @@ window.addEventListener("keydown",(e)=>{
 window.addEventListener("keyup",(e)=>{ const m=KEY_MAP[e.key.toLowerCase()]; if (m==null) return; heldKeys.delete(e.key); stopNote(m); if (keyEls.has(m)) keyEls.get(m).classList.remove("active"); });
 
 /* ============================== Project / timing ============================== */
-const FORMAT_VERSION = 2; // v2: memo layer (analysis, lyrics) + clip loopFill
-const project = { bpm:90, timeSig:{num:4,den:4}, lengthSec:32, loop:{start:0,end:32}, loopEnabled:true, countInBars:1, tracks:[] };
+const FORMAT_VERSION = 3; // v3: sampler layer (pad bank + grid/loop clips); v2: memo layer + clip loopFill
+const project = { bpm:90, timeSig:{num:4,den:4}, lengthSec:32, loop:{start:0,end:32}, loopEnabled:true, countInBars:1, tracks:[], samplerKit:[], meta:{ title:"", artist:"", album:"", genre:"", year:"", key:"", coverBlob:null } };
 let trackSeq=0, clipSeq=0, selectedTrackId=null, currentLabel="Untitled session";
 let PX_PER_SEC = 28;            // timeline zoom (px per second); 28 = 100%
 const TL_PPS_DEF = 28;
@@ -1069,6 +1238,14 @@ function buildPads(){
   const lg=document.getElementById("padLegend");
   if (lg) lg.innerHTML = GROUP_LABELS.map(([label,key])=>'<span><i style="background:'+GROUP_COLORS[key]+'"></i>'+label+'</span>').join("");
 }
+// Move the playhead highlight without rebuilding the grid. Rebuilding every step
+// swaps cells out between a user's mouse-down and mouse-up, which eats the click
+// (you couldn't toggle a cell mid-preview). This only retags the current column.
+function highlightStepCol(tbody, step){
+  tbody.querySelectorAll(".cell.curstep").forEach(c=>c.classList.remove("curstep"));
+  if (step<0) return;
+  tbody.querySelectorAll("tr").forEach(row=>{ const td=row.children[step+1]; const cell=td&&td.querySelector(".cell"); if (cell) cell.classList.add("curstep"); });
+}
 function renderGrid(){
   gridBody.innerHTML="";
   const N=stepsCount(), spB=stepsPerBar(), spb=stepsPerBeat();
@@ -1106,7 +1283,7 @@ let beatPrev={timer:null,step:0,playing:false};
 function beatPreviewStart(){
   if (beatPrev.playing) return;
   beatPrev.playing=true; beatPrev.step=0; beatPrevBtn.textContent="■ Stop"; beatPrevBtn.classList.add("danger");
-  const tick=()=>{ if (!beatPrev.playing) return; const N=stepsCount(), sd=quarterSec()/4, s=beatPrev.step%N, now=getCtx().currentTime+0.02; for (let r=0;r<DRUMS.length;r++) if (beatGrid[r][s]) playDrumAt(r, now); renderGrid(); beatPrev.step++; beatPrev.timer=setTimeout(tick, sd*1000); };
+  const tick=()=>{ if (!beatPrev.playing) return; const N=stepsCount(), sd=quarterSec()/4, s=beatPrev.step%N, now=getCtx().currentTime+0.02; for (let r=0;r<DRUMS.length;r++) if (beatGrid[r][s]) playDrumAt(r, now); highlightStepCol(gridBody, s); beatPrev.step++; beatPrev.timer=setTimeout(tick, sd*1000); };
   tick();
 }
 function beatPreviewStop(){ beatPrev.playing=false; if (beatPrev.timer) clearTimeout(beatPrev.timer); beatPrev.timer=null; renderGrid(); beatPrevBtn.textContent="▶ Preview"; beatPrevBtn.classList.remove("danger"); }
@@ -1120,9 +1297,164 @@ beatAddBtn.addEventListener("click",()=>{
   addClip(track, { id:++clipSeq, grid: beatGrid.map(row=>row.slice()) });
 });
 
+/* ============================== Sample beat (sampler) ==============================
+   A global sample kit (project.samplerKit) played like the synth beat machine: an expandable
+   N×N pad bank (Play mode = tap to audition; Edit mode = load / rename / mark-loop / drag to
+   reorder & group) plus a step grid. "＋ Timeline" drops the pattern onto a Sampler lane; a pad
+   flagged "loop" can be dropped as a continuous loop clip. Clips are { kind:"grid", grid } or
+   { kind:"loop", pad }; event expansion = samplerClipEvents(). */
+const MAX_SAMP_PADS = 64;
+const sampBank=document.getElementById("sampBank"), sampGridBody=document.getElementById("sampGridBody"),
+      sampBarsSel=document.getElementById("sampBarsSel"), sampLenOut=document.getElementById("sampLenOut");
+let samplerEdit={ grid:[], bars:1, selected:-1, size:2, mode:"play" };
+let sampPrev={ playing:false, step:0, timer:null };
+let sampDragIdx=-1, sampLoadIdx=-1;
+function kit(){ return project.samplerKit || (project.samplerKit=[]); }
+const sampVisiblePads=()=> samplerEdit.size*samplerEdit.size;
+const sampStepsCount=()=> samplerEdit.bars*stepsPerBar();
+function sampEnsureGrid(){
+  const N=sampStepsCount(), old=samplerEdit.grid, oldLen=old[0]?old[0].length:0;
+  samplerEdit.grid=[]; for (let r=0;r<MAX_SAMP_PADS;r++){ const row=new Array(N).fill(false); for (let s=0;s<Math.min(oldLen,N);s++) row[s]=!!(old[r]&&old[r][s]); samplerEdit.grid.push(row); }
+}
+sampEnsureGrid();
+function updateSampLen(){ if(sampLenOut){ const steps=sampStepsCount(); sampLenOut.textContent=steps+" steps · "+(steps*(quarterSec()/4)).toFixed(2)+" s"; } }
+function refreshSampler(){ renderSampBank(); renderSampPadDetail(); renderSampGrid(); updateSampLen(); }
+// audition / preview playback of a pad
+function samplerPlayPad(pad, when, loop, dur, dest){
+  if (!pad||!pad.buffer) return null;
+  const ctx=getCtx(), s=ctx.createBufferSource(); s.buffer=pad.buffer; if (loop) s.loop=true;
+  const g=ctx.createGain(); g.gain.value=(pad.gain==null?1:pad.gain); s.connect(g); g.connect(dest||ctx.destination);
+  s.start(when); if (loop && dur) s.stop(when+dur); return s;
+}
+const sampFileInput=document.createElement("input"); sampFileInput.type="file"; sampFileInput.accept="audio/*"; sampFileInput.style.display="none"; document.body.appendChild(sampFileInput);
+function renderSampBank(){
+  if(!sampBank) return; const K=kit(), edit=(samplerEdit.mode==="edit");
+  sampBank.style.gridTemplateColumns="repeat("+samplerEdit.size+",1fr)"; sampBank.innerHTML="";
+  for (let i=0;i<sampVisiblePads();i++){
+    const pad=K[i];
+    const el=document.createElement("div");
+    el.className="samp-pad"+(pad?" loaded":"")+(samplerEdit.selected===i&&edit?" sel":"");
+    el.innerHTML='<span class="pnum">'+(i+1)+'</span>'+(pad
+      ? '<span class="pnm">'+escapeHtml(pad.name||("Pad "+(i+1)))+'</span>'+(pad.loop?'<span class="ploopflag">↻</span>':'')
+      : '<span class="plus">'+(edit?'＋':'')+'</span>');
+    el.title = edit ? (pad?"Click to edit · drag to reorder":"Click to load a sample") : (pad?"Tap to play":"empty");
+    if (edit && pad){
+      el.draggable=true;
+      el.addEventListener("dragstart",(e)=>{ sampDragIdx=i; el.classList.add("dragging"); e.dataTransfer.effectAllowed="move"; try{ e.dataTransfer.setData("text/plain",String(i)); }catch(_){} });
+      el.addEventListener("dragend",()=>{ el.classList.remove("dragging"); sampDragIdx=-1; });
+      el.addEventListener("dragover",(e)=>{ if(sampDragIdx>=0&&sampDragIdx!==i){ e.preventDefault(); el.classList.add("dragover"); } });
+      el.addEventListener("dragleave",()=>el.classList.remove("dragover"));
+      el.addEventListener("drop",(e)=>{ e.preventDefault(); el.classList.remove("dragover"); sampSwapPads(sampDragIdx,i); });
+    }
+    el.addEventListener("click",()=>{
+      if (edit){
+        if (!K[i]){ sampLoadIdx=i; sampFileInput.value=""; sampFileInput.click(); return; }
+        samplerEdit.selected=i; samplerPlayPad(K[i], getCtx().currentTime+0.01, false); renderSampBank(); renderSampPadDetail();
+      } else if (K[i]) samplerPlayPad(K[i], getCtx().currentTime+0.01, false);
+    });
+    sampBank.appendChild(el);
+  }
+}
+function sampSwapPads(a,b){
+  if (a<0||b<0||a===b) return; const K=kit();
+  const tp=K[a]; K[a]=K[b]; K[b]=tp;
+  const tg=samplerEdit.grid[a]; samplerEdit.grid[a]=samplerEdit.grid[b]; samplerEdit.grid[b]=tg;
+  if (samplerEdit.selected===a) samplerEdit.selected=b; else if (samplerEdit.selected===b) samplerEdit.selected=a;
+  renderSampBank(); renderSampPadDetail(); renderSampGrid(); scheduleAutosave();
+}
+// selected-pad controls — only shown in Edit mode
+function renderSampPadDetail(){
+  const host=document.getElementById("sampPadDetail"); if(!host) return;
+  const edit=(samplerEdit.mode==="edit"), K=kit(), i=samplerEdit.selected, pad=(edit&&i>=0)?K[i]:null;
+  host.style.display = edit ? "flex" : "none"; host.innerHTML="";
+  if (!edit) return;
+  if (!pad){ host.innerHTML='<span class="empty-hint">Click an empty pad to load a sample · click a loaded pad to rename it, set its volume, mark it a loop, drop it on the timeline, or clear it. Drag pads to reorder &amp; group.</span>'; return; }
+  const r1=document.createElement("div"); r1.className="sd-row";
+  r1.innerHTML='<b style="color:var(--sampler-clip)">Pad '+(i+1)+'</b>';
+  const nm=document.createElement("input"); nm.className="pname"; nm.value=pad.name||("Pad "+(i+1));
+  nm.addEventListener("change",()=>{ pad.name=nm.value; renderSampBank(); renderSampGrid(); scheduleAutosave(); });
+  r1.appendChild(nm);
+  const r2=document.createElement("div"); r2.className="sd-row"; r2.innerHTML='<span>vol</span>';
+  const gr=document.createElement("input"); gr.type="range"; gr.min="0"; gr.max="1.5"; gr.step="0.01"; gr.value=(pad.gain==null?1:pad.gain);
+  gr.addEventListener("input",()=>{ pad.gain=parseFloat(gr.value); }); gr.addEventListener("change",scheduleAutosave); r2.appendChild(gr);
+  const r3=document.createElement("div"); r3.className="sd-row";
+  const aud=document.createElement("button"); aud.textContent="▶ Audition"; aud.addEventListener("click",()=>samplerPlayPad(pad,getCtx().currentTime+0.01,false));
+  const loop=document.createElement("button"); loop.className="samp-loopbtn"+(pad.loop?" on":""); loop.textContent="loop"; loop.title="Mark as a loop sample"; loop.addEventListener("click",()=>{ pad.loop=!pad.loop; loop.classList.toggle("on",pad.loop); renderSampBank(); scheduleAutosave(); });
+  const toLoop=document.createElement("button"); toLoop.textContent="→ loop clip"; toLoop.title="Drop this sample on the timeline as a continuous loop"; toLoop.addEventListener("click",()=>{ addSamplerLoopClip(i); flash(toLoop,"✓ added"); });
+  const clr=document.createElement("button"); clr.textContent="✕ clear"; clr.style.marginLeft="auto"; clr.addEventListener("click",()=>{ K[i]=null; samplerEdit.selected=-1; renderSampBank(); renderSampPadDetail(); renderSampGrid(); scheduleAutosave(); });
+  r3.appendChild(aud); r3.appendChild(loop); r3.appendChild(toLoop); r3.appendChild(clr);
+  host.appendChild(r1); host.appendChild(r2); host.appendChild(r3);
+}
+sampFileInput.addEventListener("change", async ()=>{
+  const i=sampLoadIdx; if (i<0||!sampFileInput.files.length) return;
+  const f=sampFileInput.files[0], ctx=getCtx(), K=kit();
+  try {
+    const buffer=await ctx.decodeAudioData(await f.arrayBuffer());
+    K[i]={ name:f.name.replace(/\.[^.]+$/,"").slice(0,24), blob:f, buffer, gain:1, loop:buffer.duration>1.2 };
+    samplerEdit.selected=i;
+    renderSampBank(); renderSampPadDetail(); renderSampGrid(); scheduleAutosave();
+  } catch(e){ alert("Couldn't decode \""+f.name+"\" — unsupported or corrupt audio file."); }
+});
+function renderSampGrid(){
+  if(!sampGridBody) return; const K=kit(); sampGridBody.innerHTML="";
+  const N=sampStepsCount(), spB=stepsPerBar(), spb=stepsPerBeat();
+  let any=false;
+  for (let r=0;r<sampVisiblePads();r++){
+    const pad=K[r]; if(!pad) continue; any=true;
+    const tr=document.createElement("tr");
+    const lab=document.createElement("td"); lab.className="lab"; lab.textContent=pad.name||("Pad "+(r+1)); tr.appendChild(lab);
+    for (let s=0;s<N;s++){
+      const td=document.createElement("td"); const cell=document.createElement("div");
+      cell.className="cell"+((s%spB===0)?" bar1":((s%spb===0)?" beat4":""))+(samplerEdit.grid[r][s]?" on":"")+((sampPrev.playing && (sampPrev.step%N)===s)?" curstep":"");
+      cell.addEventListener("click",()=>{ samplerEdit.grid[r][s]=!samplerEdit.grid[r][s]; if (samplerEdit.grid[r][s]) samplerPlayPad(pad, getCtx().currentTime+0.01, false); renderSampGrid(); });
+      td.appendChild(cell); tr.appendChild(td);
+    }
+    sampGridBody.appendChild(tr);
+  }
+  if (!any){ const tr=document.createElement("tr"); const td=document.createElement("td"); td.className="lab"; td.style.color="var(--muted)"; td.colSpan=2; td.textContent="Load a pad (Edit mode) to start a pattern"; tr.appendChild(td); sampGridBody.appendChild(tr); }
+}
+function sampPreviewStart(){
+  const K=kit(); sampPrev.playing=true; sampPrev.step=0;
+  document.getElementById("sampPrevBtn").textContent="■ Stop";
+  const tick=()=>{ if(!sampPrev.playing) return; const N=sampStepsCount(), sd=quarterSec()/4, s=sampPrev.step%N, now=getCtx().currentTime+0.02;
+    for (let r=0;r<sampVisiblePads();r++){ if (samplerEdit.grid[r][s] && K[r]) samplerPlayPad(K[r], now, false); }
+    highlightStepCol(sampGridBody, s); sampPrev.step++; sampPrev.timer=setTimeout(tick, sd*1000); };
+  tick();
+}
+function sampPreviewStop(){ sampPrev.playing=false; if(sampPrev.timer) clearTimeout(sampPrev.timer); sampPrev.timer=null; const b=document.getElementById("sampPrevBtn"); if(b) b.textContent="▶ Preview"; renderSampGrid(); }
+function setSampMode(m){ samplerEdit.mode=m; const pb=document.getElementById("sampModePlay"), eb=document.getElementById("sampModeEdit"); if(pb)pb.classList.toggle("seg-on",m==="play"); if(eb)eb.classList.toggle("seg-on",m==="edit"); renderSampBank(); renderSampPadDetail(); }
+function setSampSize(n){ samplerEdit.size=clamp(Math.round(n),2,8); const o=document.getElementById("sampSizeOut"); if(o)o.textContent=samplerEdit.size+"×"+samplerEdit.size; renderSampBank(); renderSampGrid(); }
+function addSamplerLoopClip(padIdx){
+  const pad=kit()[padIdx]; if (!pad || !pad.buffer) return;
+  const track=ensureTrack("sampler");
+  addClip(track, { id:++clipSeq, kind:"loop", pad:padIdx, loopFill:true });
+}
+(function wireSampler(){
+  const prevBtn=document.getElementById("sampPrevBtn"), clearBtn=document.getElementById("sampClearBtn"), addBtn=document.getElementById("sampAddBtn");
+  if(!prevBtn) return;
+  prevBtn.addEventListener("click",()=>{ sampPrev.playing?sampPreviewStop():sampPreviewStart(); });
+  clearBtn.addEventListener("click",()=>{ sampEnsureGrid(); samplerEdit.grid.forEach(row=>row.fill(false)); renderSampGrid(); });
+  sampBarsSel.addEventListener("change",()=>{ samplerEdit.bars=parseInt(sampBarsSel.value,10)||1; sampEnsureGrid(); renderSampGrid(); updateSampLen(); });
+  document.getElementById("sampModePlay").addEventListener("click",()=>setSampMode("play"));
+  document.getElementById("sampModeEdit").addEventListener("click",()=>setSampMode("edit"));
+  document.getElementById("sampSizeMinus").addEventListener("click",()=>setSampSize(samplerEdit.size-1));
+  document.getElementById("sampSizePlus").addEventListener("click",()=>setSampSize(samplerEdit.size+1));
+  addBtn.addEventListener("click",()=>{
+    if (!samplerEdit.grid.some(row=>row.some(Boolean))){ flash(addBtn,"Program some hits first"); return; }
+    const track=ensureTrack("sampler");
+    addClip(track, { id:++clipSeq, kind:"grid", grid: samplerEdit.grid.map(row=>row.slice()) });
+    flash(addBtn,"✓ added");
+  });
+  setSampSize(samplerEdit.size); setSampMode(samplerEdit.mode); refreshSampler();
+})();
+
 /* ============================== Timeline model ============================== */
 function beatSteps(clip){ return (clip.grid && clip.grid[0]) ? clip.grid[0].length : 16; }
-function patternSec(track, clip){ return track.type==="arp" ? clip.steps.length*(quarterSec()/clip.rate) : beatSteps(clip)*(quarterSec()/4); }
+function patternSec(track, clip){
+  if (track.type==="arp") return clip.steps.length*(quarterSec()/clip.rate);
+  if (track.type==="sampler" && clip.kind==="loop"){ const pad=project.samplerKit&&project.samplerKit[clip.pad]; return (pad&&pad.buffer)?Math.max(0.05,pad.buffer.duration):beatUnitSec()*4; }
+  return beatSteps(clip)*(quarterSec()/4);
+}
 function naturalBeats(track, clip){ return Math.max(1, Math.round(patternSec(track,clip)/beatUnitSec())); }
 function clipDuration(track, clip){
   if (track.type==="voice"||track.type==="memo") return clip.audioDur||1;
@@ -1138,7 +1470,7 @@ function ensureTrack(type){
 }
 function addTrack(type){
   const n = project.tracks.filter(t=>t.type===type).length + 1;
-  const t = { id:++trackSeq, type, name:({arp:"Arp ",beat:"Beat ",voice:"Voice ",memo:"Memo "}[type]||"Track ")+n, clips:[], fx: fxDefaults(), transpose:0 };
+  const t = { id:++trackSeq, type, name:({arp:"Arp ",beat:"Beat ",sampler:"Sampler ",voice:"Voice ",memo:"Memo "}[type]||"Track ")+n, clips:[], fx: fxDefaults(), transpose:0 };
   project.tracks.push(t); ensureTrackChain(t); selectedTrackId=t.id; renderTimeline(); return t;
 }
 function addClip(track, clip){
@@ -1222,6 +1554,11 @@ function renderTimeline(){
       imp.addEventListener("click",(e)=>{ e.stopPropagation(); memoImportTo(track); });
       acts.appendChild(imp);
     }
+    if (track.type==="sampler"){
+      const ed=document.createElement("button"); ed.className="del fxbtn"; ed.textContent="🎛 Sample beat"; ed.title="Open the Sample beat section to load pads & program patterns";
+      ed.addEventListener("click",(e)=>{ e.stopPropagation(); const s=document.querySelector('.csec[data-key="sampler"]'); if(s){ setCollapsed(s,false); saveLayout(); s.scrollIntoView({behavior:"smooth",block:"start"}); } });
+      acts.appendChild(ed);
+    }
     if (track.type==="voice"){
       const cv=document.createElement("button"); cv.className="del fxbtn"; cv.textContent="→📝"; cv.title="Convert this voice layer to an annotated memo layer (chords · notes · tempo · lyrics)";
       cv.addEventListener("click",(e)=>{ e.stopPropagation(); convertVoiceTrack(track); });
@@ -1246,6 +1583,11 @@ function renderTimeline(){
         let title, meta, loopBadge="";
         if (track.type==="arp"){ title="Arp"; meta=clip.steps.filter(s=>!s.rest).length+" notes"; loopBadge='<div class="cloop">'+(clip.loopFill?'∞ fill':'⟳ '+(clip.lengthBeats||naturalBeats(track,clip)))+'</div>'; }
         else if (track.type==="beat"){ title="Beat"; meta=clip.grid.flat().filter(Boolean).length+" hits"; loopBadge='<div class="cloop">'+(clip.loopFill?'∞ fill':'⟳ '+(clip.lengthBeats||naturalBeats(track,clip)))+'</div>'; }
+        else if (track.type==="sampler"){
+          if (clip.kind==="loop"){ const pad=(project.samplerKit||[])[clip.pad]; title="🔁 Loop"; meta=(pad?(pad.name||("Pad "+(clip.pad+1))):"—"); }
+          else { title="🎛 Sampler"; meta=(clip.grid?clip.grid.flat().filter(Boolean).length:0)+" hits"; }
+          loopBadge='<div class="cloop">'+(clip.loopFill?'∞ fill':'⟳ '+(clip.lengthBeats||naturalBeats(track,clip)))+'</div>';
+        }
         else { title="🎙 Voice"; meta=(clip.audioDur||0).toFixed(1)+"s"+(clip.buffer?"":" …"); }
         el.innerHTML='<div class="ctitle">'+title+'</div><div class="cmeta">'+meta+'</div><div class="cdel">✕</div>'+loopBadge;
         const lb=el.querySelector(".cloop"); if (lb) lb.addEventListener("click",(e)=>{ e.stopPropagation(); openLoopPopup(track, clip, e.target); });
@@ -1263,6 +1605,7 @@ function renderTimeline(){
   });
   positionPlayhead();
   if (typeof updateTransposeUI==="function") updateTransposeUI();
+  if (typeof scheduleAutosave==="function") scheduleAutosave();
 }
 function fmtBars(sec){ const bu=beatUnitSec(), bpb=beatsPerBar(); const beats=sec/bu; const bar=Math.floor(beats/bpb)+1; const beat=(beats%bpb); return bar+"."+(beat.toFixed(0)*1+1); }
 
@@ -1321,11 +1664,33 @@ document.addEventListener("pointerdown",(e)=>{ if (loopPopup.style.display!=="no
 
 /* ============================== Master transport ============================== */
 const transport={ playing:false, timer:null, raf:null, startCtx:0, evIdx:0, iter:0, events:[], loopStart:0, loopLen:0, srcs:new Set() };
+// Pure (DOM-free, testable): expand one sampler clip into pad-trigger events.
+// o = { stepSec, clipDur, patSec, clipStart }. A "loop" clip yields a single looped
+// event spanning clipDur; a grid clip yields one-shot events per active cell, repeated.
+function samplerClipEvents(clip, o){
+  const evs=[];
+  if (clip.kind==="loop"){ evs.push({ time:o.clipStart, pad:clip.pad, loop:true, dur:o.clipDur }); return evs; }
+  const grid=clip.grid||[], steps=grid[0]?grid[0].length:16;
+  for (let off=0; off<o.clipDur-1e-6; off+=o.patSec){
+    for (let r=0;r<grid.length;r++) for (let s=0;s<steps;s++){
+      if (!grid[r][s]) continue; const local=off+s*o.stepSec;
+      if (local>=o.clipDur-1e-6) continue;
+      evs.push({ time:o.clipStart+local, pad:r, loop:false });
+    }
+  }
+  return evs;
+}
 function forEachClipEvent(cb){
   const spq=quarterSec();
   for (const tr of project.tracks){
     for (const clip of tr.clips){
       if (tr.type==="voice"||tr.type==="memo"){ if (clip.buffer || clip.blob) cb({ kind:"voice", time:clip.start, clip, track:tr }); continue; }
+      if (tr.type==="sampler"){
+        const clipDur=clipDuration(tr,clip);
+        samplerClipEvents(clip, { stepSec:spq/4, clipDur, patSec:patternSec(tr,clip), clipStart:clip.start })
+          .forEach(e=>cb({ kind:"sample", time:e.time, pad:e.pad, loop:e.loop, dur:e.dur, track:tr }));
+        continue;
+      }
       const patSec=patternSec(tr,clip), clipDur=clipDuration(tr,clip);
       if (patSec<=0) continue;
       for (let off=0; off<clipDur-1e-6; off+=patSec){
@@ -1342,14 +1707,14 @@ function forEachClipEvent(cb){
 }
 function buildEvents(){
   const start=project.loop.start, end=project.loop.end, evs=[];
-  forEachClipEvent(ev=>{ if (ev.time>=start && ev.time<end){ if (ev.kind==="voice") evs.push({ t:ev.time-start, kind:"voice", buffer:ev.clip.buffer, track:ev.track }); else evs.push({ t:ev.time-start, kind:ev.kind, midi:ev.midi, dur:ev.dur, wave:ev.wave, drum:ev.drum, track:ev.track }); } });
+  forEachClipEvent(ev=>{ if (ev.time>=start && ev.time<end){ if (ev.kind==="voice") evs.push({ t:ev.time-start, kind:"voice", buffer:ev.clip.buffer, track:ev.track }); else evs.push({ t:ev.time-start, kind:ev.kind, midi:ev.midi, dur:ev.dur, wave:ev.wave, drum:ev.drum, pad:ev.pad, loop:ev.loop, track:ev.track }); } });
   evs.sort((a,b)=>a.t-b.t);
   transport.events=evs; transport.loopStart=start; transport.loopLen=Math.max(0.1, end-start);
 }
 function transportPlay(){
   if (transport.playing) return;
   const ctx=getCtx(); buildEvents();
-  transport.playing=true; transport.evIdx=0; transport.iter=0;
+  transport.playing=true; transport.evIdx=0; transport.iter=0; transport._glidePrev=new Map();
   const startCtx=ctx.currentTime+0.12, ci=countInSec();
   transport.countIn=ci;
   transport.musicCtx=startCtx+ci;   // ctx time where timeline position loopStart begins
@@ -1368,9 +1733,10 @@ function transportScheduler(){
     if (evCtx>=ctx.currentTime-0.02){
       const ch=e.track?ensureTrackChain(e.track):null, dest=ch?ch.input:(e.kind==="drum"?masterGain:synthBus);
       const tr=(e.track&&e.track.type==="arp")?(e.track.transpose||0):0;
-      if (e.kind==="note") playNoteAt(e.midi+tr,evCtx,e.dur,e.wave,ctx,dest);
+      if (e.kind==="note"){ const m=e.midi+tr, gp=transport._glidePrev||(transport._glidePrev=new Map()); playNoteAt(m,evCtx,e.dur,e.wave,ctx,dest,gp.get(e.track)); gp.set(e.track,m); }
       else if (e.kind==="drum") playDrumAt(e.drum,evCtx,1,ctx,dest);
       else if (e.kind==="voice" && e.buffer){ const s=ctx.createBufferSource(); s.buffer=e.buffer; s.connect(dest); s.onended=()=>transport.srcs.delete(s); transport.srcs.add(s); s.start(evCtx); }
+      else if (e.kind==="sample"){ const pad=project.samplerKit&&project.samplerKit[e.pad]; if (pad&&pad.buffer){ const s=ctx.createBufferSource(); s.buffer=pad.buffer; if (e.loop) s.loop=true; const g=ctx.createGain(); g.gain.value=(pad.gain==null?1:pad.gain); s.connect(g); g.connect(dest); s.onended=()=>transport.srcs.delete(s); transport.srcs.add(s); s.start(evCtx); if (e.loop && e.dur) s.stop(evCtx+e.dur); } }
     }
     transport.evIdx++;
     if (transport.evIdx>=ev.length){ transport.evIdx=0; transport.iter++; if (!project.loopEnabled) break; }
@@ -1413,6 +1779,7 @@ loopResetBtn.addEventListener("click",()=>{ project.loop.start=0; project.loop.e
 document.getElementById("countInSel").addEventListener("change",(e)=>{ project.countInBars=parseInt(e.target.value,10)||0; renderTimeline(); });
 addArpTrackBtn.addEventListener("click",()=>addTrack("arp"));
 addBeatTrackBtn.addEventListener("click",()=>addTrack("beat"));
+document.getElementById("addSamplerTrackBtn").addEventListener("click",()=>{ addTrack("sampler"); const s=document.querySelector('.csec[data-key="sampler"]'); if(s){ setCollapsed(s,false); saveLayout(); s.scrollIntoView({behavior:"smooth",block:"start"}); } });
 
 /* ---- timeline zoom (buttons · ctrl/cmd+scroll · touch pinch) ---- */
 function setTimelineZoom(pps, anchorPx){
@@ -2191,6 +2558,70 @@ function memoLrc(clip){
   return lines.map(l=>ts(l.t)+l.words.join(" ")).join("\n")+"\n";
 }
 function memoLabels(items){ return items.map(it=>it.start.toFixed(6)+"\t"+it.end.toFixed(6)+"\t"+it.label).join("\n")+"\n"; }
+
+/* ---- Song-package builders (DOM-free, lifted by the test suite) ---- */
+// Group word-timed lyrics into display lines (a >0.8 s gap starts a new line).
+function lyricLines(words){
+  const lines=[]; let cur=null, curEnd=0;
+  (words||[]).forEach(wd=>{
+    if (!cur || wd.start-curEnd>0.8){ if (cur) lines.push(cur); cur={ start:wd.start, end:wd.end||wd.start, words:[] }; }
+    cur.words.push(wd.text); curEnd=cur.end=(wd.end||wd.start);
+  });
+  if (cur) lines.push(cur); return lines;
+}
+// SRT subtitles from word timings (for karaoke/video overlay tools).
+function memoSrt(clip){
+  const lines=lyricLines(clip&&clip.lyricsWords); if (!lines.length) return null;
+  const pad=(n,l)=>String(n).padStart(l,"0");
+  const fmt=(s)=>{ s=Math.max(0,s); const h=Math.floor(s/3600), m=Math.floor(s%3600/60), ss=Math.floor(s%60), ms=Math.round((s-Math.floor(s))*1000); return pad(h,2)+":"+pad(m,2)+":"+pad(ss,2)+","+pad(ms,3); };
+  return lines.map((l,i)=>(i+1)+"\n"+fmt(l.start)+" --> "+fmt(l.end)+"\n"+l.words.join(" ")+"\n").join("\n")+"\n";
+}
+function songMetadataJson(meta, stems){
+  return JSON.stringify({
+    title:meta.title||"", artist:meta.artist||"", album:meta.album||"", genre:meta.genre||"",
+    year:meta.year||"", bpm:meta.bpm||null, key:meta.key||"", durationSec:meta.durationSec||null,
+    lyrics: meta.unsyncedLyrics||"", exportedFrom:"Pitch Studio "+APP_VERSION, format:meta.audioFormat||"",
+    stems: stems||[]
+  }, null, 2);
+}
+// ID3v2.3 tag bytes (UTF-16 text frames, USLT/SYLT lyrics, APIC cover) → Uint8Array.
+function buildId3(meta){
+  meta=meta||{};
+  const utf16=(s)=>{ s=String(s==null?"":s); const out=[0xFF,0xFE]; for (const ch of s){ let c=ch.codePointAt(0); if (c>0xFFFF){ c-=0x10000; const hi=0xD800+(c>>10), lo=0xDC00+(c&0x3FF); out.push(hi&0xff,hi>>8,lo&0xff,lo>>8); } else out.push(c&0xff,c>>8); } return out; };
+  const latin1=(s)=>{ s=String(s==null?"":s); const out=[]; for (let i=0;i<s.length;i++) out.push(s.charCodeAt(i)&0xff); return out; };
+  const frames=[];
+  const push=(id,body)=>{ const len=body.length; frames.push([ id.charCodeAt(0),id.charCodeAt(1),id.charCodeAt(2),id.charCodeAt(3), (len>>>24)&0xff,(len>>>16)&0xff,(len>>>8)&0xff,len&0xff, 0,0, ...body ]); };
+  const text=(id,val)=>{ if (val==null||val==="") return; push(id,[0x01,...utf16(val),0,0]); };
+  text("TIT2",meta.title); text("TPE1",meta.artist); text("TALB",meta.album);
+  text("TCON",meta.genre); text("TYER",meta.year);
+  if (meta.bpm) text("TBPM",String(Math.round(meta.bpm)));
+  if (meta.key) text("TKEY",meta.key);
+  if (meta.unsyncedLyrics){ push("USLT",[0x01,0x65,0x6e,0x67, 0xFF,0xFE,0,0, ...utf16(meta.unsyncedLyrics)]); }
+  if (meta.syncedLyrics && meta.syncedLyrics.length){
+    const body=[0x01,0x65,0x6e,0x67, 0x02, 0x01, 0xFF,0xFE,0,0];
+    meta.syncedLyrics.forEach(w=>{ const ms=Math.max(0,Math.round((w.start||0)*1000)); body.push(...utf16(w.text||""),0,0, (ms>>>24)&0xff,(ms>>>16)&0xff,(ms>>>8)&0xff,ms&0xff); });
+    push("SYLT",body);
+  }
+  if (meta.coverJpeg && meta.coverJpeg.length){ push("APIC",[0x00, ...latin1("image/jpeg"),0x00, 0x03, 0x00, ...meta.coverJpeg]); }
+  let size=0; frames.forEach(f=>size+=f.length);
+  const ss=[(size>>>21)&0x7f,(size>>>14)&0x7f,(size>>>7)&0x7f,size&0x7f];
+  const head=[0x49,0x44,0x33, 0x03,0x00, 0x00, ...ss];
+  const out=new Uint8Array(head.length+size); out.set(head,0); let p=head.length; frames.forEach(f=>{ out.set(f,p); p+=f.length; });
+  return out;
+}
+// 16-bit PCM WAV bytes, optionally with extra RIFF chunks (e.g. an embedded ID3 tag).
+function wavBytes16(buffer, extraChunks){
+  const numCh=Math.min(2,buffer.numberOfChannels), sr=buffer.sampleRate, len=buffer.length, blockAlign=numCh*2, dataLen=len*blockAlign;
+  let extraLen=0; (extraChunks||[]).forEach(c=>{ extraLen+=8+c.data.length+(c.data.length&1); });
+  const ab=new ArrayBuffer(44+dataLen+extraLen), dv=new DataView(ab); let p=0;
+  const ws=s=>{ for (let i=0;i<s.length;i++) dv.setUint8(p++,s.charCodeAt(i)); };
+  const u32=v=>{ dv.setUint32(p,v,true); p+=4; }, u16=v=>{ dv.setUint16(p,v,true); p+=2; };
+  ws("RIFF"); u32(36+dataLen+extraLen); ws("WAVE"); ws("fmt "); u32(16); u16(1); u16(numCh); u32(sr); u32(sr*blockAlign); u16(blockAlign); u16(16); ws("data"); u32(dataLen);
+  const chans=[]; for (let c=0;c<numCh;c++) chans.push(buffer.getChannelData(c));
+  for (let i=0;i<len;i++) for (let c=0;c<numCh;c++){ let s=Math.max(-1,Math.min(1,chans[c][i])); dv.setInt16(p, s<0?s*0x8000:s*0x7FFF, true); p+=2; }
+  (extraChunks||[]).forEach(c=>{ ws(c.id); u32(c.data.length); for (let i=0;i<c.data.length;i++) dv.setUint8(p++,c.data[i]); if (c.data.length&1) dv.setUint8(p++,0); });
+  return new Uint8Array(ab);
+}
 const CRC_TABLE=(()=>{ const t=new Uint32Array(256); for(let n=0;n<256;n++){ let c=n; for(let k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1); t[n]=c>>>0; } return t; })();
 function crc32(u8){ let c=0xFFFFFFFF; for(let i=0;i<u8.length;i++) c=CRC_TABLE[(c^u8[i])&0xFF]^(c>>>8); return (c^0xFFFFFFFF)>>>0; }
 function makeZip(files){ // store-only zip; files: [{name, data:Uint8Array}]
@@ -2569,13 +3000,15 @@ async function renderMix(trackFilter, applyMasterEq){
   // decode voice blobs into the offline context
   const vbuf={};
   for (const tr of project.tracks){ if (tr.type!=="voice"&&tr.type!=="memo") continue; if (trackFilter && !trackFilter(tr)) continue; for (const clip of tr.clips){ if (!clip.blob) continue; const b=await decodeBlob(clip.blob, octx); if (b) vbuf[clip.id]=b; } }
+  const glidePrev=new Map();
   forEachClipEvent(ev=>{
     if (trackFilter && !trackFilter(ev.track)) return;
     const ch=chains.get(ev.track); if (!ch) return; const dest=ch.input;
     const tr=(ev.track.type==="arp")?(ev.track.transpose||0):0;
-    if (ev.kind==="note") playNoteAt(ev.midi+tr, ev.time, ev.dur, ev.wave, octx, dest);
+    if (ev.kind==="note"){ const m=ev.midi+tr; playNoteAt(m, ev.time, ev.dur, ev.wave, octx, dest, glidePrev.get(ev.track)); glidePrev.set(ev.track, m); }
     else if (ev.kind==="drum") playDrumAt(ev.drum, ev.time, 1, octx, dest);
     else if (ev.kind==="voice"){ const b=vbuf[ev.clip.id]; if (b){ const s=octx.createBufferSource(); s.buffer=b; s.connect(dest); s.start(ev.time); } }
+    else if (ev.kind==="sample"){ const pad=project.samplerKit&&project.samplerKit[ev.pad]; if (pad&&pad.buffer){ const s=octx.createBufferSource(); s.buffer=pad.buffer; if (ev.loop) s.loop=true; const g=octx.createGain(); g.gain.value=(pad.gain==null?1:pad.gain); s.connect(g); g.connect(dest); s.start(ev.time); if (ev.loop && ev.dur) s.stop(ev.time+ev.dur); } }
   });
   return await octx.startRendering();
 }
@@ -2601,6 +3034,100 @@ async function doExportStems(){
   exportBtn.textContent=old; exportBtn.disabled=false;
 }
 function flash(btn, msg){ const old=btn.textContent; btn.textContent=msg; btn.classList.add("danger"); setTimeout(()=>{ btn.textContent=old; btn.classList.remove("danger"); },1100); }
+
+/* ============================== Song package export ============================== */
+// Encode a render to MP3 via WebCodecs when the browser supports it (frames concatenate
+// into a valid .mp3, ID3 prepended); otherwise fall back to a WAV with an embedded id3 chunk.
+async function webcodecsMp3(buffer){
+  if (!(window.AudioEncoder && AudioEncoder.isConfigSupported)) return null;
+  const nCh=Math.min(2,buffer.numberOfChannels), sr=buffer.sampleRate;
+  const cfg={ codec:"mp3", sampleRate:sr, numberOfChannels:nCh, bitrate:192000 };
+  let sup; try { sup=await AudioEncoder.isConfigSupported(cfg); } catch(e){ return null; }
+  if (!sup||!sup.supported) return null;
+  return await new Promise((resolve)=>{
+    const chunks=[]; let failed=false;
+    const enc=new AudioEncoder({ output:(c)=>{ const b=new Uint8Array(c.byteLength); c.copyTo(b); chunks.push(b); }, error:()=>{ failed=true; } });
+    try { enc.configure(cfg); } catch(e){ resolve(null); return; }
+    const total=buffer.length, block=sr;
+    for (let off=0; off<total && !failed; off+=block){
+      const n=Math.min(block,total-off), data=new Float32Array(n*nCh);
+      for (let c=0;c<nCh;c++){ const cd=buffer.getChannelData(Math.min(c,buffer.numberOfChannels-1)); for (let i=0;i<n;i++) data[c*n+i]=cd[off+i]; }
+      try { const ad=new AudioData({ format:"f32-planar", sampleRate:sr, numberOfFrames:n, numberOfChannels:nCh, timestamp:Math.round(off/sr*1e6), data }); enc.encode(ad); ad.close(); }
+      catch(e){ failed=true; }
+    }
+    enc.flush().then(()=>{ try{enc.close();}catch(_){}
+      if (failed||!chunks.length){ resolve(null); return; }
+      let len=0; chunks.forEach(c=>len+=c.length); const out=new Uint8Array(len); let p=0; chunks.forEach(c=>{ out.set(c,p); p+=c.length; }); resolve(out);
+    }).catch(()=>resolve(null));
+  });
+}
+async function encodeSongAudio(buffer, id3bytes){
+  let mp3=null; try { mp3=await webcodecsMp3(buffer); } catch(e){ mp3=null; }
+  if (mp3 && mp3.length){
+    const out=id3bytes&&id3bytes.length ? (()=>{ const o=new Uint8Array(id3bytes.length+mp3.length); o.set(id3bytes,0); o.set(mp3,id3bytes.length); return o; })() : mp3;
+    return { bytes:out, ext:"mp3", codec:"MP3 (WebCodecs)" };
+  }
+  return { bytes: wavBytes16(buffer, id3bytes&&id3bytes.length?[{id:"id3 ",data:id3bytes}]:[]), ext:"wav", codec:"WAV 16-bit (MP3 unsupported by this browser)" };
+}
+// scale an uploaded image down to <=500px and JPEG-encode it for the cover art
+async function coverToJpeg(blob){
+  if (!blob) return null;
+  try {
+    const img=await new Promise((res,rej)=>{ const im=new Image(); im.onload=()=>res(im); im.onerror=rej; im.src=URL.createObjectURL(blob); });
+    const max=500, scale=Math.min(1, max/Math.max(img.width,img.height));
+    const w=Math.max(1,Math.round(img.width*scale)), h=Math.max(1,Math.round(img.height*scale));
+    const cv=document.createElement("canvas"); cv.width=w; cv.height=h; cv.getContext("2d").drawImage(img,0,0,w,h);
+    URL.revokeObjectURL(img.src);
+    const jpegBlob=await new Promise(res=>cv.toBlob(res,"image/jpeg",0.85));
+    return new Uint8Array(await jpegBlob.arrayBuffer());
+  } catch(e){ return null; }
+}
+// find the first memo clip carrying lyrics (drives embedded lyrics + LRC/SRT/TXT)
+function firstLyricClip(){
+  for (const t of project.tracks){ if (t.type!=="memo") continue; for (const c of t.clips){ if (c.lyricsText || (c.lyricsWords&&c.lyricsWords.length)) return c; } }
+  return null;
+}
+async function exportSongPackage(meta){
+  const status=document.getElementById("songStatus");
+  const setStatus=(m)=>{ if (status) status.textContent=m; };
+  if (!project.tracks.some(t=>t.clips.length)){ setStatus("Nothing to export — add some clips first."); return; }
+  const btn=document.getElementById("songExportBtn"); if (btn) btn.disabled=true;
+  try {
+    const base=(meta.title||currentLabel||"song").replace(/[^\w\-]+/g,"_");
+    const lyricClip=firstLyricClip();
+    const lyricsText=(meta.lyrics!=null?meta.lyrics:(lyricClip?lyricClip.lyricsText:""))||"";
+    const syncedLyrics=lyricClip&&lyricClip.lyricsWords?lyricClip.lyricsWords:null;
+    setStatus("Preparing cover art…");
+    const coverJpeg=await coverToJpeg(meta.coverBlob);
+    const id3meta={ title:meta.title, artist:meta.artist, album:meta.album, genre:meta.genre, year:meta.year,
+      bpm:project.bpm, key:meta.key, unsyncedLyrics:lyricsText, syncedLyrics, coverJpeg };
+    const id3=buildId3(id3meta);
+    setStatus("Rendering full mix…");
+    const fullBuf=await renderMix(null,true);
+    const song=await encodeSongAudio(fullBuf, id3);
+    const files=[{ name:base+"."+song.ext, data:song.bytes }];
+    setStatus("Rendering karaoke (instrumental)…");
+    const hasVocals=project.tracks.some(t=>(t.type==="voice"||t.type==="memo")&&t.clips.length);
+    if (hasVocals){
+      const karaBuf=await renderMix(t=>t.type!=="voice"&&t.type!=="memo", true);
+      const kara=await encodeSongAudio(karaBuf, buildId3({ ...id3meta, title:(meta.title||"Song")+" (Karaoke)", coverJpeg, syncedLyrics }));
+      files.push({ name:base+"_karaoke."+kara.ext, data:kara.bytes });
+    }
+    // lyrics sidecars
+    if (syncedLyrics){ const lrc=memoLrc(lyricClip); if (lrc) files.push({ name:base+".lrc", data:new TextEncoder().encode(lrc) }); const srt=memoSrt(lyricClip); if (srt) files.push({ name:base+".srt", data:new TextEncoder().encode(srt) }); }
+    if (lyricsText) files.push({ name:base+"_lyrics.txt", data:new TextEncoder().encode(lyricsText+"\n") });
+    if (coverJpeg) files.push({ name:"cover.jpg", data:coverJpeg });
+    // stems
+    setStatus("Rendering stems…");
+    const stemTracks=project.tracks.filter(t=>t.clips.length); const stemNames=[];
+    for (const tr of stemTracks){ try { const b=await renderMix(t=>t===tr,false); const nm="stems/"+tr.name.replace(/\s+/g,"")+".wav"; files.push({ name:nm, data:wavBytes16(b,[]) }); stemNames.push({ name:tr.name, type:tr.type, file:nm }); } catch(e){} }
+    // manifest
+    files.push({ name:"metadata.json", data:new TextEncoder().encode(songMetadataJson({ ...meta, bpm:project.bpm, durationSec:project.lengthSec, unsyncedLyrics:lyricsText, audioFormat:song.codec }, stemNames)) });
+    downloadBlob(makeZip(files), base+"_songpackage.zip");
+    setStatus("✓ Exported "+base+"_songpackage.zip — audio: "+song.codec);
+  } catch(e){ console.warn("Song package failed:",e); setStatus("Export failed: "+(e&&e.message||e)); }
+  if (btn) btn.disabled=false;
+}
 
 /* ============================== MIDI export ============================== */
 function writeVarLen(v){ const bytes=[v&0x7f]; v=Math.floor(v/128); while (v>0){ bytes.unshift((v&0x7f)|0x80); v=Math.floor(v/128); } return bytes; }
@@ -2647,18 +3174,29 @@ function exportMIDI(){
 }
 
 /* ============================== Sessions (IndexedDB) ============================== */
-const DB_NAME="pitchStudioDB", DB_VER=1, STORE="sessions";
-function openDB(){ return new Promise((res,rej)=>{ const r=indexedDB.open(DB_NAME,DB_VER); r.onupgradeneeded=e=>{ const db=e.target.result; if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE,{keyPath:"id",autoIncrement:true}); }; r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+const DB_NAME="pitchStudioDB", DB_VER=2, STORE="sessions", AUTO_STORE="autosave";
+function openDB(){ return new Promise((res,rej)=>{ const r=indexedDB.open(DB_NAME,DB_VER); r.onupgradeneeded=e=>{ const db=e.target.result; if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE,{keyPath:"id",autoIncrement:true}); if (!db.objectStoreNames.contains(AUTO_STORE)) db.createObjectStore(AUTO_STORE); }; r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+// Autosave: the live working session (tracks, audio blobs, sampler kit, meta) is mirrored
+// to IndexedDB so a page reload restores exactly where you left off — clips and all.
+async function saveAutosave(){ try { const db=await openDB(); const data=serializeProject(); await new Promise((res)=>{ const tx=db.transaction(AUTO_STORE,"readwrite"); tx.objectStore(AUTO_STORE).put({ label:currentLabel, savedAt:Date.now(), data }, "current"); tx.oncomplete=res; tx.onerror=res; }); } catch(e){} }
+async function loadAutosave(){ try { const db=await openDB(); return await new Promise((res)=>{ const tx=db.transaction(AUTO_STORE,"readonly"); const req=tx.objectStore(AUTO_STORE).get("current"); req.onsuccess=()=>res(req.result); req.onerror=()=>res(null); }); } catch(e){ return null; } }
+let autosaveTimer=null, autosaveReady=false;
+function scheduleAutosave(){ if (!autosaveReady) return; if (autosaveTimer) clearTimeout(autosaveTimer); autosaveTimer=setTimeout(()=>{ autosaveTimer=null; saveAutosave(); }, 1500); }
 function serializeProject(){
   return {
     version: FORMAT_VERSION, bpm: project.bpm, timeSig: {...project.timeSig},
     lengthSec: project.lengthSec, loop: {...project.loop}, loopEnabled: project.loopEnabled, countInBars: project.countInBars,
     synth: {...synthParams}, masterEq: {...masterEqParams}, layout: currentLayout(),
+    meta: project.meta ? {...project.meta} : undefined,
+    samplerKit: (project.samplerKit||[]).map(p=> p ? { name:p.name, gain:(p.gain==null?1:p.gain), loop:!!p.loop, blob:p.blob } : null),
     tracks: project.tracks.map(function(t){
       return {
         type: t.type, name: t.name, transpose: t.transpose||0, fx: JSON.parse(JSON.stringify(t.fx||fxDefaults())),
         clips: t.clips.map(function(c){
           if (t.type === "arp") return { start:c.start, lengthBeats:c.lengthBeats, loopFill:!!c.loopFill, rate:c.rate, wave:c.wave, steps:c.steps.map(s=>({...s})) };
+          if (t.type === "sampler"){ return c.kind==="loop"
+            ? { start:c.start, lengthBeats:c.lengthBeats, loopFill:!!c.loopFill, kind:"loop", pad:c.pad }
+            : { start:c.start, lengthBeats:c.lengthBeats, loopFill:!!c.loopFill, kind:"grid", grid:(c.grid||[]).map(r=>r.slice()) }; }
           if (t.type === "voice") return { start:c.start, audioDur:c.audioDur, blob:c.blob };
           if (t.type === "memo") return { start:c.start, audioDur:c.audioDur, blob:c.blob,
             analysis: c.analysis?JSON.parse(JSON.stringify(c.analysis)):null,
@@ -2680,16 +3218,26 @@ function loadProject(data){
   const ciSel=document.getElementById("countInSel"); if (ciSel) ciSel.value=String(project.countInBars);
   if (data.synth) Object.assign(synthParams, data.synth);
   if (data.masterEq) Object.assign(masterEqParams, data.masterEq);
+  project.meta = data.meta || { title:"", artist:"", album:"", genre:"", year:"", key:"", coverBlob:null };
   syncSynthUI(); buildOscUI(); syncMasterEqUI(); applyMasterEq(); refreshActiveFilters();
   project.tracks=[]; trackSeq=0; clipSeq=0;
-  const toDecode=[];
-  (data.tracks||[]).forEach(t=>{ const tr={id:++trackSeq,type:t.type,name:t.name,clips:[],fx:mergeFx(t.fx),transpose:t.transpose||0}; (t.clips||[]).forEach(c=>{ const clip={id:++clipSeq,start:c.start,lengthBeats:c.lengthBeats,loopFill:!!c.loopFill}; if (t.type==="arp"){ clip.rate=c.rate; clip.wave=c.wave; clip.steps=(c.steps||[]).map(s=>({...s})); } else if (t.type==="voice"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if (clip.blob) toDecode.push(clip); } else if (t.type==="memo"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; clip.analysis=c.analysis||null; clip.lyricsText=c.lyricsText||""; clip.lyricsWords=c.lyricsWords||null; clip.analysisKey=c.analysisKey||"auto"; clip.lyricsLang=c.lyricsLang||null; if (clip.blob) toDecode.push(clip); } else { clip.grid=(c.grid||DRUMS.map(()=>new Array(16).fill(false))).map(r=>r.slice()); } tr.clips.push(clip); }); project.tracks.push(tr); });
+  const toDecode=[], padsToDecode=[];
+  project.samplerKit=(data.samplerKit||[]).map(p=> p ? { name:p.name, gain:(p.gain==null?1:p.gain), loop:!!p.loop, blob:p.blob, buffer:null } : null);
+  project.samplerKit.forEach(p=>{ if (p&&p.blob) padsToDecode.push(p); });
+  (data.tracks||[]).forEach(t=>{ const tr={id:++trackSeq,type:t.type,name:t.name,clips:[],fx:mergeFx(t.fx),transpose:t.transpose||0};
+    (t.clips||[]).forEach(c=>{ const clip={id:++clipSeq,start:c.start,lengthBeats:c.lengthBeats,loopFill:!!c.loopFill}; if (t.type==="arp"){ clip.rate=c.rate; clip.wave=c.wave; clip.steps=(c.steps||[]).map(s=>({...s})); } else if (t.type==="sampler"){ clip.kind=c.kind||"grid"; if (clip.kind==="loop") clip.pad=c.pad||0; else clip.grid=(c.grid||[]).map(r=>r.slice()); } else if (t.type==="voice"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if (clip.blob) toDecode.push(clip); } else if (t.type==="memo"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; clip.analysis=c.analysis||null; clip.lyricsText=c.lyricsText||""; clip.lyricsWords=c.lyricsWords||null; clip.analysisKey=c.analysisKey||"auto"; clip.lyricsLang=c.lyricsLang||null; if (clip.blob) toDecode.push(clip); } else { clip.grid=(c.grid||DRUMS.map(()=>new Array(16).fill(false))).map(r=>r.slice()); } tr.clips.push(clip); }); project.tracks.push(tr); });
   selectedTrackId=project.tracks[0]?.id||null;
   project.tracks.forEach(ensureTrackChain);
   if (data.layout && typeof applySectionLayout==="function"){ applySectionLayout(data.layout); saveLayout(); }
   updateLoopButtons(); updateMsReadout(); renderTimeline();
-  // decode voice clips asynchronously, then refresh
-  if (toDecode.length){ const ctx=getCtx(); Promise.all(toDecode.map(async clip=>{ clip.buffer=await decodeBlob(clip.blob, ctx); if (clip.buffer) clip.audioDur=clip.buffer.duration; })).then(renderTimeline); }
+  if (typeof refreshSampler==="function") refreshSampler();
+  // decode voice/memo clips and sampler pads asynchronously, then refresh
+  if (toDecode.length || padsToDecode.length){ const ctx=getCtx();
+    Promise.all([
+      ...toDecode.map(async clip=>{ clip.buffer=await decodeBlob(clip.blob, ctx); if (clip.buffer) clip.audioDur=clip.buffer.duration; }),
+      ...padsToDecode.map(async pad=>{ pad.buffer=await decodeBlob(pad.blob, ctx); })
+    ]).then(()=>{ renderTimeline(); if (typeof refreshSampler==="function") refreshSampler(); });
+  }
 }
 async function saveSession(label, desc, data){ const db=await openDB(); const rec={ label, description:desc||"", version:FORMAT_VERSION, savedAt:Date.now(), data: data||serializeProject() }; return new Promise((res,rej)=>{ const tx=db.transaction(STORE,"readwrite"); tx.objectStore(STORE).add(rec); tx.oncomplete=res; tx.onerror=()=>rej(tx.error); }); }
 
@@ -2786,7 +3334,187 @@ saveBtn.addEventListener("click",()=>openModal(true));
 loadBtn.addEventListener("click",()=>openModal(false));
 // export dropdown menu
 exportBtn.addEventListener("click",(e)=>{ e.stopPropagation(); exportMenu.style.display = exportMenu.style.display==="none" ? "flex" : "none"; });
-exportMenu.addEventListener("click",(e)=>{ const a=e.target.dataset.act; if(!a) return; exportMenu.style.display="none"; if(a==="midi") exportMIDI(); else if(a==="wav") doBounce(); else if(a==="stems") doExportStems(); });
+exportMenu.addEventListener("click",(e)=>{ const a=e.target.dataset.act; if(!a) return; exportMenu.style.display="none"; if(a==="midi") exportMIDI(); else if(a==="wav") doBounce(); else if(a==="stems") doExportStems(); else if(a==="song") openSongModal(); });
+
+/* ---- song-package modal wiring ---- */
+const songModal=document.getElementById("songModal");
+// best-guess key from a memo clip's analysis (root + mode), else blank
+function detectedSongKey(){ for (const t of project.tracks){ if (t.type!=="memo") continue; for (const c of t.clips){ const k=c.analysis&&c.analysis.key; if (k&&k.root!=null) return NOTE_NAMES[k.root]+(k.mode&&/min|aeol|dor|phr|loc/i.test(k.mode)?"m":""); } } return ""; }
+function openSongModal(){
+  const m=project.meta||(project.meta={});
+  songTitle.value=m.title||(currentLabel!=="Untitled session"?currentLabel:"");
+  songArtist.value=m.artist||""; songAlbum.value=m.album||""; songGenre.value=m.genre||"";
+  songYear.value=m.year||""; songKey.value=m.key||detectedSongKey();
+  const lc=firstLyricClip(); songLyrics.value=(m.lyrics!=null?m.lyrics:(lc?lc.lyricsText:""))||"";
+  document.getElementById("songStatus").textContent = m.coverBlob ? "Cover image set ✓" : "";
+  document.getElementById("songCover").value="";
+  songModal.style.display="flex";
+}
+function closeSongModal(){ songModal.style.display="none"; }
+document.getElementById("songModalClose").addEventListener("click",closeSongModal);
+songModal.addEventListener("click",(e)=>{ if(e.target===songModal) closeSongModal(); });
+document.getElementById("songCover").addEventListener("change",(e)=>{ const f=e.target.files&&e.target.files[0]; if(f){ project.meta.coverBlob=f; document.getElementById("songStatus").textContent="Cover image set ✓"; } });
+document.getElementById("songExportBtn").addEventListener("click",()=>{
+  const m=project.meta||(project.meta={});
+  m.title=songTitle.value.trim(); m.artist=songArtist.value.trim(); m.album=songAlbum.value.trim();
+  m.genre=songGenre.value.trim(); m.year=songYear.value.trim(); m.key=songKey.value.trim(); m.lyrics=songLyrics.value;
+  exportSongPackage({ title:m.title, artist:m.artist, album:m.album, genre:m.genre, year:m.year, key:m.key, lyrics:m.lyrics, coverBlob:m.coverBlob });
+});
+
+/* ============================== AI Composer (bring-your-own-key) ==============================
+   A provider-agnostic OpenAI-compatible chat call returns a strict-JSON arrangement spec, which
+   applyProjectSpec() renders into isolated tracks using this app's own synth/drum engine — so the
+   stems are separated by construction. Keys live only in localStorage. The LLM composes structure
+   + lyrics; it does not synthesize audio (an optional audio endpoint can import a generated stem). */
+const aiModal=document.getElementById("aiModal");
+const AI_DEFAULT_MODELS={ openrouter:"anthropic/claude-3.5-sonnet", huggingface:"meta-llama/Llama-3.3-70B-Instruct", custom:"" };
+function aiLoadCfg(){ try { return JSON.parse(localStorage.getItem("ps_ai_cfg")||"{}"); } catch(e){ return {}; } }
+function aiSaveCfg(cfg){ try { localStorage.setItem("ps_ai_cfg", JSON.stringify(cfg)); } catch(e){} }
+function aiEndpoint(provider, baseUrl){
+  if (provider==="openrouter") return "https://openrouter.ai/api/v1/chat/completions";
+  if (provider==="huggingface") return "https://router.huggingface.co/v1/chat/completions";
+  return baseUrl||"";
+}
+function openAiModal(){
+  const c=aiLoadCfg();
+  aiProvider.value=c.provider||"openrouter";
+  aiModel.value=c.model||AI_DEFAULT_MODELS[aiProvider.value]||"";
+  aiKey.value=c.key||""; aiBaseUrl.value=c.baseUrl||""; aiAudioUrl.value=c.audioUrl||"";
+  document.getElementById("aiBaseRow").style.display = aiProvider.value==="custom" ? "block" : "none";
+  document.getElementById("aiStatus").textContent="";
+  aiModal.style.display="flex";
+}
+function closeAiModal(){ aiModal.style.display="none"; }
+document.getElementById("aiComposeBtn").addEventListener("click",openAiModal);
+document.getElementById("aiModalClose").addEventListener("click",closeAiModal);
+aiModal.addEventListener("click",(e)=>{ if(e.target===aiModal) closeAiModal(); });
+aiProvider.addEventListener("change",()=>{ document.getElementById("aiBaseRow").style.display = aiProvider.value==="custom" ? "block" : "none"; if(!aiModel.value) aiModel.value=AI_DEFAULT_MODELS[aiProvider.value]||""; });
+document.getElementById("aiSaveCfg").addEventListener("click",()=>{ aiSaveCfg({ provider:aiProvider.value, model:aiModel.value.trim(), key:aiKey.value.trim(), baseUrl:aiBaseUrl.value.trim(), audioUrl:aiAudioUrl.value.trim() }); flash(document.getElementById("aiSaveCfg"),"Saved ✓"); });
+
+// The agent works against the LIVE project: we send it a compact summary of the current
+// state (tempo, key, tracks + what they play, loaded sampler pads, lyrics) and it replies
+// with a list of edit OPERATIONS to apply — so it edits/extends what's there rather than
+// replacing it. Audio (recorded memos, sampler samples) is summarized but never sent.
+function aiProjectSummary(){
+  return {
+    bpm: project.bpm,
+    key: { root: NOTE_NAMES[parseInt(rootSel.value,10)||0], mode: modeSel.value },
+    lengthBars: Math.max(1, Math.round(project.lengthSec/barSec())),
+    timeSig: project.timeSig.num+"/"+project.timeSig.den,
+    tracks: project.tracks.map(t=>{
+      const o={ name:t.name, type:t.type, clips:t.clips.length };
+      if (t.type==="arp" && t.clips[0]) o.notes=(t.clips[0].steps||[]).filter(s=>!s.rest).map(s=>s.midi);
+      else if (t.type==="beat" && t.clips[0]){ const hit=new Set(); t.clips.forEach(c=>(c.grid||[]).forEach((row,r)=>{ if(row.some(Boolean)) hit.add(DRUMS[r].name); })); o.drums=[...hit]; }
+      else if (t.type==="sampler") o.clipKinds=t.clips.map(c=>c.kind);
+      return o;
+    }),
+    samplerPads: (project.samplerKit||[]).map((p,i)=> p?{ index:i, name:p.name, loop:!!p.loop }:null).filter(Boolean),
+    lyrics: (project.meta&&project.meta.lyrics)||""
+  };
+}
+const AI_EDIT_PROMPT = "You are the editing engine for Pitch Studio, a browser DAW. The user message contains a request AND the current project as JSON. Reply with ONLY a JSON object (no prose, no code fences):\n"+
+  "{\"note\":\"<one short sentence describing what you changed>\",\"ops\":[ ...operations... ]}\n"+
+  "Each operation is one of:\n"+
+  "{\"op\":\"setTempo\",\"bpm\":<20-300>}\n"+
+  "{\"op\":\"setKey\",\"root\":\"<C,C#,D,D#,E,F,F#,G,G#,A,A#,B>\",\"mode\":\"<ionian|dorian|phrygian|lydian|mixolydian|aeolian|locrian>\"}\n"+
+  "{\"op\":\"setLength\",\"bars\":<1-64>}\n"+
+  "{\"op\":\"addArp\",\"wave\":\"<sine|triangle|square|sawtooth>\",\"rate\":<1|2|3|4>,\"notes\":[<MIDI 36-84, in key>],\"loop\":<true|false>}\n"+
+  "{\"op\":\"addBeat\",\"pattern\":{\"kick\":[<0-15 steps>],\"snare\":[...],\"hat\":[...],\"clap\":[...],\"tom\":[...]}}\n"+
+  "{\"op\":\"addSampler\",\"pattern\":{\"<exact loaded pad name from samplerPads>\":[<0-15 steps>]}}\n"+
+  "{\"op\":\"clearType\",\"type\":\"<arp|beat|sampler>\"}\n"+
+  "{\"op\":\"removeTrack\",\"name\":\"<exact track name>\"}\n"+
+  "{\"op\":\"setLyrics\",\"text\":\"<lines, \\n separated>\"}\n"+
+  "Rules: rate 2 = 1/8 notes; 16 steps per bar; notes in the chosen key. Only change what the user asked — leave everything else. To REPLACE a part, emit clearType for that type, then the add op. addSampler may only use pad names listed in samplerPads. Output JSON only.";
+
+function aiParseSpec(text){
+  if (!text) return null;
+  let s=String(text).trim().replace(/^```(?:json)?/i,"").replace(/```$/,"").trim();
+  try { return JSON.parse(s); } catch(e){}
+  const m=s.match(/\{[\s\S]*\}/); if (m){ try { return JSON.parse(m[0]); } catch(e){} }
+  return null;
+}
+async function aiChat(cfg, idea){
+  const url=aiEndpoint(cfg.provider, cfg.baseUrl); if (!url) throw new Error("No endpoint — set a base URL");
+  const headers={ "Content-Type":"application/json", "Authorization":"Bearer "+cfg.key };
+  if (cfg.provider==="openrouter"){ headers["HTTP-Referer"]=location.origin; headers["X-Title"]="Pitch Studio"; }
+  const userMsg="User request:\n"+idea+"\n\nCurrent project:\n"+JSON.stringify(aiProjectSummary());
+  const body={ model:cfg.model, messages:[{role:"system",content:AI_EDIT_PROMPT},{role:"user",content:userMsg}], temperature:0.7 };
+  const res=await fetch(url,{ method:"POST", headers, body:JSON.stringify(body) });
+  if (!res.ok){ let t=""; try { t=(await res.json()).error?.message||""; } catch(e){ try { t=await res.text(); } catch(_){} } throw new Error("HTTP "+res.status+(t?": "+t.slice(0,160):"")); }
+  const data=await res.json();
+  return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
+}
+function firstDrumVoice(group){ const norm={clap:"snare",openhat:"hat",closedhat:"hat",hihat:"hat",hats:"hat",cymbal:"hat",percussion:"perc"}; const g=norm[group]||group; const i=DRUM_GROUPS.indexOf(g); return i>=0?i:DRUM_GROUPS.indexOf("snare"); }
+function applyProjectSpec(spec){
+  if (!spec||typeof spec!=="object") throw new Error("No spec");
+  if (spec.bpm){ project.bpm=clamp(Math.round(spec.bpm),20,300); bpmInput.value=project.bpm; }
+  if (spec.key && spec.key.root!=null){ const r=NOTE_NAMES.indexOf(String(spec.key.root).replace("b","#").trim()); if (r>=0) rootSel.value=String(r); if (spec.key.mode && SCALES[spec.key.mode]) modeSel.value=spec.key.mode; applyScaleHighlight(); }
+  if (spec.lengthBars){ setLength(Math.max(barSec(), Math.round(spec.lengthBars)*barSec())); }
+  const made=[];
+  (spec.tracks||[]).forEach(td=>{
+    if (td.type==="arp"){ const t=addTrack("arp"); const notes=(td.notes||[]).filter(n=>typeof n==="number").map(n=>({midi:clamp(Math.round(n),24,96)})); if (notes.length){ addClip(t,{ id:++clipSeq, steps:notes, rate:[1,2,3,4].indexOf(td.rate)>=0?td.rate:2, wave:["sine","triangle","square","sawtooth"].indexOf(td.wave)>=0?td.wave:"sawtooth", loopFill:true }); made.push("arp"); } }
+    else if (td.type==="beat"){ const t=addTrack("beat"); const grid=DRUMS.map(()=>new Array(16).fill(false)); const pat=td.pattern||{}; Object.keys(pat).forEach(name=>{ const v=firstDrumVoice(String(name).toLowerCase()); (pat[name]||[]).forEach(s=>{ s=Math.round(s); if (v>=0 && s>=0 && s<16) grid[v][s]=true; }); }); if (grid.some(r=>r.some(Boolean))){ addClip(t,{ id:++clipSeq, grid, loopFill:true }); made.push("beat"); } }
+  });
+  if (spec.lyrics){ project.meta=project.meta||{}; project.meta.lyrics=String(spec.lyrics); }
+  updateMsReadout(); renderTimeline();
+  return made;
+}
+// Apply a list of edit operations from the agent to the live project.
+function applyProjectOps(ops){
+  if (!Array.isArray(ops)) return 0;
+  let n=0;
+  const WAVES=["sine","triangle","square","sawtooth"];
+  ops.forEach(op=>{
+    try { switch(op&&op.op){
+      case "setTempo": if(op.bpm){ project.bpm=clamp(Math.round(op.bpm),20,300); bpmInput.value=project.bpm; n++; } break;
+      case "setKey": { const r=NOTE_NAMES.indexOf(String(op.root||"").replace("b","#").trim()); if(r>=0) rootSel.value=String(r); if(op.mode&&SCALES[op.mode]) modeSel.value=op.mode; applyScaleHighlight(); n++; } break;
+      case "setLength": if(op.bars){ setLength(Math.max(barSec(), Math.round(op.bars)*barSec())); n++; } break;
+      case "clearType": if(op.type){ project.tracks=project.tracks.filter(t=>t.type!==op.type); n++; } break;
+      case "removeTrack": if(op.name){ project.tracks=project.tracks.filter(t=>t.name!==op.name); n++; } break;
+      case "addArp": { const notes=(op.notes||[]).filter(x=>typeof x==="number").map(x=>({midi:clamp(Math.round(x),24,96)})); if(notes.length){ const t=addTrack("arp"); addClip(t,{ id:++clipSeq, steps:notes, rate:[1,2,3,4].indexOf(op.rate)>=0?op.rate:2, wave:WAVES.indexOf(op.wave)>=0?op.wave:"sawtooth", loopFill:op.loop!==false }); n++; } } break;
+      case "addBeat": { const grid=DRUMS.map(()=>new Array(16).fill(false)); const pat=op.pattern||{}; Object.keys(pat).forEach(name=>{ const v=firstDrumVoice(String(name).toLowerCase()); (pat[name]||[]).forEach(s=>{ s=Math.round(s); if(v>=0&&s>=0&&s<16) grid[v][s]=true; }); }); if(grid.some(r=>r.some(Boolean))){ const t=addTrack("beat"); addClip(t,{ id:++clipSeq, grid, loopFill:true }); n++; } } break;
+      case "addSampler": { const K=project.samplerKit||[]; const grid=Array.from({length:MAX_SAMP_PADS},()=>new Array(16).fill(false)); const pat=op.pattern||{}; let any=false; Object.keys(pat).forEach(name=>{ const idx=K.findIndex(p=>p&&String(p.name||"").toLowerCase()===String(name).toLowerCase()); if(idx<0) return; (pat[name]||[]).forEach(s=>{ s=Math.round(s); if(s>=0&&s<16){ grid[idx][s]=true; any=true; } }); }); if(any){ const t=ensureTrack("sampler"); addClip(t,{ id:++clipSeq, kind:"grid", grid }); n++; } } break;
+      case "setLyrics": project.meta=project.meta||{}; project.meta.lyrics=String(op.text||""); n++; break;
+    } } catch(e){ console.warn("AI op failed:", op, e); }
+  });
+  selectedTrackId=project.tracks[0]?.id||selectedTrackId;
+  if (typeof syncSynthUI==="function") syncSynthUI();
+  updateMsReadout(); renderTimeline(); if (typeof refreshSampler==="function") refreshSampler();
+  return n;
+}
+async function aiImportAudioStem(cfg, idea){
+  if (!cfg.audioUrl) return false;
+  const res=await fetch(cfg.audioUrl,{ method:"POST", headers:{ "Content-Type":"application/json", "Authorization":"Bearer "+cfg.key }, body:JSON.stringify({ prompt:idea, inputs:idea }) });
+  if (!res.ok) throw new Error("audio endpoint HTTP "+res.status);
+  const blob=await res.blob(); const ctx=getCtx();
+  const buf=await ctx.decodeAudioData(await blob.arrayBuffer());
+  const t=addTrack("memo"); addMemoClip(t, buf, 0); return true;
+}
+document.getElementById("aiComposeRun").addEventListener("click",async()=>{
+  const cfg={ provider:aiProvider.value, model:aiModel.value.trim(), key:aiKey.value.trim(), baseUrl:aiBaseUrl.value.trim(), audioUrl:aiAudioUrl.value.trim() };
+  const idea=aiIdea.value.trim(); const status=document.getElementById("aiStatus"); const btn=document.getElementById("aiComposeRun");
+  if (!cfg.key){ status.textContent="Enter your API key first."; return; }
+  if (!cfg.model){ status.textContent="Enter a model id."; return; }
+  if (!idea){ status.textContent="Describe the song first."; return; }
+  aiSaveCfg(cfg); btn.disabled=true; status.textContent="Reading your project & generating edits…";
+  try {
+    const content=await aiChat(cfg, idea);
+    const spec=aiParseSpec(content);
+    if (!spec) throw new Error("Could not parse JSON from the model reply.");
+    let applied=0, note="";
+    if (Array.isArray(spec.ops)){ applied=applyProjectOps(spec.ops); note=spec.note||""; }
+    else if (spec.tracks){ applied=(applyProjectSpec(spec)||[]).length; }   // legacy full-spec fallback
+    else throw new Error("Model reply had no edit ops.");
+    status.textContent="✓ Applied "+applied+" edit"+(applied===1?"":"s")+(note?" — "+note:".");
+    if (document.getElementById("aiGenAudio").checked && cfg.audioUrl){
+      status.textContent+=" Requesting audio stem…";
+      try { await aiImportAudioStem(cfg, idea); status.textContent+=" audio stem imported ✓"; }
+      catch(e){ status.textContent+=" (audio stem failed: "+(e.message||e)+")"; }
+    }
+    setTimeout(closeAiModal, 1400);
+  } catch(e){ status.textContent="Failed: "+(e&&e.message||e); }
+  btn.disabled=false;
+});
 document.addEventListener("click",(e)=>{ if(exportMenu.style.display!=="none" && !e.target.closest(".menu-wrap")) exportMenu.style.display="none"; });
 modalClose.addEventListener("click",closeModal);
 sessionModal.addEventListener("click",(e)=>{ if (e.target===sessionModal) closeModal(); });
@@ -2809,14 +3537,25 @@ function drawSynthEq(){
   if (!tSynth||tSynth.length!==synthAnalyser.fftSize) tSynth=new Uint8Array(synthAnalyser.fftSize);
   synthAnalyser.getByteTimeDomainData(tSynth);         // the REAL output waveform (live)
   const N=tSynth.length, mid=h*0.5, amp=h*0.44;
-  // filled mirror ribbon of the live waveform (silence = flat line)
+  // Standing-wave display: trigger on a rising zero-crossing so the shape is phase-locked
+  // (doesn't scroll). Then draw a fixed number of periods so the cycle count is stable and
+  // you can read the actual waveshape — how the filter rounds it, how the envelope scales it.
+  let peak=0; for (let i=0;i<N;i++){ const d=Math.abs(tSynth[i]-128); if(d>peak)peak=d; }
+  let t0=0;
+  if (peak>3){ const lim=N>>1; for (let i=1;i<lim;i++){ if (tSynth[i-1]<128 && tSynth[i]>=128){ t0=i; break; } } }
+  let period=0; for (let i=t0+3;i<N;i++){ if (tSynth[i-1]<128 && tSynth[i]>=128){ period=i-t0; break; } }
+  const CYCLES=3;
+  let win = period>4 ? Math.min(N-t0, period*CYCLES) : Math.min(N-t0, N>>1);
+  if (win<8) win=Math.min(N, 512);
+  const yAt=(j)=> mid+((tSynth[t0+j]-128)/128)*amp;
+  // filled mirror ribbon of the standing waveform (silence = flat line)
   c.beginPath();
-  for (let i=0;i<N;i++){ const x=i/(N-1)*w, y=mid+((tSynth[i]-128)/128)*amp; i?c.lineTo(x,y):c.moveTo(x,y); }
-  for (let i=N-1;i>=0;i--){ const x=i/(N-1)*w, y=mid-((tSynth[i]-128)/128)*amp; c.lineTo(x,y); }
+  for (let j=0;j<win;j++){ const x=j/(win-1)*w, y=yAt(j); j?c.lineTo(x,y):c.moveTo(x,y); }
+  for (let j=win-1;j>=0;j--){ const x=j/(win-1)*w, y=mid-((tSynth[t0+j]-128)/128)*amp; c.lineTo(x,y); }
   c.closePath();
   const g=c.createLinearGradient(0,0,w,0); g.addColorStop(0,"rgba(74,222,128,0.32)"); g.addColorStop(0.5,"rgba(56,189,248,0.32)"); g.addColorStop(1,"rgba(167,139,250,0.32)");
   c.fillStyle=g; c.fill();
-  c.beginPath(); for (let i=0;i<N;i++){ const x=i/(N-1)*w, y=mid+((tSynth[i]-128)/128)*amp; i?c.lineTo(x,y):c.moveTo(x,y); }
+  c.beginPath(); for (let j=0;j<win;j++){ const x=j/(win-1)*w, y=yAt(j); j?c.lineTo(x,y):c.moveTo(x,y); }
   c.strokeStyle="rgba(255,255,255,0.7)"; c.lineWidth=1.6; c.stroke();
 }
 function drawMasterEq(){
@@ -2841,48 +3580,75 @@ function fmtHz(v){ return v>=1000 ? (v/1000).toFixed(v>=10000?0:1)+" kHz" : Math
 
 // --- synth ---
 const filtTypeSel=document.getElementById("filtTypeSel");
+// A knob = a slider + an editable numeric readout, bound both ways. Moving the slider
+// updates the value box; typing a value (and Enter/blur) moves the slider. Both clamp to
+// the slider's min/max and call apply(). `dec` = decimal places shown in the box.
+function bindKnob(sliderId, valId, apply, dec){
+  const sl=document.getElementById(sliderId), vi=document.getElementById(valId);
+  const fmt=(v)=> (dec==null ? String(v) : Number(v).toFixed(dec));
+  const mn=sl?parseFloat(sl.min):-Infinity, mx=sl?parseFloat(sl.max):Infinity;
+  if (sl) sl.addEventListener("input",()=>{ const v=parseFloat(sl.value); if(vi) vi.value=fmt(v); apply(v); });
+  if (vi){
+    const upd=()=>{ let v=parseFloat(vi.value); if(isNaN(v)) return; v=Math.min(mx,Math.max(mn,v)); if(sl) sl.value=v; apply(v); };
+    vi.addEventListener("input", upd);
+    vi.addEventListener("change",()=>{ upd(); const v=parseFloat(vi.value); if(!isNaN(v)) vi.value=fmt(Math.min(mx,Math.max(mn,v))); });
+  }
+}
 function syncSynthUI(){
   filtTypeSel.value=synthParams.filterType;
-  setVal("cutoffR",synthParams.cutoff); setText("cutoutOut",fmtHz(synthParams.cutoff));
-  setVal("resR",synthParams.resonance); setText("resOut",synthParams.resonance.toFixed(1));
-  setVal("atkR",synthParams.attack); setText("atkOut",synthParams.attack.toFixed(3)+"s");
-  setVal("decR",synthParams.decay); setText("decOut",synthParams.decay.toFixed(3)+"s");
-  setVal("susR",synthParams.sustain); setText("susOut",synthParams.sustain.toFixed(2));
-  setVal("relR",synthParams.release); setText("relOut",synthParams.release.toFixed(2)+"s");
+  const set=(sl,vi,val,dec)=>{ setVal(sl,val); setVal(vi, dec==null?val:Number(val).toFixed(dec)); };
+  set("cutoffR","cutoutOut",synthParams.cutoff,0);
+  set("resR","resOut",synthParams.resonance,1);
+  set("atkR","atkOut",synthParams.attack,3);
+  set("decR","decOut",synthParams.decay,3);
+  set("susR","susOut",synthParams.sustain,2);
+  set("relR","relOut",synthParams.release,2);
+  set("glideR","glideOut",synthParams.glide||0,3);
 }
 filtTypeSel.addEventListener("change",()=>{ synthParams.filterType=filtTypeSel.value; refreshActiveFilters(); });
-bindR("cutoffR", v=>{ synthParams.cutoff=v; setText("cutoutOut",fmtHz(v)); refreshActiveFilters(); });
-bindR("resR", v=>{ synthParams.resonance=v; setText("resOut",v.toFixed(1)); refreshActiveFilters(); });
-bindR("atkR", v=>{ synthParams.attack=v; setText("atkOut",v.toFixed(3)+"s"); });
-bindR("decR", v=>{ synthParams.decay=v; setText("decOut",v.toFixed(3)+"s"); });
-bindR("susR", v=>{ synthParams.sustain=v; setText("susOut",v.toFixed(2)); });
-bindR("relR", v=>{ synthParams.release=v; setText("relOut",v.toFixed(2)+"s"); });
+bindKnob("cutoffR","cutoutOut", v=>{ synthParams.cutoff=v; refreshActiveFilters(); }, 0);
+bindKnob("resR","resOut", v=>{ synthParams.resonance=v; refreshActiveFilters(); }, 1);
+bindKnob("atkR","atkOut", v=>{ synthParams.attack=v; }, 3);
+bindKnob("decR","decOut", v=>{ synthParams.decay=v; }, 3);
+bindKnob("susR","susOut", v=>{ synthParams.sustain=v; }, 2);
+bindKnob("relR","relOut", v=>{ synthParams.release=v; }, 2);
+bindKnob("glideR","glideOut", v=>{ synthParams.glide=v; }, 3);
 
 // --- oscillators (OSC 1/2/3) ---
 function buildOscUI(){
   const host=document.getElementById("oscRows"); if(!host) return; host.innerHTML="";
   synthParams.oscs.forEach((o,i)=>{
-    const row=document.createElement("div"); row.className="osc-row on"; row.style.borderLeftColor=OSC_COLORS[i];
+    const row=document.createElement("div"); row.className="osc-row on"; row.style.borderLeftColor=oscColor(i);
     const wave = '<select data-osc="'+i+'" data-k="wave">'+["sine","triangle","square","sawtooth"].map(w=>'<option value="'+w+'"'+(o.wave===w?" selected":"")+'>'+w+'</option>').join("")+'</select>';
     const rm = i===0 ? '' : '<button class="osc-rm" data-osc="'+i+'" title="Remove this oscillator">✕</button>';
     row.innerHTML =
-      '<span class="osc-name" style="color:'+OSC_COLORS[i]+'">OSC '+(i+1)+'</span>'+ wave +
+      '<span class="osc-name" style="color:'+oscColor(i)+'">OSC '+(i+1)+'</span>'+ wave +
       '<label class="osc-knob">Oct <input type="number" data-osc="'+i+'" data-k="octave" min="-3" max="3" step="1" value="'+(o.octave||0)+'"></label>'+
       '<label class="osc-knob">Semis <input type="number" data-osc="'+i+'" data-k="semis" min="-24" max="24" step="1" value="'+(o.semis||0)+'"></label>'+
-      '<label class="osc-knob">Detune <input type="range" data-osc="'+i+'" data-k="detune" min="-50" max="50" step="1" value="'+(o.detune||0)+'"></label>'+
-      '<label class="osc-knob">Level <input type="range" data-osc="'+i+'" data-k="level" min="0" max="1" step="0.01" value="'+(o.level==null?1:o.level)+'"></label>'+
-      '<label class="osc-knob">Pan <input type="range" data-osc="'+i+'" data-k="pan" min="-1" max="1" step="0.05" value="'+(o.pan||0)+'"></label>'+ rm;
+      '<label class="osc-knob vert">Detune <input type="range" data-osc="'+i+'" data-k="detune" min="-50" max="50" step="1" value="'+(o.detune||0)+'"><input type="number" class="kval" data-osc="'+i+'" data-k="detune" min="-50" max="50" step="1" value="'+(o.detune||0)+'"></label>'+
+      '<label class="osc-knob vert">Level <input type="range" data-osc="'+i+'" data-k="level" min="0" max="1" step="0.01" value="'+(o.level==null?1:o.level)+'"><input type="number" class="kval" data-osc="'+i+'" data-k="level" min="0" max="1" step="0.01" value="'+(o.level==null?1:o.level)+'"></label>'+
+      '<label class="osc-knob">Pan <input type="range" data-osc="'+i+'" data-k="pan" min="-1" max="1" step="0.05" value="'+(o.pan||0)+'"><input type="number" class="kval" data-osc="'+i+'" data-k="pan" min="-1" max="1" step="0.05" value="'+(o.pan||0)+'"></label>'+ rm;
     host.appendChild(row);
   });
-  if (synthParams.oscs.length<3){ const add=document.createElement("button"); add.id="oscAddBtn"; add.textContent="＋ Add oscillator"; host.appendChild(add); }
+  const add=document.createElement("button"); add.id="oscAddBtn"; add.textContent="＋ Add oscillator"; host.appendChild(add);
 }
 (function wireOsc(){
   const host=document.getElementById("oscRows");
-  const onChange=(e)=>{ const el=e.target; if(el.dataset.osc==null||!el.dataset.k) return; const i=+el.dataset.osc, k=el.dataset.k; synthParams.oscs[i][k] = (k==="wave") ? el.value : parseFloat(el.value); };
+  const onChange=(e)=>{
+    const el=e.target; if(el.dataset.osc==null||!el.dataset.k) return;
+    const i=+el.dataset.osc, k=el.dataset.k;
+    if (k==="wave"){ synthParams.oscs[i].wave=el.value; return; }
+    let v=parseFloat(el.value); if(isNaN(v)) return;
+    const mn=el.min!==""?parseFloat(el.min):-Infinity, mx=el.max!==""?parseFloat(el.max):Infinity; v=Math.min(mx,Math.max(mn,v));
+    synthParams.oscs[i][k]=v;
+    // keep the slider and its value box (same data-k in this row) in sync
+    const row=el.closest(".osc-row"); if(row) row.querySelectorAll('[data-osc="'+i+'"][data-k="'+k+'"]').forEach(sib=>{ if(sib!==el) sib.value=v; });
+    if(e.type==="change") el.value=v;
+  };
   host.addEventListener("input", onChange);
   host.addEventListener("change", onChange);
   host.addEventListener("click",(e)=>{
-    if (e.target.id==="oscAddBtn"){ if(synthParams.oscs.length<3){ const p={...OSC_PRESETS[synthParams.oscs.length], wave: synthParams.oscs[0].wave}; synthParams.oscs.push(p); buildOscUI(); } return; }
+    if (e.target.id==="oscAddBtn"){ const p={...oscPreset(synthParams.oscs.length), wave: synthParams.oscs[0].wave}; synthParams.oscs.push(p); buildOscUI(); return; }
     const rm=e.target.closest(".osc-rm"); if(rm){ synthParams.oscs.splice(+rm.dataset.osc,1); buildOscUI(); }
   });
 })();
@@ -2982,8 +3748,8 @@ buildKeyboard(); applyScaleHighlight(); buildPads(); renderGrid(); renderSequenc
 addTrack("arp"); addTrack("beat"); addTrack("voice"); selectedTrackId=project.tracks[0].id; renderTimeline();
 // ===== Collapsible + draggable sections (order/state persisted) =====
 const LAYOUT_KEY="pitchStudioLayout_v2";
-const DEFAULT_ORDER=["soundkey","pitch","timeline","synthkeys","arp","beat","eq"];
-const DEFAULT_COLLAPSED=["beat","eq"];
+const DEFAULT_ORDER=["soundkey","pitch","timeline","synthkeys","arp","beat","sampler","eq"];
+const DEFAULT_COLLAPSED=["beat","sampler","eq"];
 function loadLayout(){ try { return JSON.parse(localStorage.getItem(LAYOUT_KEY)); } catch(e){ return null; } }
 function currentLayout(){ return { order:[...document.querySelectorAll(".csec")].map(s=>s.dataset.key), collapsed:[...document.querySelectorAll(".csec.collapsed")].map(s=>s.dataset.key) }; }
 function saveLayout(){ try { localStorage.setItem(LAYOUT_KEY, JSON.stringify(currentLayout())); } catch(e){} }
@@ -2991,11 +3757,50 @@ function applySectionLayout(layout){
   const wrap=document.querySelector(".wrap");
   const order=(layout&&layout.order&&layout.order.length)?layout.order:DEFAULT_ORDER;
   order.forEach(k=>{ const s=document.querySelector('.csec[data-key="'+k+'"]'); if(s) wrap.appendChild(s); });
+  // sections not present in a saved layout (e.g. newly added) get appended at the end
+  document.querySelectorAll(".csec").forEach(s=>{ if(!order.includes(s.dataset.key)) wrap.appendChild(s); });
   const collapsed=(layout&&layout.collapsed)?layout.collapsed:DEFAULT_COLLAPSED;
   document.querySelectorAll(".csec").forEach(s=>setCollapsed(s, collapsed.includes(s.dataset.key)));
 }
-function setCollapsed(sec, c){ sec.classList.toggle("collapsed",c); const b=sec.querySelector(":scope > .sec-head > .sec-toggle"); if(b){ b.textContent=c?"+":"–"; b.title=c?"Expand":"Minimize"; } }
+function setCollapsed(sec, c){ sec.classList.toggle("collapsed",c); const b=sec.querySelector(":scope > .sec-head > .sec-toggle:not(.sec-pop)"); if(b){ b.textContent=c?"+":"–"; b.title=c?"Expand":"Minimize"; } }
 let dragSec=null;
+
+/* ----- Pop sections out to their own windows (multi-monitor) -----
+   The section's DOM node is moved into a child window; its event handlers and audio keep
+   running in the main window (same JS realm), so state stays in sync automatically. So that
+   the app's many getElementById() lookups still resolve after a node moves, we extend
+   getElementById to also search open pop-out windows. Closing a pop-out returns its section
+   to the main window; closing the main window closes all pop-outs. */
+const popWindows=new Set(), popMap=new Map(); let mainClosing=false;
+const _getElById=document.getElementById.bind(document);
+document.getElementById=function(id){ let el=_getElById(id); if(el) return el; for(const w of popWindows){ try{ const e=w.document.getElementById(id); if(e) return e; }catch(_){} } return el; };
+function allStyles(){ return [...document.querySelectorAll("style")].map(s=>s.textContent).join("\n"); }
+function popOutSection(sec){
+  if (popMap.has(sec)){ try{ popMap.get(sec).win.focus(); }catch(_){} return; }
+  const title=(sec.querySelector(":scope > .sec-head > .sec-title")||{}).textContent||"Section";
+  const w=window.open("","_blank","width=760,height=600");
+  if (!w){ alert("Pop-out was blocked — allow pop-ups for this page, then try again."); return; }
+  w.document.open(); w.document.write('<!doctype html><html><head><meta charset="utf-8"><title>Pitch Studio — '+title+'</title><style>'+allStyles()+'\nhtml,body{margin:0}body{padding:18px;background:#0c0e13;color:#e7e9ee;font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}.pop-host{max-width:1100px;margin:0 auto}.pop-host .csec{margin:0}</style></head><body><div class="pop-host"></div></body></html>'); w.document.close();
+  const placeholder=document.createComment("popped:"+(sec.dataset.key||""));
+  sec.parentNode.insertBefore(placeholder, sec);
+  setCollapsed(sec,false);
+  w.document.querySelector(".pop-host").appendChild(w.document.adoptNode(sec));
+  popWindows.add(w); popMap.set(sec,{win:w,placeholder});
+  w.addEventListener("change", ()=>scheduleAutosave(), true);   // edits in the popped window still persist
+  const onClose=()=>{ if(!mainClosing) returnSection(sec); };
+  w.addEventListener("pagehide", onClose); w.addEventListener("beforeunload", onClose);
+}
+function returnSection(sec){
+  const rec=popMap.get(sec); if(!rec) return;
+  popMap.delete(sec); popWindows.delete(rec.win);
+  try { document.adoptNode(sec); } catch(_){}
+  if (rec.placeholder && rec.placeholder.parentNode){ rec.placeholder.parentNode.insertBefore(sec, rec.placeholder); rec.placeholder.remove(); }
+  else { document.querySelector(".wrap").appendChild(sec); }
+  try { if(!rec.win.closed) rec.win.close(); } catch(_){}
+  saveLayout();
+}
+window.addEventListener("pagehide",()=>{ mainClosing=true; popWindows.forEach(w=>{ try{ w.close(); }catch(_){} }); });
+
 function makeCollapsible(sec){
   const movable=["row","detector"], moved=[];
   movable.forEach(cl=>{ if(sec.classList.contains(cl)){ sec.classList.remove(cl); moved.push(cl); } });
@@ -3004,9 +3809,12 @@ function makeCollapsible(sec){
   while(sec.firstChild) body.appendChild(sec.firstChild);
   const head=document.createElement("div"); head.className="sec-head"; head.draggable=true;
   head.innerHTML='<span class="sec-grip" title="Drag to reorder">⠿</span><span class="sec-title">'+title+'</span>';
+  const pop=document.createElement("button"); pop.className="sec-toggle sec-pop"; pop.title="Pop out into its own window (multi-monitor)";
+  pop.innerHTML='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="8.5" y="2.5" width="13" height="13" rx="2.5"></rect><rect x="2.5" y="8.5" width="13" height="13" rx="2.5" fill="var(--panel-2)"></rect></svg>';
+  pop.addEventListener("click",(e)=>{ e.stopPropagation(); popOutSection(sec); });
   const btn=document.createElement("button"); btn.className="sec-toggle"; btn.textContent="–"; btn.title="Minimize";
   btn.addEventListener("click",(e)=>{ e.stopPropagation(); const c=sec.classList.toggle("collapsed"); btn.textContent=c?"+":"–"; btn.title=c?"Expand":"Minimize"; saveLayout(); });
-  head.appendChild(btn); sec.appendChild(head); sec.appendChild(body);
+  head.appendChild(pop); head.appendChild(btn); sec.appendChild(head); sec.appendChild(body);
   head.addEventListener("dragstart",(e)=>{ dragSec=sec; sec.classList.add("dragging"); e.dataTransfer.effectAllowed="move"; try{ e.dataTransfer.setData("text/plain", sec.dataset.key||""); }catch(_){} });
   head.addEventListener("dragend",()=>{ sec.classList.remove("dragging"); dragSec=null; saveLayout(); });
   sec.addEventListener("dragover",(e)=>{ if(!dragSec||dragSec===sec) return; e.preventDefault(); const r=sec.getBoundingClientRect(); const before=(e.clientY < r.top + r.height/2); sec.parentNode.insertBefore(dragSec, before?sec:sec.nextSibling); });
@@ -3014,7 +3822,15 @@ function makeCollapsible(sec){
 document.querySelectorAll(".csec").forEach(makeCollapsible);
 centerKeyboard(60);
 applySectionLayout(loadLayout());
-initDemo();
+// Restore the last working session (clips + audio) from IndexedDB; first-ever run gets the demo.
+(async ()=>{
+  let auto=null; try { auto=await loadAutosave(); } catch(e){}
+  if (auto && auto.data){ try { loadProject(auto.data); currentLabel=auto.label||currentLabel; sessionLabelEl.textContent=currentLabel; } catch(e){ await initDemo(); } }
+  else { await initDemo(); }
+  autosaveReady=true;
+})();
+window.addEventListener("pagehide", ()=>{ try { saveAutosave(); } catch(_){} });
+document.addEventListener("change", ()=>scheduleAutosave(), true);   // synth/FX/key/BPM tweaks persist too
 </script>
 </body>
 </html>

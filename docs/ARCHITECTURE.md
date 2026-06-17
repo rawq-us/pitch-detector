@@ -22,6 +22,7 @@ they're spawned from Blob URLs whose source lives inline (a string, or
 | Pitch detection (live) | `autoCorrelate` on a 2048 analyser frame — the *tuner*; moment-in-time only |
 | Project / timing | `project` (bpm, timeSig, lengthSec, loop, tracks), `quarterSec`/`barSec` helpers |
 | Arp editor / Beat machine | pattern builders that emit clips |
+| Sample beat (sampler) | always-present collapsible section over a **global** `project.samplerKit`; expandable N×N pad bank (Play/Edit modes, drag-reorder) + step grid; `＋ Timeline` adds grid/loop clips to a `sampler` lane; `samplerClipEvents` (DOM-free) expands them |
 | Timeline model | tracks → clips; `clipDuration` (incl. `loopFill` = repeat to session end), `addClip`, `growIfNeeded` |
 | Timeline rendering | `renderTimeline()` rebuilds head column + lanes + clips; `PX_PER_SEC` is the zoom (28 = 100%, `setTimelineZoom`) |
 | Transport | look-ahead scheduler (25 ms tick, ~120 ms ahead) on the Web Audio clock; `forEachClipEvent` expands clips to events |
@@ -29,7 +30,10 @@ they're spawned from Blob URLs whose source lives inline (a string, or
 | **Memo layer** | see below |
 | Offline render | `renderMix` via `OfflineAudioContext` → bounce/stems WAV |
 | MIDI export (global) | `buildMidi` — SMF-1 of arp/beat/memo-melody at project tempo |
-| Sessions | `serializeProject`/`loadProject` + IndexedDB; `FORMAT_VERSION` |
+| Song package | `exportSongPackage` → zip: full mix + karaoke render + LRC/SRT/TXT + stems + cover + manifest. `encodeSongAudio` (WebCodecs MP3 → tagged WAV fallback), `buildId3`, `memoSrt`, `songMetadataJson`, `wavBytes16` (DOM-free) |
+| AI Composer | stateful editor: `aiProjectSummary` sends the live project, the model replies with edit ops, `applyProjectOps` applies them (`applyProjectSpec` legacy fallback); provider-agnostic OpenAI-compatible `aiChat`/`aiParseSpec`; BYO key in `localStorage` |
+| Sessions | `serializeProject`/`loadProject` + IndexedDB; `FORMAT_VERSION`. **Autosave**: live project mirrored to the `autosave` store, restored on reload |
+| Layout / pop-out | collapsible/draggable `.csec` sections (order persisted); each can **pop out** into its own window (DOM moved into a child window; `getElementById` shimmed to search pop-outs) |
 | Demo | Bach prelude over a trap beat, installed on first run |
 | Visualizers, synth/FX UI, layout | oscilloscope, master EQ, collapsible/draggable `.csec` sections (order persisted) |
 

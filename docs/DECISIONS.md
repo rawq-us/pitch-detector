@@ -123,3 +123,103 @@ under `node:test` against synthesized ground-truth audio. Constraint that
 keeps this working: those functions stay DOM-free and avoid string literals
 with unbalanced braces. First run of the suite caught a real bug (silence
 fabricated a 224.7 BPM tempo map → silence guard in trackBeats).
+
+## 18. Fader orientation (v1.8)
+Sliders carry meaning by axis: level/volume/gain/mix/amount (and sustain)
+are **vertical** faders (`.knob.vert`, `writing-mode: vertical-lr`); pan and
+frequency/time *sweeps* (cutoff, attack/decay/release, glide, FX rate/time/
+depth) stay **horizontal**. No JS change — the element is still an
+`input[type=range]`, so `bindR`/`setVal` are untouched. FX cards switched to
+a bottom-aligned wrapping row so mixed orientations coexist like a hardware
+strip.
+
+## 19. Glide (v1.8)
+`synthParams.glide` (seconds) makes each oscillator start at the previous
+note's pitch and `exponentialRampToValueAtTime` to the new one. The live
+keyboard glides from `lastLiveMidi`; sequenced arp notes glide from a
+per-track previous-pitch map kept in the realtime scheduler
+(`transport._glidePrev`) and the offline render. Additive — old sessions
+default to 0, no format bump.
+
+## 20. Sampler layer (v1.8, FORMAT_VERSION → 3)
+A `sampler` track owns a pad bank (≤8 decoded samples) plus clips that are
+either `{kind:"grid", grid}` (one-shot triggers on the beat-machine 16-step
+grid → sampled beats) or `{kind:"loop", pad}` (a single buffer with
+`source.loop=true`, loop-filled → sampled loops). Event expansion is the
+DOM-free, tested `samplerClipEvents`; the transport and offline render gained
+a `sample` event kind. Pads (blob + name/gain/loop) and clips serialize;
+pad blobs decode asynchronously on load like voice/memo clips. AudioBuffers
+decoded in the live context are reused directly in the OfflineAudioContext
+(same sample rate) rather than re-decoded.
+
+## 21. Song package + MP3 reality (v1.8)
+"Export song…" bounces a finished track plus a karaoke (instrumental)
+render, synced lyrics (LRC/SRT/TXT, Musixmatch-friendly), isolated stems,
+cover art, and a `metadata.json` manifest — all in one store-only zip.
+Audio uses the browser's `AudioEncoder` (WebCodecs) MP3 when supported
+(frames concatenate into a valid `.mp3`, ID3v2.3 prepended); **most
+Chromium builds don't support MP3 *encoding***, so it falls back to a 16-bit
+WAV carrying the same ID3 tag in an embedded `id3 ` RIFF chunk. The chosen
+format is reported in the export status. `buildId3` writes UTF-16 text
+frames + USLT/SYLT lyrics + APIC cover; all builders are DOM-free and tested.
+
+## 22. AI Composer: compose, don't synthesize (v1.8)
+A bring-your-own-key, OpenAI-compatible chat call (OpenRouter / Hugging Face
+router / custom base URL) returns a strict-JSON arrangement spec that
+`applyProjectSpec` renders with the app's own synth/drum engine — so every
+generated part is its own isolated stem by construction. The LLM composes
+structure + lyrics; it does **not** generate audio. An optional, off-by-
+default audio endpoint can POST the prompt and import returned audio as a
+stem, but no chat provider emits music audio, so that path is scaffolding
+until a suitable CORS-friendly audio model is supplied. Keys live only in
+`localStorage` (`ps_ai_cfg`); nothing is hardcoded or committed.
+
+## 23. Sampler is a global-kit section, not a per-track modal (v1.9)
+The sampler was reworked to mirror the synth beat machine: one **global**
+`project.samplerKit` (not per-track pads) drives an always-present, collapsible/
+draggable **"Sample beat"** section. The pad bank is an expandable N×N grid
+(2×2→8×8) with **Play** mode (tap to audition) and **Edit** mode (load / rename
+/ vol / mark-loop / clear, plus **drag pads to reorder & group** — swapping a pad
+also swaps its step-grid row). `＋ Timeline` ensures a Sampler lane and drops the
+grid pattern; a loop pad drops a continuous loop clip. Playback looks the pad up
+in `project.samplerKit[pad]`. Same model as beat clips: clips are immutable grid
+snapshots. The kit (blobs + name/gain/loop) serializes once at project level.
+
+## 24. Working-session autosave (v1.9, DB_VER → 2)
+Clips/audio weren't restored on reload because sessions were manual save/load
+only. Now the live project (tracks, audio blobs, sampler kit, meta) is mirrored
+to a dedicated IndexedDB `autosave` store (key `"current"`), debounced 1.5 s off
+`renderTimeline`/control-change and flushed on `pagehide`. Startup loads the
+autosave if present, else seeds the demo. Named sessions (the `sessions` store)
+are unchanged. An `autosaveReady` guard prevents the empty boot state from
+clobbering a good autosave before the restore completes.
+
+## 25. Section pop-out windows via DOM move + getElementById shim (v1.9)
+Each section has a ⧉ button (next to minimize) that **moves its DOM node into a
+child `window.open`** (CSS copied in). Handlers and audio keep running in the
+main realm, so state stays synced with zero message-passing. The catch: the
+codebase looks elements up by id, and a moved node leaves the main document — so
+`document.getElementById` is wrapped to also search open pop-out windows. Closing
+a pop-out returns its section to a placeholder slot; the main window's `pagehide`
+sets `mainClosing` and closes all children (so children don't try to re-home into
+a closing parent). Pop-ups need a user gesture and the pop-up blocker allowed.
+
+## 26. AI Composer is a stateful editor, not a one-shot generator (v1.10)
+The request now carries `aiProjectSummary()` — a compact view of the live project
+(tempo, key, length, each track + what it plays, loaded sampler-pad names, lyrics;
+**no audio is uploaded**). The model replies with a list of **edit operations**
+(`{note, ops:[…]}`) that `applyProjectOps` executes against the live project:
+`setTempo / setKey / setLength / addArp / addBeat / addSampler / clearType /
+removeTrack / setLyrics`. So it *edits and extends* what's there ("make the beat
+busier", "use my Kick & Snare pads for a trap pattern", "switch to D minor")
+rather than replacing the arrangement. `addSampler` references loaded pads **by
+name** from the summary. Every op is clamped/whitelisted; unknown ops are skipped.
+The legacy full-`projectSpec` reply (`applyProjectSpec`) is still accepted as a
+fallback. Still no provider-side JSON-schema constraint or tool-calling — that's
+the next step if reliability on weaker models matters.
+
+## 27. Editable value readouts (v1.10)
+Synth filter/envelope and oscillator values are now `<input type=number>` boxes
+bound two-way to their sliders via `bindKnob` (drag → box updates; type+Enter →
+slider moves; both clamp to the slider's min/max). Replaces the old read-only
+`<span>` readouts so values can be dialed in precisely.
