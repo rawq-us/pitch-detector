@@ -973,7 +973,8 @@
 </div>
 <div id="keyPopup" class="popup" style="display:none; z-index:130">
   <label>Key / mode change <span id="keyPopupAt" class="dim" style="font-weight:400"></span></label>
-  <div class="row" style="gap:6px;flex-wrap:nowrap"><select id="keyPopRoot"></select><select id="keyPopMode"></select><button id="keyPopDel" class="mini" title="Remove this key change">✕</button></div>
+  <div class="row" style="gap:6px;flex-wrap:nowrap"><select id="keyPopRoot"></select><select id="keyPopMode"></select></div>
+  <div class="row" style="gap:6px;margin-top:8px"><button id="keyPopSave" class="primary mini">✓ Save</button><button id="keyPopDel" class="mini" title="Remove this key change">🗑 Delete</button></div>
 </div>
 
 <!-- Sessions modal -->
@@ -993,7 +994,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.15.1";
+const APP_VERSION="1.15.2";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -2781,7 +2782,9 @@ function keyPopEdited(){ if(!keyReg) return;
 }
 keyPopRoot.addEventListener("change",keyPopEdited);
 keyPopMode.addEventListener("change",keyPopEdited);
+document.getElementById("keyPopSave").addEventListener("click",()=>{ keyPopEdited(); closeKeyPopup(); });
 keyPopDel.addEventListener("click",()=>{ if(!keyReg) return; project.keyMap=(project.keyMap||[]).filter(r=>r!==keyReg); closeKeyPopup(); renderTimeline(); scheduleAutosave(); });
+window.addEventListener("keydown",(e)=>{ if(keyPopup.style.display!=="none" && e.key==="Escape") closeKeyPopup(); });
 document.addEventListener("pointerdown",(e)=>{ if (keyPopup.style.display!=="none" && !keyPopup.contains(e.target) && !e.target.closest(".key-region") && !e.target.closest(".key-lane")) closeKeyPopup(); });
 function auditionChord(s){
   const q=MEMO_QUALS.find(x=>x.q===s.quality)||MEMO_QUALS[0];

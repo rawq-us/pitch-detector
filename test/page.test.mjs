@@ -41,7 +41,7 @@ test("required element ids exist in the markup", () => {
     "memoLangSel","memoModelSel","memoTranscribe","memoOutputSel","memoOutputGroup","memoLyrics","memoExport",
     "chordPopup","chordRootSel","chordQualSel",
     // key/mode map
-    "keyPopup","keyPopRoot","keyPopMode","keyPopDel",
+    "keyPopup","keyPopRoot","keyPopMode","keyPopDel","keyPopSave",
   ];
   for (const id of ids) assert.ok(html.includes('id="' + id + '"'), "missing #" + id);
 });

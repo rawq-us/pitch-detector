@@ -306,6 +306,12 @@ Two features aimed at the "take a song idea to a music-gen service, then to a DA
   per-section structure. **No FORMAT_VERSION bump** — additive and forward/back compatible
   (old builds ignore `keyMap`; new builds default it to `[]`).
 
+## 38. Key/mode popup gets an explicit Save button (v1.15.2)
+The little key/mode editor applied live on dropdown `change` and only dismissed via a finicky
+outside-click — users couldn't tell it had committed. Added a primary **✓ Save** button (applies +
+closes) alongside a relabelled **🗑 Delete**, plus Esc-to-close. Live-apply stays for preview; Save
+is the clean commit/close.
+
 ## 37. Key-edge drag fix + Settings save-on-close (v1.15.1)
 - **Edge-drag was dead on arrival:** `attachKeyEdgeDrag` captured `const block=edge.parentElement`
   at attach time, but the edge is wired *before* `block.appendChild(edge)`, so `block` was `null`
