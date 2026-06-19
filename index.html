@@ -188,13 +188,18 @@
   .lyr-chip.unsynced { background: var(--panel-2); color: var(--muted); border: 1px dashed var(--border); box-shadow: none; }
   .lyr-chip.grabbing { cursor: grabbing; z-index: 5; }
   .lyr-chip.active { outline: 2px solid #fff; outline-offset: -1px; }
-  .tl-lane.key-lane { height: 30px; background: rgba(167,139,250,0.05); }
-  .tl-head.key-head { height: 30px; }
+  .tl-lane.key-lane { height: 34px; background: rgba(167,139,250,0.05); }
+  .tl-head.key-head { height: 34px; }
   .badge.keymap { background: #a78bfa; color: #1a1033; }
-  .key-chip { position: absolute; top: 5px; height: 20px; box-sizing: border-box; white-space: nowrap; background: linear-gradient(180deg,#c4b5fd,#a78bfa); color: #1a1033; font-size: 10.5px; font-weight: 700; padding: 3px 7px; border-radius: 5px; cursor: grab; user-select: none; touch-action: none; box-shadow: 0 2px 5px rgba(0,0,0,0.35); z-index: 2; }
-  .key-chip.start { background: var(--panel-2); color: var(--muted); border: 1px solid var(--border); box-shadow: none; cursor: default; font-weight: 600; }
-  .key-chip.grabbing { cursor: grabbing; z-index: 5; }
-  .key-band { position: absolute; top: 0; bottom: 0; opacity: 0.16; pointer-events: none; z-index: 0; }
+  /* full-width region blocks (like clips): they fill the space between key changes */
+  .key-region { position: absolute; top: 2px; bottom: 2px; display: flex; align-items: center; padding: 0 9px; font-size: 11px; font-weight: 700; color: #0c1118; cursor: pointer; overflow: hidden; white-space: nowrap; border-right: 1px solid rgba(0,0,0,0.45); box-sizing: border-box; z-index: 1; }
+  .key-region:hover { filter: brightness(1.12); }
+  .key-region .kr-lab { pointer-events: none; text-shadow: 0 1px 1px rgba(255,255,255,0.22); }
+  .key-region .kr-def { font-weight: 600; opacity: 0.7; }
+  .key-region .kr-edge { position: absolute; left: 0; top: 0; bottom: 0; width: 8px; cursor: ew-resize; }
+  .key-region .kr-edge:hover { background: rgba(0,0,0,0.28); }
+  .key-add { margin-left: 8px; font-size: 10px; padding: 2px 8px; border: 1px solid var(--accent-2); color: var(--accent-2); background: none; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+  .key-add:hover { background: var(--accent-2); color: #04222e; }
   .lyr-lane-empty { position: absolute; top: 14px; color: var(--muted); font-size: 11px; }
   /* pitch-map modal fills the available height; track-name column doesn't smoosh */
   #pitchModal .modal-box { display: flex; flex-direction: column; overflow: hidden; }
@@ -988,7 +993,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.15.0";
+const APP_VERSION="1.15.1";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -2762,15 +2767,22 @@ function openKeyPopup(reg, anchor){
   keyReg=reg; const r=anchor.getBoundingClientRect();
   keyPopup.style.left=(window.scrollX+Math.min(r.left, window.innerWidth-220))+"px";
   keyPopup.style.top=(window.scrollY+r.bottom+6)+"px";
-  keyPopRoot.value=String(reg.root); keyPopMode.value=reg.mode; keyPopAt.textContent="(bar "+lyrBarBeatStr(reg.beat)+")";
+  keyPopRoot.value=String(reg.root); keyPopMode.value=reg.mode;
+  keyPopAt.textContent = reg.isDefault ? "(default — start of song)" : ("(bar "+lyrBarBeatStr(reg.beat)+")");
+  keyPopDel.style.display = reg.isDefault ? "none" : "";   // the default key can't be deleted
   keyPopup.style.display="flex";
 }
 function closeKeyPopup(){ keyPopup.style.display="none"; keyReg=null; }
-function keyPopEdited(){ if(!keyReg) return; keyReg.root=parseInt(keyPopRoot.value,10); keyReg.mode=keyPopMode.value; keyPopAt.textContent="(bar "+lyrBarBeatStr(keyReg.beat)+")"; renderTimeline(); scheduleAutosave(); }
+function keyPopEdited(){ if(!keyReg) return;
+  const root=parseInt(keyPopRoot.value,10), mode=keyPopMode.value;
+  if (keyReg.isDefault){ rootSel.value=String(root); modeSel.value=mode; if(typeof applyScaleHighlight==="function") applyScaleHighlight(); if(typeof updateKeyFollowReadout==="function") updateKeyFollowReadout(); }
+  else { keyReg.root=root; keyReg.mode=mode; keyPopAt.textContent="(bar "+lyrBarBeatStr(keyReg.beat)+")"; }
+  renderTimeline(); scheduleAutosave();
+}
 keyPopRoot.addEventListener("change",keyPopEdited);
 keyPopMode.addEventListener("change",keyPopEdited);
 keyPopDel.addEventListener("click",()=>{ if(!keyReg) return; project.keyMap=(project.keyMap||[]).filter(r=>r!==keyReg); closeKeyPopup(); renderTimeline(); scheduleAutosave(); });
-document.addEventListener("pointerdown",(e)=>{ if (keyPopup.style.display!=="none" && !keyPopup.contains(e.target) && !e.target.closest(".key-chip") && !e.target.closest(".key-lane")) closeKeyPopup(); });
+document.addEventListener("pointerdown",(e)=>{ if (keyPopup.style.display!=="none" && !keyPopup.contains(e.target) && !e.target.closest(".key-region") && !e.target.closest(".key-lane")) closeKeyPopup(); });
 function auditionChord(s){
   const q=MEMO_QUALS.find(x=>x.q===s.quality)||MEMO_QUALS[0];
   let base=48+s.root; if (base>59) base-=12;
@@ -4186,7 +4198,9 @@ function openSettings(){
   settingsToggleBase(); document.getElementById("settingsStatus").textContent="";
   settingsModal.style.display="flex";
 }
-function closeSettings(){ settingsModal.style.display="none"; refreshAiCfgSummary(); }
+// closing the panel commits whatever's in the fields — there's an explicit Save too, but closing
+// (✕ or click-outside) shouldn't silently throw your edits away
+function closeSettings(){ aiSaveCfg(readSettingsCfg()); settingsModal.style.display="none"; refreshAiCfgSummary(); }
 function readSettingsCfg(){ return { provider:aiProvider.value, model:aiModel.value.trim(), key:aiKey.value.trim(), baseUrl:aiBaseUrl.value.trim(), audioUrl:aiAudioUrl.value.trim() }; }
 document.getElementById("settingsBtn").addEventListener("click",openSettings);
 document.getElementById("settingsClose").addEventListener("click",closeSettings);
@@ -4650,57 +4664,70 @@ function lyrExport(fmt){
 // beat position; drag to re-time (snap-to-beat optional). Called by renderTimeline.
 // The optional Key/Mode lane: a marker per override region in project.keyMap. Click the
 // lane to add a change at that beat; click a marker to edit/delete; drag to re-time.
+// The key/mode lane shows full-width region BLOCKS (like clips): the default block fills from the
+// start to the first change, each change fills to the next, and the last fills to the timeline end —
+// no gaps. Click a block to edit it (the default block edits the song's starting key); drag a
+// block's left edge to move the change; the + button or a right-click adds a new one.
 function renderKeyLane(W){
   if (!tlLanes || !tlHeadCol) return;
-  const origin=originPx();
+  const origin=originPx(), g=globalKey();
   const head=document.createElement("div"); head.className="tl-head key-head";
-  const g=globalKey();
-  head.innerHTML='<div class="tname"><span class="badge keymap">key</span>Key / mode</div><div class="hint" style="font-size:9px;margin:0">'+keyModeName(g.root,g.mode)+' · click to add change</div>';
+  head.innerHTML='<div class="tname"><span class="badge keymap">key</span>Key / mode</div>';
+  const addBtn=document.createElement("button"); addBtn.className="key-add"; addBtn.textContent="＋ key"; addBtn.title="Add a key/mode change (you can also right-click the lane, or drag a block's left edge)";
+  addBtn.addEventListener("click",()=>addKeyChangeAt(keyAddDefaultBeat())); head.appendChild(addBtn);
   tlHeadCol.appendChild(head);
+
   const lane=document.createElement("div"); lane.className="tl-lane key-lane"; lane.style.width=W+"px";
   const bu=beatUnitSec(), barPx=beatsPerBar()*bu*PX_PER_SEC;
   lane.style.backgroundImage="repeating-linear-gradient(90deg, transparent, transparent "+(barPx-1)+"px, #3a4254 "+(barPx-1)+"px, #3a4254 "+barPx+"px)";
   lane.style.backgroundPositionX=origin+"px";
-  // colored region bands (by mode) so the key changes read at a glance — only when there are changes
-  if (project.keyMap && project.keyMap.length){
-    const regions=[{beat:0, root:g.root, mode:g.mode}, ...keyMapSorted()];
-    const endBeat=Math.max(regions[regions.length-1].beat+beatsPerBar(), lyrSecToBeat(project.lengthSec));
-    regions.forEach((r,i)=>{
-      const startSec=lyrBeatToSec(r.beat), nextBeat=(i+1<regions.length)?regions[i+1].beat:endBeat;
-      const band=document.createElement("div"); band.className="key-band";
-      band.style.left=(origin+startSec*PX_PER_SEC)+"px"; band.style.width=Math.max(0,(lyrBeatToSec(nextBeat)-startSec)*PX_PER_SEC)+"px";
-      band.style.background=(MODE_COLORS[r.mode]||"#888");
-      lane.appendChild(band);
-    });
-  }
-  // a quiet "start" tag for the global key at beat 0
-  const start=document.createElement("div"); start.className="key-chip start"; start.style.left=(origin+2)+"px";
-  start.textContent=keyModeName(g.root,g.mode); start.title="Song key (set in the header). Add changes by clicking further along the lane.";
-  lane.appendChild(start);
-  keyMapSorted().forEach(r=>{
-    const sec=lyrBeatToSec(r.beat);
-    const chip=document.createElement("div"); chip.className="key-chip"; chip._reg=r;
-    chip.textContent=keyModeName(r.root,r.mode); chip.title="bar "+lyrBarBeatStr(r.beat)+" → "+keyModeName(r.root,r.mode)+"  (click to edit, drag to move)";
-    chip.style.left=(origin+sec*PX_PER_SEC)+"px";
-    attachKeyChipDrag(chip, r, lane);
-    lane.appendChild(chip);
+
+  const regions=[{beat:0, root:g.root, mode:g.mode, isDefault:true}, ...keyMapSorted()];
+  const endBeat=Math.max((regions[regions.length-1].beat||0)+1, lyrSecToBeat(project.lengthSec));
+  regions.forEach((r,i)=>{
+    const startSec=lyrBeatToSec(r.beat), nextBeat=(i+1<regions.length)?regions[i+1].beat:endBeat;
+    const left=origin+startSec*PX_PER_SEC, wPx=Math.max(3,(lyrBeatToSec(nextBeat)-startSec)*PX_PER_SEC);
+    const block=document.createElement("div"); block.className="key-region"+(r.isDefault?" def":""); block._reg=r;
+    block.style.left=left+"px"; block.style.width=wPx+"px"; block.style.background=(MODE_COLORS[r.mode]||"#888");
+    block.innerHTML='<span class="kr-lab">'+keyModeName(r.root,r.mode)+(r.isDefault?' <span class="kr-def">· default</span>':'')+'</span>';
+    block.title=r.isDefault ? "Default key — the whole song until the first change. Click to change the song's starting key/mode." : ("Key change at bar "+lyrBarBeatStr(r.beat)+" — click to edit, drag the left edge to move.");
+    if (!r.isDefault){ const edge=document.createElement("div"); edge.className="kr-edge"; attachKeyEdgeDrag(edge, r, lane); block.appendChild(edge); }
+    block.addEventListener("click",(e)=>{ if(e.target.classList.contains("kr-edge")) return; openKeyPopup(r, block); });
+    lane.appendChild(block);
   });
-  lane.addEventListener("pointerdown",(e)=>{
-    if (e.target!==lane) return;               // only empty-lane clicks add a region
-    const rct=lane.getBoundingClientRect(); let sec=(e.clientX-rct.left-origin)/PX_PER_SEC; sec=Math.max(0,sec);
-    let beat=lyrSecToBeat(sec); if (lyrSnap) beat=Math.round(beat); if (beat<=0) beat=beatsPerBar();
-    const k=keyAtBeat(beat); const reg={ beat, root:k.root, mode:k.mode };
-    project.keyMap=project.keyMap||[]; project.keyMap.push(reg);
-    renderTimeline(); scheduleAutosave();
-    const nc=[...tlLanes.querySelectorAll(".key-chip")].find(c=>c._reg===reg); if (nc) openKeyPopup(reg, nc);
-  });
+  lane.addEventListener("contextmenu",(e)=>{ e.preventDefault(); const rct=lane.getBoundingClientRect(); let beat=lyrSecToBeat((e.clientX-rct.left-origin)/PX_PER_SEC); if(lyrSnap) beat=Math.round(beat); addKeyChangeAt(Math.max(1,beat)); });
   tlLanes.appendChild(lane);
 }
-function attachKeyChipDrag(chip, reg, lane){
-  let dragging=false, moved=false;
-  chip.addEventListener("pointerdown",(e)=>{ e.preventDefault(); e.stopPropagation(); dragging=true; moved=false; chip.setPointerCapture(e.pointerId); chip.classList.add("grabbing"); });
-  chip.addEventListener("pointermove",(e)=>{ if(!dragging) return; moved=true; const r=lane.getBoundingClientRect(); let sec=(e.clientX-r.left-originPx())/PX_PER_SEC; sec=Math.max(0,sec); let beat=lyrSecToBeat(sec); if(lyrSnap) beat=Math.round(beat); if(beat<=0) beat=1; reg.beat=beat; chip.style.left=(originPx()+lyrBeatToSec(beat)*PX_PER_SEC)+"px"; chip.title="bar "+lyrBarBeatStr(beat)+" → "+keyModeName(reg.root,reg.mode); });
-  chip.addEventListener("pointerup",(e)=>{ if(!dragging) return; dragging=false; chip.classList.remove("grabbing"); if(moved){ renderTimeline(); scheduleAutosave(); } else { openKeyPopup(reg, chip); } });
+// where the + button drops a new change: after the last change (or ~2 bars in), avoiding a dup
+function keyAddDefaultBeat(){ const last=keyMapSorted().slice(-1)[0]; return Math.max(1, (last?last.beat:0)+beatsPerBar()*2); }
+function addKeyChangeAt(beat){
+  beat=Math.round(beat); if (beat<=0) beat=beatsPerBar();
+  const k=keyAtBeat(beat); const reg={ beat, root:k.root, mode:k.mode };
+  project.keyMap=project.keyMap||[]; project.keyMap.push(reg);
+  renderTimeline(); scheduleAutosave();
+  const nb=[...tlLanes.querySelectorAll(".key-region")].find(b=>b._reg===reg); if (nb) openKeyPopup(reg, nb);
+}
+// drag a change's left edge to move it — live-resizes this block and its left neighbour without a
+// full re-render (which would destroy the element mid-drag), then renders once on release
+function attachKeyEdgeDrag(edge, reg, lane){
+  let dragging=false, moved=false, block=null, prev=null, nextLeft=0;
+  edge.addEventListener("pointerdown",(e)=>{ e.preventDefault(); e.stopPropagation(); dragging=true; moved=false; edge.setPointerCapture(e.pointerId);
+    block=edge.parentElement;   // resolved now that the edge is in the DOM (it was null at attach time)
+    prev=(block.previousElementSibling&&block.previousElementSibling.classList.contains("key-region"))?block.previousElementSibling:null;
+    const nb=(block.nextElementSibling&&block.nextElementSibling.classList.contains("key-region"))?block.nextElementSibling:null;
+    nextLeft=nb?nb.offsetLeft:(block.offsetLeft+block.offsetWidth);
+  });
+  edge.addEventListener("pointermove",(e)=>{ if(!dragging) return; moved=true; const r=lane.getBoundingClientRect();
+    let beat=lyrSecToBeat((e.clientX-r.left-originPx())/PX_PER_SEC); if(lyrSnap) beat=Math.round(beat);
+    const minBeat=prev?lyrSecToBeat((prev.offsetLeft-originPx())/PX_PER_SEC)+1:1;
+    const nextBeat=lyrSecToBeat((nextLeft-originPx())/PX_PER_SEC);
+    beat=clamp(beat, Math.max(1,minBeat), Math.max(1,nextBeat-1)); reg.beat=beat;
+    const nl=originPx()+lyrBeatToSec(beat)*PX_PER_SEC;
+    block.style.left=nl+"px"; block.style.width=Math.max(3,nextLeft-nl)+"px";
+    if (prev) prev.style.width=Math.max(3,nl-prev.offsetLeft)+"px";
+    block.title="Key change at bar "+lyrBarBeatStr(beat);
+  });
+  edge.addEventListener("pointerup",(e)=>{ if(!dragging) return; dragging=false; if(moved){ renderTimeline(); scheduleAutosave(); } });
 }
 
 function renderLyricsLane(W){

@@ -306,6 +306,28 @@ Two features aimed at the "take a song idea to a music-gen service, then to a DA
   per-section structure. **No FORMAT_VERSION bump** — additive and forward/back compatible
   (old builds ignore `keyMap`; new builds default it to `[]`).
 
+## 37. Key-edge drag fix + Settings save-on-close (v1.15.1)
+- **Edge-drag was dead on arrival:** `attachKeyEdgeDrag` captured `const block=edge.parentElement`
+  at attach time, but the edge is wired *before* `block.appendChild(edge)`, so `block` was `null`
+  and the first `pointerdown` threw. Resolve `block` lazily inside `pointerdown` (the edge is in the
+  DOM by then).
+- **Settings now persist on close.** `closeSettings()` commits the field values (`aiSaveCfg`) before
+  hiding — closing via ✕ or click-outside no longer silently discards edits. The explicit Save / Test
+  buttons remain.
+
+## 36. Key/mode lane → proportional region blocks (v1.15)
+The first cut drew the key map as small text-sized chips at a point plus faint background bands —
+which read nothing like the rest of the timeline (where clips fill their span) and made the default
+key a locked, non-clickable "start" tag. Rebuilt so the lane is **full-width region blocks like
+clips**: an ordered `[{default}, …keyMapSorted()]`, each block spanning from its beat to the next
+change (the default fills 0→first change, the last fills →timeline end) — no gaps, sized by space
+not by text. The **default block is clickable** and edits the song's *global* starting key
+(`rootSel`/`modeSel`) via the same popup with Delete hidden (`reg.isDefault`). Adding a change has
+three affordances: a **＋ key** button in the lane head, **right-click** the lane (`contextmenu`),
+or drag a block's **left edge** (`.kr-edge`). The edge drag live-resizes the block and its left
+neighbour without a full re-render (a full render mid-drag would destroy the element and drop the
+pointer capture), rendering once on release.
+
 ## 35. File menu bar, real session lifecycle, key/mode relocation, zoom perf (v1.15)
 - **Sticky File menu bar** replaces the old `.topbar`: brand + a **File** dropdown (New · Open… ·
   Save ⌘S · Save As… · Export ▸ MIDI/WAV/Stems/Song/Import · Recent) + the current session name +

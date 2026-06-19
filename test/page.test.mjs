@@ -63,7 +63,7 @@ test("core functions the tests and features depend on are present", () => {
     "renderLyricsLane","lyrLinesFlat","lyrSecToBeat","lyricFmtBarBeat",
     "buildSongPrompt","gatherSongPrompt","styleTagsList","renderStyleChips","persistStyleTags",
     "vozartLyricsRaw","vozartStyleRaw","vzField","vzUpdateCounts","styTokens","styToggleTag","styHasTag","highlightStyleChips",
-    "parseKeyName","keysFromLyrics","keyFollowTick","keyFollowReset","renderKeyLane",
+    "parseKeyName","keysFromLyrics","keyFollowTick","keyFollowReset","renderKeyLane","addKeyChangeAt","attachKeyEdgeDrag",
     "parseMidiFile","importMidiToProject","initWebMIDI","onMidiMessage","midiNoteOn",
     // key/mode map
     "keyAtBeat","keyChangeSummary","keyMapSorted","renderKeyLane","keyModeName",
