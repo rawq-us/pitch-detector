@@ -306,6 +306,217 @@ Two features aimed at the "take a song idea to a music-gen service, then to a DA
   per-section structure. **No FORMAT_VERSION bump** — additive and forward/back compatible
   (old builds ignore `keyMap`; new builds default it to `[]`).
 
+## 52. Timeline track-header cleanup (v1.24.1)
+- The per-track header column was a wrapping mess (the wide "meter: global" select + FX/Rec/Import/
+  Convert/Delete crammed into ~160px wrapped into the next row). Rebuilt: the **compact meter select**
+  ("global") moves onto the name row (right-aligned); the name is a `.tnm` span that ellipsizes
+  gracefully instead of the whole `.tname`. All actions are now uniform `.thd-btn` chips on one
+  non-wrapping row — labels without redundant icons (FX, Rec, Import, Pads, → Memo) and icon-only only
+  where unambiguous (🗑). `.tl-head` got `overflow:hidden` as a safety; head/lane heights stay coupled
+  at 58 px. No more vertical spill.
+
+## 53. The song's key palette is now first-class in the editors — info, hint, constraint, enforcement (v1.25)
+- **Information + hinting:** `timelineKeys()` returns the distinct (root,mode) pairs actually used across
+  the timeline (default region + every key-map change, with the bar each appears at). `renderKeyChips`
+  shows them as a "SONG KEYS" chip row in BOTH editors; the clip's current key is highlighted (`.on`),
+  and `clipKeySpan()` flags the chips whose regions the clip overlaps (`.covers`). So you can see — and
+  one-click apply — the keys your song uses, instead of hunting through a blank 12×7 dropdown.
+- **Constraint / quick-pick:** clicking a chip calls `midiApplyKey`/`synthApplyKey`, which drives the
+  existing selectors and writes back to the covering timeline region.
+- **Enforcement (toggleable):** a `🎵 In-key only` toolbar button in the MIDI editor (synced with the
+  keyboard's scale-lock `kbScaleLock` via `syncInKeyBtns`). When on, `midiSnapPitch`/`nearestInScale`
+  snap newly-added and dragged notes to the current scale; toggle to `🎹 All keys` for chromatic freedom.
+- WHY: the user (rightly) noted the timeline's configured keys/modes were *completely* absent from the
+  editors — not as info, hint, constraint, or enforcement. Now they're all four.
+
+## 51. Editor key/mode selectors — timeline-derived, write back to the key map (v1.24)
+- **Both editors now have real Key + Mode selectors in the header, and they are NOT a detached global.**
+  MIDI editor: `#midiKeyRoot`/`#midiKeyMode` initialise from `keyAtBeat(clipStartBeat)` (the timeline
+  region the clip sits in). Changing them runs `midiEditorSetKey`, which edits **the timeline region
+  covering the clip** (`keyMapSorted` → last region with `beat<=pos`), or the base/default key
+  (`rootSel`/`modeSel`) if the clip is in the default region — so the change shows on the timeline and
+  persists. `renderMidiRoll` keeps the selectors in sync with `currentScaleSet()`, and `midiKeyChangeNote`
+  flags when a clip spans key changes (shading uses the clip start). Mood is shown next to it.
+- **Synth modal** gets `#synthKeyRoot`/`#synthKeyMode` ("Base key") wired to the song's default region
+  (`rootSel`/`modeSel`) — the synth keyboard isn't at a timeline position, so the base key is its
+  reference; during playback it still follows regions via `keyFollowTick`. `syncSynthKeySel` refreshes
+  on open.
+- WHY: the user (correctly) flagged that the editors showed a fixed key with no way to change it. The
+  app already routed `activeKeyOverride = keyAtBeat(clipStart)`, but with no selector and no write-back it
+  *felt* global. Now picking a mode is a first-class, timeline-aware action in the editor.
+
+## 50. Pattern library — genre progressions/arps, in-key, in the MIDI editor (v1.23)
+- **We generate the patterns ourselves, not from a public MIDI repo.** Chord progressions/scales aren't
+  copyrightable, so `PATTERN_LIB` stores each as interval data (`[semitoneOffsetFromKeyRoot, quality]`
+  per bar) — no external files, no licensing/trademark exposure (matches the no-artist-names rule), and
+  it's tiny. `renderPattern(pat, keyRoot, bpb)` renders it into MIDI notes **in the current key** (block
+  chords or eighth-note arp), so it always lands in tune. A few genres × a few progressions each (Pop,
+  Hip-hop/Lo-fi, House/EDM, Rock, Jazz, Blues incl. a 12-bar). `CHORD_QUAL` maps qualities to intervals.
+- **UX: a 📚 Patterns panel inside the MIDI editor** (`#midiLib`, overlay on the box, not the scroll
+  wrapper). Genre select **defaults to the song's `meta.genre`**; each row has ▶ preview (plays via
+  `playNoteAt` in the clip's key) and ＋ add (`midiLibAdd` inserts after the last note and grows the
+  clip). This is the "Logic loops"-style plop-it-in-then-tweak flow the user wanted, and it leans on the
+  song-genre metadata + the key/mode engine from the previous releases. Pure builders are test-listed.
+- FUTURE: the arp section could get the same panel; more genres/progressions are just data additions.
+
+## 49. Both instrument keyboards become visualizer sections + full-screen editors (v1.22)
+- **Synth — keys is now a visualizer + Edit button.** At init `relocateSynth()` moves `#synthControls`
+  (keyboard, arp, filter, oscillators) into `#synthModal` (a `.fs-box` full-screen modal). The SECTION
+  keeps the oscilloscope + `#synthLayerViz` (a mini piano-roll preview of the arp layers) + the
+  "Open Synth Keys" button. `openSynthModal`/`closeSynthModal` show/hide it and lock body scroll.
+- **New MIDI — keys section** (`data-key="midikeys"`, in `DEFAULT_ORDER` after `synthkeys`): `#midiLayerViz`
+  previews every MIDI clip (clickable → opens it) plus "＋ New MIDI layer" / "✎ Edit" buttons. The MIDI
+  editor was already a full-screen modal.
+- **One keyboard, never two listening.** The single `.kbd-row` lives in the synth modal; the MIDI editor
+  borrows it (`midiKbToModal`) and the two modals are mutually exclusive (`openMidiEditor`→`closeSynthModal`).
+  This is the architecture the user asked for twice: sections show layer visualizers, editing happens in
+  a full-screen modal, and you can't have two keyboards competing for input.
+- `renderInstViz(containerId,type)` draws the per-layer mini piano-roll (arp steps or MIDI notes as dots),
+  refreshed from `renderTimeline` via `renderInstVizAll`. Each row has a 🗑 delete button (v1.23.1) so
+  layers can be removed from the section, not only the timeline (same confirm + filter as the timeline's).
+- **`applySectionLayout` now slots an unknown (newly-shipped) section into its `DEFAULT_ORDER` position**
+  — right after its nearest known predecessor — instead of dumping it at the very end, so upgrading users
+  see MIDI — keys land right under Synth — keys.
+
+## 48. Theory-aware key/mode suggestions + song metadata header (v1.21)
+- **`keySuggestions(fromRoot, fromMode)`** proposes smooth changes grounded in theory, ranked
+  smoothest-first: **pivots** (the other modes that share the same 7 notes — relative major/minor
+  surfaces first, then Dorian/Phrygian/Lydian/Mixolydian — `changed:0`), **circle-of-fifths** neighbours
+  (±a 5th, same mode, one accidental), and **parallel modes** (same tonic, recoloured, with a
+  brighter/darker hint from `MODE_BRIGHTNESS`). The key popup renders these as click-to-apply chips with
+  a plain-language "why" + the mode's mood — the "from" key is the region *before* this one
+  (`keyPopupFrom`), so it reads like "smooth changes from C major." Helpers `scalePCs`/`pcSetsEqual`/
+  `pcOverlap` are pure and test-listed. This exists because the user (and most musicians) don't have the
+  circle of fifths / modes memorised.
+- **Song metadata in the header.** `project.meta` already held title/genre/etc.; added `take`. The
+  header is now a button showing `songDisplayName()` = "Title — Genre · Take N" (was a bare session
+  label, which the user found meaningless), opening a small editor (title / genre w/ datalist / take).
+  `take` flows into `songMetadataJson` (export). Kept a hidden `#sessionLabel` so `setCurrentLabel` and
+  the save system keep working. FUTURE: genre will seed common-progression suggestions.
+
+## 47. MIDI editor — timeline key-awareness, moods, true full-screen (v1.20.1)
+- **The editor now honors the key/mode the clip sits under on the timeline, not just the global
+  default.** `openMidiEditor` sets `activeKeyOverride = keyAtBeat(clipStartBeat)` (restored on close),
+  which `currentScaleSet()` already reads — so the grid shading, the keyboard's in-key highlight AND
+  its scale-lock muting all follow the bar's key at once. Verified: a clip under a D-Dorian region
+  shades D roots and tags "D Dorian" while global is C major.
+- **`.kbd-foot` moves into the modal too** (not just `.kbd-row`), so the In-key/All-keys toggle + live
+  key readout are available; the arp-transpose seg is hidden in-modal via `.midi-kb-host .kbd-mode`.
+- **Mode → mood/genre map (`MODE_MOOD`)** surfaced as a "Feel / genres" readout next to the mode
+  selector and appended to the editor key tag — musicians who don't think in modes get the feeling.
+- **True full-screen:** `.midi-box` fills 100vw×100vh (radius 0) and `body.modal-locked` hides the page
+  scrollbar behind it.
+- **Removed the duplicate top Velocity input** — the Velocity *controller lane* is the real editor;
+  new notes just start at 100. Bars/Snap share `input.midi-in` width (uniform). NOTE: the larger
+  restructuring the user wants next — both keyboards as modal-launched editors with the section showing
+  a layer *visualizer*, a MIDI-keys section, and a key ruler showing the full timeline inside the editor
+  — is deferred pending alignment on the "timeline = the song; clips are key-aware spans; looping is a
+  clip property, not the core model" concept.
+
+## 46. MIDI editor v2 — full-screen, real keyboard, key-aware, control lanes (v1.20)
+- **The editor reuses the ONE synth keyboard instead of drawing a second one.** Opening relocates the
+  live `.kbd-row` DOM node into `#midiKbHost` (`midiKbToModal`/`midiKbRestore`, marker comment for the
+  home slot) and forces `setKbMode("play")`; closing moves it back. Same `keyEls`, QWERTY map, ±4
+  octave switch, in-key box and (critically) the same single input listener — so there is never a
+  two-keyboard input conflict. This is why we did NOT need to modal-ize the synth keyboard or build
+  layer visualizers (the user floated that; the full-screen modal already makes only one keyboard live).
+- **No vertical piano.** The gutter is now note-name labels per row (`.mr-glabel`, like the pitch-map),
+  and rows are shaded by the current key/mode via `currentScaleSet()` (`.mr-row.inkey/.root`), with the
+  key name in the header (`#midiKeyTag`). Row height 12→14 for label legibility.
+- **Input coordination:** the editor's keydown is on `document`, which bubbles BEFORE the synth's
+  `window` handlers. It `stopPropagation()`s only the keys it owns (Esc, Space, ⌘A, Del, and arrows
+  *when notes are selected*); letters and unselected ↑/↓ fall through so QWERTY still plays/records and
+  ↑/↓ still shifts the keyboard octave. Don't move this handler to `window` or the coordination breaks.
+- **Control lanes** (`MIDI_CTRLS`, collapsible `#midiCtrlBox`): Velocity (per-note bars, drives the
+  synth), plus Pitch Bend / Modulation / Expression / Sustain as point automation (`clip.cc`, SVG
+  polyline + draggable handles; sustain renders stepped; bend has a center line). Persisted in
+  serialize/load. **MIDI export carries them**: `buildMidi` now writes per-note velocity, `0xB0` CCs
+  (1/11/64) and `0xE0` pitch-bend. HONEST: our synth only renders velocity; bend/CC are edit + store +
+  `.mid` export so they reach real tools. Signal's lane code is not drop-in compatible — this is ours.
+
+## 45. Arpeggiator folded into Synth — keys; clearer collapse affordance (v1.19.1)
+- **Arp is now a `synth-fold` inside the `synthkeys` panel** (above Filter & envelope), not a
+  standalone `.csec` — removed from `DEFAULT_ORDER`. `applySectionLayout` already guards missing
+  keys, so old saved layouts that list `"arp"` are harmless. All arp ids (`rateSel`, `seq`, `trMinus`…)
+  were preserved so the existing wiring keeps working.
+- **Collapse affordance:** the fold `<summary>` markers changed from a bullet/caret to a **+/− box**
+  (`::before` = `–` open, `+` closed) — users couldn't tell the bullet sections were collapsible.
+- **Transpose buttons are musical now:** `−8ve −W −½ / +½ +W +8ve` (added the whole-step ±2; relabelled
+  the half-step ±1 and octave ±12) instead of the opaque `−12 −1 +1 +12`.
+- **Arp sequence is bar-aware:** `renderSequence` lays steps as a grid padded out to whole bars, marks
+  each bar start with an accent left-border, and `arpBarsOut` reads e.g. "2 bars · 11/16 steps".
+  `arpStepsPerBar()` = `beatsPerBar() × rate`; re-renders on rate change. Empty trailing slots are
+  click-to-fill-with-rests so you can space notes to fill the bar.
+
+## 44. MIDI piano-roll layer + editor (v1.19)
+- **New `midi` track type** holding clips with `notes:[{midi,beat,dur,vel}]` (beat/dur in beats).
+  Integrated at every existing seam rather than a parallel system: `addTrack` name map, `patternSec`
+  (loop length = `lengthBeats`), `forEachClipEvent` emits `kind:"note"` events — which the live
+  scheduler, offline `renderMix`, and `buildMidi` export **already** handle (arp uses the same kind),
+  so MIDI layers play, bounce, and export to .mid for free. `serializeProject`/`loadProject` round-trip
+  `notes` (additive — no FORMAT_VERSION bump). Timeline clip shows the note count + double-click opens
+  the editor; `＋🎼` button adds a layer and opens it on an empty 2-bar clip.
+- **The editor** (`#midiModal`, `renderMidiRoll`): a DOM piano roll, pitch rows 36–96 × beats, notes as
+  positioned divs. Click-empty adds, drag-body moves, right-edge resizes, drag-empty marquee-selects;
+  ↑↓ transpose (⇧ = octave), ←→ nudge by snap, Del removes, ⌘/Ctrl-A selects all, gutter-click
+  auditions a pitch. Snap (1/4…1/8T/off), per-note **velocity** lane (drag bars), Quantize, Clear.
+- **Audition + record share one local transport** (`midiStartPlay`/`midiSchedWindow`): a 0.25 s
+  look-ahead loop scheduler over `playNoteAt`, looping at `lengthBeats`. Recording arms `midiRec`, a
+  hook fired from `playNote`/`stopNote` (+`recVelHint` carries hardware velocity through `midiNoteOn`),
+  so live QWERTY / on-screen / **hardware-MIDI** notes land on the grid at the playhead beat (snapped),
+  note-off setting duration. This keeps our keyboard as the input surface (Signal's editor, our input).
+- SCOPE LANDED THIS ROUND: full editor + record + multi-select/transform + velocity. Pitch-bend / mod /
+  CC / sustain-pedal capture lanes are the documented next layer (the hook + lane plumbing is in place).
+
+## 43. Timeline header cleanup, instrument tuner, per-layer polymeter, collapsible synth (v1.18)
+- **Collapsible synth sub-sections:** the oscilloscope, filter/envelope, and oscillators are now
+  `<details class="synth-fold">` (oscillators collapsed by default) so they stop dominating the
+  keyboard area; open state persists in localStorage (`ps_fold_*`). Hiding the scope is safe —
+  `drawSynthEq` already bails when the canvas has zero size.
+- **Header layout:** the BPM/time-sig/length/count-in fields share one width via `input.tl-in,
+  select.tl-in {width:96px}` (the class needed an element-qualified selector to beat the base
+  `input[type=number]{width:92px}` rule). Play/Loop/Count-in are centered (spacers either side of a
+  `.tl-transport` group), Zoom moved to the right end of the second (track-button) row next to the
+  timeline, and the unhelpful "Cycle region" readout was removed (the `#loopReadout` element stays
+  hidden so `renderTimeline` keeps working).
+- **Instrument tuner** (`#tunerModal`, opened from 🎸 Tuner in the detector): `TUNINGS` table for
+  guitar/bass/mandolin/ukulele/guitalele in common tunings; clicking a string plays a reference via
+  `playNoteAt` (bypasses the in-key filter so out-of-key strings still sound). Pair with the mic
+  detector to tune.
+- **Per-layer polymeter:** a track can declare its own `meter` (`trackMeter`/`trackBeatSec`) — drums
+  in 3/4 over a 4/4 guitar, à la Led Zeppelin. The lane draws bar/beat guides at the layer's meter
+  with a brighter bar line, plus a header badge + a `.trk-meter` selector; persisted in serialize/
+  load. SCOPE: this **showcases and sets** the layer meter (visual guide for composing polymetrically
+  + where the cadences reconverge at the LCM) — the scheduler still plays each clip's programmed
+  pattern; meter-driven playback divergence is a deeper follow-up.
+
+## 42. Bar-centric timeline (compose in bars, not seconds) (v1.17)
+Musicians think in bars, not seconds, so the Length control is now **LENGTH (BARS)**: `projectBars()`
+= round(lengthSec / barSec()), `setLengthBars(n)` = setLength(n·barSec). `setLength` shows bars in the
+field; `loadProject` too. Crucially, **changing tempo or meter preserves the bar count** (the bpm and
+time-sig handlers capture `projectBars()`, then `setLength(bars·barSec())` after) — seconds are derived,
+bars are canonical. **Fit to bars** was rebuilt: instead of spreading lines across a fixed seconds-
+length (the v1.16 weighted version, now superseded), it lays **one bar per line on the downbeat** and
+**recalibrates the song length to the line count** (`setLengthBars(lines.length)`). Pasting a multi-line
+sheet (`paste` event with ≥2 newlines) auto-runs it, so a pasted sheet resizes the song to the bars it
+needs instead of being mashed into a fixed duration.
+
+## 41. AI lyrics: generation wizard + mulligan rewriter (v1.17)
+Two BYO-key (OpenRouter/Gemini) lyric features on a shared generic call.
+- **`aiComplete(cfg, system, user, opts)`** — generic chat-completion; `aiChat` (project editor) now
+  delegates to it, and the lyric features use it with their own system prompts.
+- **Generation wizard** (`#lyrWizModal`): a structured config — theme, style refs (artists/songs/
+  genres → *inferred* descriptors, names never echoed), genre, singers, bpm/key/mode, verses,
+  couplets per verse/chorus, chorus hook-repeat interval, intro/outro/bridge(+placement), poetic
+  form, rhyme scheme, syllables/line, allow-duplicate-rhymes. `buildLyricsWizPrompt` (DOM-free,
+  tested) + `LYR_WIZ_SYSTEM` pin the OUTPUT to Pitch Studio's bracket DSL, so the reply parses
+  straight back (singers, `[Key:]/[Mode:]/[Tempo:]` directives apply, sections, `(bg)`).
+- **Mulligan** (`#lyrMullModal`): select lines in the editor → send the selection + full sheet +
+  optional comments → `buildMulliganPrompt` asks for 6 JSON variations → `parseAiVariations`
+  (handles `{variations:[…]}`, bare arrays, and numbered lists) → render 6 editable cards; "Use #n"
+  splices the (possibly-edited) text back over the original selection; the generate button becomes
+  "↻ Reprompt". The selection is read from the textarea's `selectionStart/End` at click time.
+
 ## 40. "Fit to bars" + lyric directive parsing (v1.16)
 - **Fit to bars** (`lyrAutoDistribute`): spreads every lyric line across the song's bars, weighted
   by word count (longer lines get more time, like sung phrasing), overriding existing per-line

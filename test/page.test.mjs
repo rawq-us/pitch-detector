@@ -16,7 +16,14 @@ test("required element ids exist in the markup", () => {
   const ids = [
     // transport & layers
     "bpmInput","tsSel","lenInput","playBtn","tlZoomIn","tlZoomOut","tlZoomReset",
-    "addArpTrackBtn","addBeatTrackBtn","addSamplerTrackBtn","addVoiceTrackBtn","addMemoTrackBtn",
+    "addArpTrackBtn","addBeatTrackBtn","addSamplerTrackBtn","addVoiceTrackBtn","addMemoTrackBtn","addMidiTrackBtn",
+    // MIDI piano-roll editor
+    "midiModal","midiRoll","midiRollWrap","midiCtrlLane","midiCtrlTabs","midiCtrlBox","midiKbHost","midiKeyTag","midiSnap","midiBars","midiPlay","midiRecBtn","midiQuant",
+    // instrument sections (visualizer + full-screen editor)
+    "synthModal","synthModalHost","synthEditBtn","synthLayerViz","synthControls","midiLayerViz","midiNewBtn","midiEditBtn",
+    "midiLibBtn","midiLib","midiLibGenre","midiLibList","midiLibKey",
+    "midiKeyRoot","midiKeyMode","synthKeyRoot","synthKeyMode","midiKeyChips","synthKeyChips","midiInKeyBtn",
+    "modeMoodOut",
     "midiStatus",
     "loopPopup","loopFillBtn",
     // File menu bar + sessions
@@ -30,18 +37,23 @@ test("required element ids exist in the markup", () => {
     // lyrics editor
     "lyrSource","lyrPreview","lyrSingers","lyrFitBtn","lyrAutoSyncBtn","lyrTapSyncBtn","lyrPlayBtn","lyrExportMenu","lyrSnapBox","kbScaleLockBtn",
     "styChips","styText","styCount","vzCopyStyle","vzCopyLyrics","vzCopyTitle","vzStatus",
+    // AI lyrics: wizard + mulligan
+    "lyrWizBtn","lyrMullBtn","lyrWizModal","lyrWizGen","lwTheme","lyrMullModal","lyrMullGen","lmSel","lyrMullResults",
     // song package + AI composer
     "songModal","songTitle","songGenre","songCover","songLyrics","songExportBtn",
     "aiComposeBtn","aiModal","aiProvider","aiModel","aiKey","aiIdea","aiComposeRun","aiOpenSettings",
     // settings modal (canonical API-key editor)
     "settingsBtn","settingsModal","settingsSave","settingsTest","settingsClear","settingsStatus",
     // memo editor
+    "tunerBtn","tunerModal","tunerInst","tunerTuning","tunerStrings",
     "memoModal","memoCanvas","memoChips","memoSummary","memoKeySel","memoReanalyze",
     "memoPlayBtn","memoZoomIn","memoZoomOut","memoZoomReset","memoUseKey","memoUseBpm",
     "memoLangSel","memoModelSel","memoTranscribe","memoOutputSel","memoOutputGroup","memoLyrics","memoExport",
     "chordPopup","chordRootSel","chordQualSel",
     // key/mode map
-    "keyPopup","keyPopRoot","keyPopMode","keyPopDel","keyPopSave",
+    "keyPopup","keyPopRoot","keyPopMode","keyPopDel","keyPopSave","keySugg","keySuggFrom","keyPopMood",
+    // song metadata header (genre · title · take)
+    "songMetaBtn","songMetaDisplay","songMetaPopup","smTitle","smGenre","smTake",
   ];
   for (const id of ids) assert.ok(html.includes('id="' + id + '"'), "missing #" + id);
 });
@@ -56,7 +68,8 @@ test("core functions the tests and features depend on are present", () => {
     "samplerClipEvents","spawnOscs","buildId3","memoSrt","songMetadataJson","wavBytes16",
     "encodeSongAudio","exportSongPackage","applyProjectSpec","aiParseSpec",
     "aiProjectSummary","applyProjectOps","applySectionLayout","popOutSection","saveAutosave","bindKnob",
-    "openSettings","aiCfgSummary","aiLoadCfg","aiSaveCfg","aiChat",
+    "openSettings","aiCfgSummary","aiLoadCfg","aiSaveCfg","aiChat","aiComplete",
+    "buildLyricsWizPrompt","buildMulliganPrompt","parseAiVariations",
     "newSession","saveCurrent","openSession","saveSession","setCurrentLabel","refreshRecent",
     "openPitchEditor","pitchSnapshot","semiToRate","renderPitchRoll",
     "parseLyricsDSL","lyricsToTTML","lyricsToLRC","lyricsToAIPrompt","noteNameToMidi","lyrParse","lyrAutoSync","lyrFollowTick",
@@ -67,6 +80,11 @@ test("core functions the tests and features depend on are present", () => {
     "parseMidiFile","importMidiToProject","initWebMIDI","onMidiMessage","midiNoteOn",
     // key/mode map
     "keyAtBeat","keyChangeSummary","keyMapSorted","renderKeyLane","keyModeName",
+    "keySuggestions","scalePCs","modeMood","songDisplayName","refreshSongMeta",
+    "openSynthModal","closeSynthModal","renderInstViz","renderInstVizAll",
+    "renderPattern","midiLibAdd","midiLibPreview",
+    "midiEditorSetKey","syncSynthKeySel","fillKeySelect",
+    "timelineKeys","clipKeySpan","renderKeyChips","nearestInScale","midiSnapPitch",
   ];
   for (const n of names) assert.ok(src.includes("function " + n) || src.includes(n + "("), "missing " + n);
 });

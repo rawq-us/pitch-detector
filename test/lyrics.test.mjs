@@ -13,6 +13,7 @@ function sandbox(){
     "lyricLineText","lyricDocLines","lyricTimeLRC","lyricTimeSRT","wrapBgParens","lyricFmtBarBeat",
     "lyricsToPlain","lyricsToDSL","lyricsToAIPrompt","lyricsToLRC",
     "lyricsToSRT","lyricsToTTML","buildSongPrompt","lyricLineClean",
+    "buildLyricsWizPrompt","buildMulliganPrompt","parseAiVariations",
   ];
   const body = names.map(n => extractFunction(src, n)).join("\n");
   return new Function(body + "\nreturn { " + names.join(",") + " };")();
@@ -183,4 +184,45 @@ test("lyricLineClean: keeps (background) parens, drops pitch tags and timing", (
   // inline (ooh) background survives the parens, the rest stays plain
   const bg = L.lyricLineClean(lines[1]);
   assert.equal(bg, "(ooh) let it ring.");
+});
+
+test("buildLyricsWizPrompt: folds the config into a structured request", () => {
+  const p = L.buildLyricsWizPrompt({
+    theme: "late night drive", style: "moody synth-pop", genre: "synth-pop", singers: "female lead",
+    bpm: "92", keyRoot: "C#", mode: "Dorian",
+    verses: 3, coupletsPerVerse: 2, coupletsPerChorus: 2, chorusRepeatEvery: 4,
+    syllables: 8, form: "strict rhyme", rhyme: "AABB",
+    intro: true, outro: false, bridge: true, bridgeAfter: "after the 2nd chorus", allowDup: false,
+  });
+  assert.match(p, /Theme \/ about: late night drive/);
+  assert.match(p, /do NOT print the names/);                 // names are inferred, not echoed
+  assert.match(p, /3 verses of 2 couplets each/);
+  assert.match(p, /hook line repeated every 4 lines/);
+  assert.match(p, /an intro; no outro; a bridge after the 2nd chorus/);
+  assert.match(p, /rhyme scheme: AABB/);
+  assert.match(p, /about 8 syllables per line/);
+  assert.match(p, /do not rhyme a word with itself/);
+  assert.match(p, /tempo: 92 BPM, key: C#, mode: Dorian/);
+  // unspecified music → "choose a fitting…"
+  const lean = L.buildLyricsWizPrompt({ theme: "x", verses: 1, coupletsPerVerse: 1, coupletsPerChorus: 1 });
+  assert.match(lean, /choose a fitting BPM, key: choose a fitting key/);
+});
+
+test("buildMulliganPrompt: includes selection, full lyrics, comments, and asks for N JSON variations", () => {
+  const p = L.buildMulliganPrompt({ selection: "the hook line", fullLyrics: "[Verse 1]\nfull song here", comments: "punchier", n: 6 });
+  assert.match(p, /the hook line/);
+  assert.match(p, /full song here/);
+  assert.match(p, /What to change: punchier/);
+  assert.match(p, /exactly 6 distinct variations/);
+  assert.match(p, /"variations"/);
+  // default comment when none supplied
+  assert.match(L.buildMulliganPrompt({ selection: "x", fullLyrics: "y" }), /make it fresher and stronger/);
+});
+
+test("parseAiVariations: JSON object, bare array, and numbered-list fallbacks", () => {
+  assert.deepEqual(L.parseAiVariations('{"variations":["a","b","c"]}'), ["a", "b", "c"]);
+  assert.deepEqual(L.parseAiVariations('```json\n{"variations":["x","y"]}\n```'), ["x", "y"]);
+  assert.deepEqual(L.parseAiVariations('["p","q"]'), ["p", "q"]);
+  assert.deepEqual(L.parseAiVariations("1. first\n2. second\n3. third"), ["first", "second", "third"]);
+  assert.deepEqual(L.parseAiVariations(""), []);
 });
