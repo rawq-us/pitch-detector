@@ -28,7 +28,7 @@ test("required element ids exist in the markup", () => {
     // pitch-map editor
     "pitchModal","pitchRollBody","pitchTitle","pitchModeLock","pitchPrevBtn",
     // lyrics editor
-    "lyrSource","lyrPreview","lyrSingers","lyrAutoSyncBtn","lyrTapSyncBtn","lyrPlayBtn","lyrExportMenu","lyrSnapBox","kbScaleLockBtn",
+    "lyrSource","lyrPreview","lyrSingers","lyrFitBtn","lyrAutoSyncBtn","lyrTapSyncBtn","lyrPlayBtn","lyrExportMenu","lyrSnapBox","kbScaleLockBtn",
     "styChips","styText","styCount","vzCopyStyle","vzCopyLyrics","vzCopyTitle","vzStatus",
     // song package + AI composer
     "songModal","songTitle","songGenre","songCover","songLyrics","songExportBtn",
@@ -60,7 +60,7 @@ test("core functions the tests and features depend on are present", () => {
     "newSession","saveCurrent","openSession","saveSession","setCurrentLabel","refreshRecent",
     "openPitchEditor","pitchSnapshot","semiToRate","renderPitchRoll",
     "parseLyricsDSL","lyricsToTTML","lyricsToLRC","lyricsToAIPrompt","noteNameToMidi","lyrParse","lyrAutoSync","lyrFollowTick",
-    "renderLyricsLane","lyrLinesFlat","lyrSecToBeat","lyricFmtBarBeat",
+    "renderLyricsLane","lyrLinesFlat","lyrSecToBeat","lyricFmtBarBeat","lyrAutoDistribute","applyLyricMeta",
     "buildSongPrompt","gatherSongPrompt","styleTagsList","renderStyleChips","persistStyleTags",
     "vozartLyricsRaw","vozartStyleRaw","vzField","vzUpdateCounts","styTokens","styToggleTag","styHasTag","highlightStyleChips",
     "parseKeyName","keysFromLyrics","keyFollowTick","keyFollowReset","renderKeyLane","addKeyChangeAt","attachKeyEdgeDrag",

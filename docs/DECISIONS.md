@@ -306,6 +306,17 @@ Two features aimed at the "take a song idea to a music-gen service, then to a DA
   per-section structure. **No FORMAT_VERSION bump** — additive and forward/back compatible
   (old builds ignore `keyMap`; new builds default it to `[]`).
 
+## 40. "Fit to bars" + lyric directive parsing (v1.16)
+- **Fit to bars** (`lyrAutoDistribute`): spreads every lyric line across the song's bars, weighted
+  by word count (longer lines get more time, like sung phrasing), overriding existing per-line
+  timing. The one-click way to lay a pasted/imported sheet onto the timeline before fine-tuning with
+  drag / tap-sync. The cumulative formula keeps the last line strictly inside the song length.
+- **Lyric directive parsing.** `[Key: C#]`, `[Musical Mode: Dorian]` / `[Mode: …]`, `[Tempo: 96]` /
+  `[BPM:]`, `[Time Sig: 4/4]` at the top of a sheet were being mis-parsed as *singers* (the colon-
+  before-" - " rule caught them) — they showed up in the SINGERS list. Now a directive regex runs
+  first and routes them to `doc.meta`; `applyLyricMeta` sets the project's global key/mode, tempo,
+  and meter (idempotent). Section headers also accept `Key A#` (space, no colon), not just `key: …`.
+
 ## 39. The REAL Safari sampler-blob bug: decode detaches the Blob's buffer (v1.15.3)
 v1.11.1 switched the sampler to store a plain `Blob` copy (not the `File`) — but pads still came
 back silent in Safari with `WebKitBlobResource error 1`. Root cause was subtler: the load did

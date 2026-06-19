@@ -733,6 +733,7 @@
       <div class="group"><label>Singers</label><span id="lyrSingers" class="readout">—</span></div>
       <div class="spacer"></div>
       <div class="group"><label>Sync time <span class="dim">(by line)</span></label><div class="tr-row">
+        <button id="lyrFitBtn" class="mini primary" title="Spread the lyric lines evenly across the song's bars (weighted by line length) — overrides any existing line timing">↦ Fit to bars</button>
         <button id="lyrAutoSyncBtn" class="mini" title="Align each line to a recorded/transcribed memo's word timings">⟲ From memo</button>
         <button id="lyrTapSyncBtn" class="mini" title="Play the song and tap Space on each line to set its beat">⌨ Tap-sync</button>
         <button id="lyrPlayBtn" class="mini" title="Play the timeline and follow the lyrics (karaoke)">▶ Follow</button>
@@ -994,7 +995,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.15.3";
+const APP_VERSION="1.16.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -3142,7 +3143,7 @@ function parseKeyName(str){
 }
 function parseLyricsDSL(text){
   const lines=String(text||"").replace(/\r/g,"").split("\n");
-  const singers=[], sections=[]; let cur=null, sgSeq=0;
+  const singers=[], sections=[], meta={}; let cur=null, sgSeq=0;
   const palette=["#38bdf8","#f472b6","#a3e635","#fbbf24","#a855f7","#34d399","#fb7185"];
   const findSinger=(nm)=> singers.find(s=>s.name.toLowerCase()===String(nm).toLowerCase());
   const newSection=(name,o)=>{ cur={ id:"sec"+sections.length, name:name||("Section "+(sections.length+1)), kind:(o&&o.kind)||lyricSectionKind(name), instrumental:!!(o&&o.instrumental), singerId:(o&&o.singerId)||null, voice:(o&&o.voice)||"", styles:(o&&o.styles)||[], key:(o&&o.key)||null, lines:[] }; sections.push(cur); };
@@ -3152,6 +3153,16 @@ function parseLyricsDSL(text){
     const hb=/^\[(.+)\]$/.exec(line);
     if (hb){
       const inner=hb[1].trim();
+      // document-level directives: [Key: C#] · [Musical Mode: Dorian] · [Tempo: 90] · [Time Sig: 4/4]
+      const dir=/^(key|musical\s*mode|mode|tempo|bpm|time\s*sig(?:nature)?)\s*:\s*(.+)$/i.exec(inner);
+      if (dir){
+        const kind=dir[1].toLowerCase().replace(/\s+/g,""), val=dir[2].trim();
+        if (kind==="key"){ const k=parseKeyName(val); if(k){ meta.keyRoot=k.root; if(val.replace(/^[A-Ga-g][#b♯♭]?/,"").trim()) meta.keyMode=k.mode; } }
+        else if (kind==="musicalmode"||kind==="mode"){ const k=parseKeyName("C "+val); if(k) meta.keyMode=k.mode; }
+        else if (kind==="tempo"||kind==="bpm"){ const n=parseFloat(val); if(n>0) meta.bpm=Math.round(n); }
+        else if (kind==="timesig"||kind==="timesignature"){ const ts=/(\d+)\s*\/\s*(\d+)/.exec(val); if(ts) meta.timeSig={num:+ts[1],den:+ts[2]}; }
+        continue;
+      }
       const _colon=inner.indexOf(":"), _sep=inner.search(/\s[-–—]\s/);
       if (_colon>=0 && (_sep<0 || _colon<_sep)){                    // singer def [Name: C2–G5 style] — colon precedes any " - "; a "[Sec - key: …]" header has " - " first and is a section
         const ci=inner.indexOf(":"), name=inner.slice(0,ci).trim(), spec=inner.slice(ci+1).trim();
@@ -3164,7 +3175,7 @@ function parseLyricsDSL(text){
       const parts=inner.split(/\s+[-–—]\s+/).map(x=>x.trim()).filter(Boolean);   // split on " - " only, keep "Pre-chorus" intact
       const name=parts[0], attrs=parts.slice(1);
       let singerId=null, voice="", key=null; const styles=[];
-      attrs.forEach(a=>{ const km=/^key\s*:\s*(.+)$/i.exec(a); if (km){ key=parseKeyName(km[1])||key; return; } const sg=findSinger(a); if (sg){ singerId=sg.id; } else if (/vocal|lead|male|female|bass|alto|tenor|soprano|background|choir|harmon/i.test(a)){ voice=voice||a; } else styles.push(a); });
+      attrs.forEach(a=>{ const km=/^key(?:\s*:\s*|\s+)(.+)$/i.exec(a); if (km){ key=parseKeyName(km[1])||key; return; } const sg=findSinger(a); if (sg){ singerId=sg.id; } else if (/vocal|lead|male|female|bass|alto|tenor|soprano|background|choir|harmon/i.test(a)){ voice=voice||a; } else styles.push(a); });
       const instrumental=/\b(solo|instrumental)\b/i.test(inner) && !singerId;
       newSection(name, { singerId, voice, styles, instrumental, key });
       continue;
@@ -3175,7 +3186,7 @@ function parseLyricsDSL(text){
     const allBg=tokens.length>0 && tokens.every(t=>t.bg);
     cur.lines.push({ role:allBg?"background":"lead", singerId:cur.singerId, tokens });
   }
-  return { meta:{}, singers, sections };
+  return { meta, singers, sections };
 }
 // helpers shared by exporters
 function lyricLineText(ln){ return ln.tokens.map(t=>t.text).join(" "); }
@@ -4393,7 +4404,16 @@ function lyrParse(){
   const doc=parseLyricsDSL(lyrSource.value);
   const flat=lyrLinesFlat(doc), beats=lyricsState.lineBeats||[];      // re-apply saved line beats by index
   for (let i=0;i<flat.length && i<beats.length;i++){ if(beats[i]!=null) flat[i].beat=beats[i]; }
-  lyricsState.doc=doc; keysFromLyrics(); renderLyrSingers(); renderLyrPreview(); if(lyrTimelineReady && typeof renderTimeline==="function") renderTimeline(); if(typeof vzUpdateCounts==="function") vzUpdateCounts(); scheduleAutosave();
+  lyricsState.doc=doc; applyLyricMeta(doc.meta); keysFromLyrics(); renderLyrSingers(); renderLyrPreview(); if(lyrTimelineReady && typeof renderTimeline==="function") renderTimeline(); if(typeof vzUpdateCounts==="function") vzUpdateCounts(); scheduleAutosave();
+}
+// document-level [Key:]/[Mode:]/[Tempo:]/[Time Sig:] directives → set the project's global key/mode,
+// tempo and meter (idempotent — only when the value actually differs)
+function applyLyricMeta(m){
+  if(!m) return;
+  if (m.bpm && Math.abs(m.bpm-project.bpm)>0.5){ project.bpm=clamp(m.bpm,20,400); if(typeof bpmInput!=="undefined"&&bpmInput) bpmInput.value=project.bpm; if(typeof updateMsReadout==="function") updateMsReadout(); if(typeof updateBeatLen==="function") updateBeatLen(); }
+  if (m.timeSig && typeof tsSel!=="undefined" && tsSel){ const v=m.timeSig.num+"/"+m.timeSig.den; if([...tsSel.options].some(o=>o.value===v) && tsSel.value!==v){ tsSel.value=v; project.timeSig={num:m.timeSig.num,den:m.timeSig.den}; if(typeof setBeatBars==="function") setBeatBars(beatBars); } }
+  if (m.keyRoot!=null && typeof rootSel!=="undefined" && rootSel && parseInt(rootSel.value,10)!==m.keyRoot){ rootSel.value=String(m.keyRoot); if(typeof applyScaleHighlight==="function") applyScaleHighlight(); if(typeof updateKeyFollowReadout==="function") updateKeyFollowReadout(); }
+  if (m.keyMode && typeof modeSel!=="undefined" && modeSel && modeSel.value!==m.keyMode){ modeSel.value=m.keyMode; if(typeof applyScaleHighlight==="function") applyScaleHighlight(); if(typeof updateKeyFollowReadout==="function") updateKeyFollowReadout(); }
 }
 function lyrCaptureBeats(){ lyricsState.lineBeats=lyrLinesFlat(lyricsState.doc).map(ln=>(ln.beat!=null?ln.beat:null)); }
 function renderLyrSingers(){
@@ -4445,6 +4465,20 @@ function lyrFollowTick(timeSec){
   if (tlLanes){ const al=lines[activeIdx]&&lines[activeIdx]._ln; tlLanes.querySelectorAll(".lyr-chip").forEach(c=>c.classList.toggle("active", c._ln===al)); }
 }
 // auto-align each lyric LINE to a memo's Whisper word timings (match the line's first word)
+// Spread every lyric line across the song's bars, weighted by line length (more words → more
+// time, like sung phrasing). Overrides existing per-line timing. The quick way to lay an
+// imported/pasted sheet onto the timeline before fine-tuning with drag / tap-sync.
+function lyrAutoDistribute(){
+  const lines=lyrLinesFlat(lyricsState.doc);
+  if(!lines.length){ flash(document.getElementById("lyrFitBtn"),"Write or paste lyrics first"); return; }
+  const totalBeats=Math.max(beatsPerBar(), Math.round(project.lengthSec/beatUnitSec()));
+  const weights=lines.map(ln=>Math.max(1,(ln.tokens||[]).length));
+  const sum=weights.reduce((a,b)=>a+b,0)||1;
+  let cum=0;
+  lines.forEach((ln,i)=>{ let b=(cum/sum)*totalBeats; if(lyrSnap) b=Math.round(b); ln.beat=b; cum+=weights[i]; });
+  lyrCaptureBeats(); renderLyrPreview(); if(lyrTimelineReady && typeof renderTimeline==="function") renderTimeline(); scheduleAutosave();
+  flash(document.getElementById("lyrFitBtn"), "✓ "+lines.length+" lines over "+Math.round(totalBeats/beatsPerBar())+" bars");
+}
 function lyrAutoSync(){
   const norm=s=>String(s).toLowerCase().replace(/[^a-z0-9']/g,"");
   let clip=null; for (const tr of project.tracks){ if(tr.type!=="memo") continue; for (const c of tr.clips){ if(c.lyricsWords&&c.lyricsWords.length){ clip=c; break; } } if(clip) break; }
@@ -4647,6 +4681,7 @@ function lyrExport(fmt){
 (function wireLyrics(){
   if(!lyrSource) return;
   let t=null; lyrSource.addEventListener("input",()=>{ clearTimeout(t); t=setTimeout(lyrParse,300); });
+  document.getElementById("lyrFitBtn").addEventListener("click",lyrAutoDistribute);
   document.getElementById("lyrAutoSyncBtn").addEventListener("click",lyrAutoSync);
   document.getElementById("lyrTapSyncBtn").addEventListener("click",()=>{ lyricsState.tap?lyrTapStop():lyrTapStart(); });
   document.getElementById("lyrPlayBtn").addEventListener("click",(e)=>{ lyricsState.follow=!lyricsState.follow; e.target.classList.toggle("seg-on",lyricsState.follow); if(lyricsState.follow && !transport.playing) transportPlay(); });

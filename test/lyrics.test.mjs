@@ -66,6 +66,23 @@ test("parseKeyName: note + mode spellings → {root, mode}", () => {
   assert.equal(L.parseKeyName("nope"), null);
 });
 
+test("parseLyricsDSL: [Key:]/[Musical Mode:]/[Tempo:] are directives, NOT singers", () => {
+  const doc = L.parseLyricsDSL("[Rapper A: C2-G5 - male]\n[Musical Mode: Dorian]\n[Key: C#]\n[Tempo: 96]\n\n[Verse 1 - Rapper A]\nhello world");
+  // only the real singer — "Musical Mode" and "Key" must not become singers
+  assert.equal(doc.singers.length, 1);
+  assert.equal(doc.singers[0].name, "Rapper A");
+  // directives land in doc.meta
+  assert.equal(doc.meta.keyRoot, 1);          // C# = 1
+  assert.equal(doc.meta.keyMode, "dorian");
+  assert.equal(doc.meta.bpm, 96);
+});
+
+test("parseLyricsDSL: section 'Key A#' (no colon) is read as the section key", () => {
+  const doc = L.parseLyricsDSL("[Chorus - Key A#]\nspit on it");
+  const chorus = doc.sections.find(s => s.kind === "chorus");
+  assert.deepEqual(chorus.key, { root: 10, mode: "ionian" });   // A# major
+});
+
 test("parseLyricsDSL: inline [Section - key: …] sets section.key without breaking singers", () => {
   const doc = L.parseLyricsDSL("[Lead: C3-A4 warm]\n\n[Chorus - Lead - key: A minor]\nHow you getting cold");
   assert.equal(doc.singers.length, 1);                         // the singer def still parses (colon precedes no " - ")
