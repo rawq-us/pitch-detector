@@ -16,9 +16,10 @@ function sandbox(){
     extractFunction(src, "songMetadataJson"),
     extractFunction(src, "buildId3"),
     extractFunction(src, "wavBytes16"),
+    extractFunction(src, "parseMidiFile"),
   ].join("\n");
   return new Function(parts + `
-    return { samplerClipEvents, memoSrt, songMetadataJson, buildId3, wavBytes16 };
+    return { samplerClipEvents, memoSrt, songMetadataJson, buildId3, wavBytes16, parseMidiFile };
   `)();
 }
 const fns = sandbox();
@@ -42,10 +43,21 @@ test("samplerClipEvents: a grid pattern repeats to fill the clip", () => {
   assert.deepEqual(evs.map(e => e.time), [0, 4, 8]);
 });
 
+test("samplerClipEvents: per-step pitch offsets ride along on grid events", () => {
+  const grid = Array.from({ length: 8 }, () => new Array(16).fill(false));
+  grid[0][0] = true; grid[1][4] = true;
+  const clip = { kind: "grid", grid, pitch: { "0,0": 7, "1,4": -5 } };
+  const evs = fns.samplerClipEvents(clip, { stepSec: 0.25, clipDur: 4, patSec: 4, clipStart: 0 });
+  const byPad = Object.fromEntries(evs.map(e => [e.pad, e.off]));
+  assert.equal(byPad[0], 7);   // pad 0 transposed +7 semitones
+  assert.equal(byPad[1], -5);  // pad 1 transposed -5 semitones
+  assert.ok(evs.every(e => typeof e.off === "number"));
+});
+
 test("samplerClipEvents: a loop clip yields one looped span", () => {
   const evs = fns.samplerClipEvents({ kind: "loop", pad: 2 }, { stepSec: 0.25, clipDur: 9.3, patSec: 2, clipStart: 1.5 });
   assert.equal(evs.length, 1);
-  assert.deepEqual(evs[0], { time: 1.5, pad: 2, loop: true, dur: 9.3 });
+  assert.deepEqual(evs[0], { time: 1.5, pad: 2, loop: true, dur: 9.3, off: 0 });
 });
 
 test("buildId3: valid ID3v2.3 tag with text frames, USLT/SYLT and APIC cover", () => {
@@ -102,4 +114,24 @@ test("wavBytes16: 16-bit PCM with an embedded id3 chunk", () => {
   const dv = new DataView(out.buffer);
   assert.equal(dv.getUint32(idx + 4, true), id3.length, "id3 chunk size");
   assert.equal(out[idx + 8], 0x49, "id3 payload starts with 'I'");
+});
+
+test("parseMidiFile: reads ppq, tempo, time signature, and note on/off → notes", () => {
+  // hand-built SMF: format 0, 1 track, 96 ppq; tempo 120bpm, 4/4, one C4 quarter note
+  const mthd = [0x4D,0x54,0x68,0x64, 0,0,0,6, 0,0, 0,1, 0,96];
+  const trk = [
+    0x00, 0xFF,0x51,0x03, 0x07,0xA1,0x20,   // tempo 500000us = 120bpm
+    0x00, 0xFF,0x58,0x04, 0x04,0x02,0x18,0x08, // 4/4
+    0x00, 0x90,0x3C,0x64,                   // note on C4 vel100
+    0x60, 0x80,0x3C,0x00,                   // note off after 96 ticks (1 quarter)
+    0x00, 0xFF,0x2F,0x00,                   // end of track
+  ];
+  const mtrk = [0x4D,0x54,0x72,0x6B, 0,0,0,trk.length, ...trk];
+  const bytes = new Uint8Array([...mthd, ...mtrk]);
+  const m = fns.parseMidiFile(bytes);
+  assert.equal(m.ppq, 96);
+  assert.equal(m.bpm, 120);
+  assert.deepEqual(m.timeSig, { num: 4, den: 4 });
+  assert.equal(m.tracks.length, 1);
+  assert.deepEqual(m.tracks[0].notes[0], { midi: 60, startTick: 0, durTick: 96, channel: 0 });
 });
