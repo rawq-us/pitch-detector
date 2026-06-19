@@ -306,6 +306,17 @@ Two features aimed at the "take a song idea to a music-gen service, then to a DA
   per-section structure. **No FORMAT_VERSION bump** — additive and forward/back compatible
   (old builds ignore `keyMap`; new builds default it to `[]`).
 
+## 39. The REAL Safari sampler-blob bug: decode detaches the Blob's buffer (v1.15.3)
+v1.11.1 switched the sampler to store a plain `Blob` copy (not the `File`) — but pads still came
+back silent in Safari with `WebKitBlobResource error 1`. Root cause was subtler: the load did
+`blob = new Blob([ab]); decodeAudioData(ab)`, and **`decodeAudioData` detaches its input
+ArrayBuffer**. Chrome's `Blob` copies the bytes eagerly so it survives; **Safari's `Blob` keeps
+referencing `ab`**, so detaching it left the stored Blob backed by dead memory — unreadable from
+IndexedDB on reload. Fix: decode from a copy — `decodeAudioData(ab.slice(0))` — so `ab` (and the
+Blob built from it) stay intact. Verified: post-decode the source buffer stays `byteLength`-intact
+and the Blob re-decodes on the reload path. NB: pads loaded *before* this fix are already corrupt in
+their saved/autosaved sessions — they must be re-loaded once.
+
 ## 38. Key/mode popup gets an explicit Save button (v1.15.2)
 The little key/mode editor applied live on dropdown `change` and only dismissed via a finicky
 outside-click — users couldn't tell it had committed. Added a primary **✓ Save** button (applies +

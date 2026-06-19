@@ -994,7 +994,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.15.2";
+const APP_VERSION="1.15.3";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -1743,7 +1743,10 @@ sampFileInput.addEventListener("change", async ()=>{
     // error 1), which left restored pads silent. A fresh Blob persists its own bytes reliably.
     const ab=await f.arrayBuffer();
     const blob=new Blob([ab], { type:f.type||"audio/wav" });
-    const buffer=await ctx.decodeAudioData(ab);   // Blob already copied the bytes; ab may detach here
+    // decodeAudioData DETACHES its input — decode from a COPY so `ab` (and the Blob built from it)
+    // stay intact. Safari's Blob keeps referencing `ab`; detaching it left restored pads with
+    // WebKitBlobResource error 1 (an unreadable Blob in IndexedDB).
+    const buffer=await ctx.decodeAudioData(ab.slice(0));
     K[i]={ name:f.name.replace(/\.[^.]+$/,"").slice(0,24), blob, buffer, gain:1, loop:buffer.duration>1.2 };
     samplerEdit.selected=i;
     renderSampBank(); renderSampPadDetail(); renderSampGrid(); scheduleAutosave();
