@@ -22,7 +22,8 @@ test("required element ids exist in the markup", () => {
     // instrument sections (visualizer + full-screen editor)
     "synthModal","synthModalHost","synthEditBtn","synthLayerViz","synthControls","midiLayerViz","midiNewBtn","midiEditBtn",
     "midiLibBtn","midiLib","midiLibGenre","midiLibList","midiLibKey",
-    "midiKeyRoot","midiKeyMode","synthKeyRoot","synthKeyMode","midiKeyChips","synthKeyChips","midiInKeyBtn",
+    "midiKeyRoot","midiKeyMode","synthKeyRoot","synthKeyMode","midiKeyChips","synthKeyChips","midiInKeyBtn","midiFxBtn",
+    "midiKeyRuler","midiAddKeyBtn","midiZoomIn","midiZoomOut","midiVoiceHost",
     "modeMoodOut",
     "midiStatus",
     "loopPopup","loopFillBtn",
@@ -45,13 +46,15 @@ test("required element ids exist in the markup", () => {
     // settings modal (canonical API-key editor)
     "settingsBtn","settingsModal","settingsSave","settingsTest","settingsClear","settingsStatus",
     // memo editor
-    "tunerBtn","tunerModal","tunerInst","tunerTuning","tunerStrings",
+    "tunerBtn","tunerModal","tunerInst","tunerTuning","tunerStrings","tunerMicBtn","tunerMeter","tmNote","tmNeedle","tmCents","tmTarget",
     "memoModal","memoCanvas","memoChips","memoSummary","memoKeySel","memoReanalyze",
     "memoPlayBtn","memoZoomIn","memoZoomOut","memoZoomReset","memoUseKey","memoUseBpm",
     "memoLangSel","memoModelSel","memoTranscribe","memoOutputSel","memoOutputGroup","memoLyrics","memoExport",
     "chordPopup","chordRootSel","chordQualSel",
     // key/mode map
     "keyPopup","keyPopRoot","keyPopMode","keyPopDel","keyPopSave","keySugg","keySuggFrom","keyPopMood",
+    // song structure
+    "structSummary","structPopup","structType","structBars","structSave","structDel","structAddMenu","structAddBtns",
     // song metadata header (genre · title · take)
     "songMetaBtn","songMetaDisplay","songMetaPopup","smTitle","smGenre","smTake",
   ];
@@ -85,6 +88,10 @@ test("core functions the tests and features depend on are present", () => {
     "renderPattern","midiLibAdd","midiLibPreview",
     "midiEditorSetKey","syncSynthKeySel","fillKeySelect",
     "timelineKeys","clipKeySpan","renderKeyChips","nearestInScale","midiSnapPitch",
+    "keySegmentsInClip","renderMidiKeyRuler","midiAddKeyChange","midiZoom","cloneVoice",
+    "structAdd","renderStructureLane","structToLyrics","structLabel","structSorted",
+    "structFromLyrics","kindToStructType","syncStructureToLyrics","lyricsBlocks","structHeader","isSectionHeaderLine",
+    "tunerLiveUpdate","syncTunerMic",
   ];
   for (const n of names) assert.ok(src.includes("function " + n) || src.includes(n + "("), "missing " + n);
 });

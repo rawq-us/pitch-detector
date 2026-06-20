@@ -315,6 +315,135 @@ Two features aimed at the "take a song idea to a music-gen service, then to a DA
   where unambiguous (🗑). `.tl-head` got `overflow:hidden` as a safety; head/lane heights stay coupled
   at 58 px. No more vertical spill.
 
+## 58. Song structure layer — arrangement scaffold that feeds the lyrics (v1.28)
+- `project.structure` = an ordered set of sections `{id, type, beat, bars}` (`SECTION_TYPES`:
+  intro/verse/prechorus/chorus/bridge/solo/outro, each a colour + default bars). It's the same kind of
+  scaffold as BPM/time-sig/key. `structLabel` auto-numbers repeats ("Verse 1/2"). Serialized/loaded.
+- **A new "Structure" timeline lane** (`renderStructureLane`) sits in the top meta stack. Lane order is
+  now **key/mode → structure → lyrics → instrument tracks** (the lyrics lane moved up). Section blocks are
+  colour-coded, positioned by beat, **draggable** (snap to bar via the shared `lyrSnap`), and click-to-edit
+  (`#structPopup`: type / bars / delete). "＋ section" in the lane head opens a type menu (`#structAddMenu`).
+- **Header-right "intelligence"** (`#structSummary`, where the old loop readout was): the arrangement as
+  colour chips + total bars + a **↓ to lyrics** button. `structToLyrics` writes `[Verse 1 - Singer]`-style
+  section placeholders into the lyrics editor (adds a default singer if none), then re-parses.
+- DEFERRED (noted to user): bidirectional drag-sync (moving a block reorders the lyric declarations) and a
+  length×quantity generator. This ships the model + lane + summary + one-way lyric derivation.
+
+## 60. Tuner instruments + 3-col header + structure↔lyrics one-way removed (v1.29.1)
+- **Tuner**: Mandolin is now 8 strings (doubled GDAE courses); added **12-string Guitar** (12, octave
+  pairs on the low courses), **Octave Mandolin** (8), and **Baritone** guitar tunings (B-standard
+  BEADF#B and A-standard ADGCEA). The meter's nearest-string snap handles unison/octave pairs fine.
+  (Baritone guitars aren't any of the old standard-pitch tunings — they sit a 4th/5th lower.)
+- **Timeline header row 1 is now a strict 3-column grid** (`.tl-row1`: `1fr auto 1fr`) — left controls,
+  centered transport, right structure summary — instead of flex with spacers that wrapped into
+  "left·center·left". The structure summary wraps WITHIN its right column. Left column keeps min-content
+  (no `min-width:0`) so the BPM/time-sig/length never collapse.
+- **Removed the "↓ to lyrics" button**: structure→lyrics now happens automatically on any timeline edit
+  (`syncStructureToLyrics`, gated on a non-empty structure so it never wipes lyrics). "↑ from lyrics"
+  stays as the explicit re-infer.
+
+## 59. Instrument tuner gets a live mic meter (v1.29)
+- The tuner was reference-pitch-only (click a string to hear it). Added a real **mic tuning meter**:
+  a "🎤 Enable mic" button (toggles the SAME global mic via `micBtn.click()`, `syncTunerMic` reflects
+  state), a big detected-note readout, a **cents needle** (flat ← center → sharp), green in-tune state
+  (±5¢), and "tune up/down" guidance. It **snaps to the nearest string** in the selected tuning and
+  highlights that string card.
+- Reuses the existing pitch detector: `detectLoop` already computes `midiFloat`; it now calls
+  `tunerLiveUpdate(midiFloat)` (and `(null)` when there's no signal) whenever the tuner modal is open
+  (`tunerOpen`). `renderStrings` populates `tunerStrings` ([{midi,name,idx}]) so the meter knows the
+  targets. No second audio pipeline. Verified: flat low-E → "−20¢ ♭ tune up", in-tune A → green, sharp
+  D3 → "+25¢ ♯ tune down", each snapping to the right string.
+
+### 58c. One control-row standard + outline delete buttons (v1.28.3)
+- `.ctl-row` is now the shared "every input/select/button is the same height (32px)" utility — applied to
+  the timeline header (was `.tl-controls`, now both selectors share the rule), the MIDI toolbar (bumped
+  30→32 to match), and the pitch-detector `det-keyrow` (fixes mic-button vs tuner-button size mismatch).
+  Use `.ctl-row` on any future control row instead of re-tuning per element.
+- **Delete buttons are red OUTLINE** (transparent fill, red text + border, faint red tint on hover) — both
+  the track-header `.thd-btn.danger` "Delete" and the section-visualizer `.inst-viz-del`. No more salmon
+  fill. The track-header Delete is the same `.thd-btn` (21px) as FX/Rec — verified identical height.
+
+### 58b. Bidirectional structure↔lyrics + codified header format (v1.28.2)
+- **Official section-header format** (codified + documented in the lyrics hint): `[<Structure + optional #>
+  - <freeform label>]`. The keyword before a spaced dash is the HARD structure (matches `lyricSectionKind`);
+  everything after the ` - ` is a freeform label (singer like "Lead"/"Rapper A", or directions). Singer
+  *definitions* use a colon (`[Lead: C3-A4]`). "Pre-chorus" survives because the split is only on a spaced
+  dash. Helpers: `structHeader`, `headerLabel`, `isSectionHeaderLine`, `lyricsBlocks`.
+- **Timeline → lyrics sync.** Each structure section stores `_docIdx` (its lyric-block index, set at infer).
+  Any timeline edit routes through `structChanged` → `syncStructureToLyrics`, which rewrites the lyric
+  section HEADERS to match the structure (reorder / retype / add / remove), **preserving each section's
+  label + body lines** (matched by `_docIdx`) and the singer-def preamble. Guarded by `_structSyncing`
+  against the reparse loop; only runs when lyrics already have sections. Verified: retype Bridge→Outro
+  keeps its body; dragging Chorus ahead of Verse moves the hook lines with it; delete drops the section.
+- So lyrics↔structure are now two views of one thing: lyrics auto-seed the structure (when empty / via
+  "↑ from lyrics"); structure edits flow back into the lyric headers.
+
+### 58a. Structure inferred FROM lyrics (v1.28.1)
+- The lyric sheet already encodes structure (`[Verse 1]`, `[Chorus]`, `[guitar solo]`…), and the parser
+  already tags each section with `sec.kind` via `lyricSectionKind`. So `structFromLyrics()` maps those
+  kinds → `SECTION_TYPES` (`kindToStructType`: refrain→chorus, instrumental→solo) and builds
+  `project.structure` in document order — using the sections' synced beats when present (bars from the
+  gaps), else laying them out sequentially with default lengths.
+- **Auto:** `lyrParse` calls `structFromLyrics({auto:true})` — it populates only when the structure is
+  empty, so it never clobbers a hand-built one. **Manual:** a "↑ from lyrics" button in the structure
+  summary re-infers on demand. Lyrics are now the natural source of truth for structure, with `↓ to
+  lyrics` as the reverse. Verified: a 9-section sheet auto-built Intro/Verse 1/Chorus 1/…/Solo/Bridge/
+  Chorus 3/Outro with correct types + numbering.
+
+## 57. Timeline header sizing + key-head + delete button (v1.27.1)
+- Timeline-header controls were mismatched heights (inputs/iconbtns taller than selects/transport/zoom).
+  Both header rows got a `.tl-controls` class that forces every input/select/button to 32 px (box-sizing
+  border-box, inline-flex centering) — one consistent row.
+- The key-lane head's "＋ key" button was clipping: `.tl-head` got `overflow:hidden` in #52, and the
+  key-head stacked badge+title+button vertically past its 34 px. Fixed by laying the key-head out as a
+  ROW (`flex-direction:row`, `overflow:visible`) so the title + button sit side by side and fit.
+- The per-layer **Delete** button is now a plain red `.thd-btn.danger` reading "Delete" in white (no
+  trash icon) — same `.thd-btn` size as the FX button (both 21 px), per request.
+
+## 56. Per-region key/mode INSIDE the MIDI clip + pinch-zoom (v1.27)
+- A MIDI clip can now span multiple key/mode regions (verse in one key, chorus in another) so a single
+  loopable sequence carries real harmonic motion — instead of one key per clip + copy/paste.
+  `keySegmentsInClip(clipB0, lenB)` returns the distinct spans (in local clip beats) from the timeline
+  key map. `renderMidiRoll` shades each segment's in-key rows over its own x-range and draws a `.mr-keydiv`
+  at each change; the gutter only colours when there's a single segment.
+- **A labeled, clickable key ruler** (`#midiKeyRuler`, `renderMidiKeyRuler`) pins to the top of the grid
+  (CSS sticky) and scrolls horizontally with it; each span opens the existing `keyPopup` to change its
+  key (`midiRegionForSeg` resolves the segment → the covering key-map region / default). A **✚ Key change**
+  button (`midiAddKeyChange`) inserts a region at the playhead/clip-middle bar. It's the SAME
+  `project.keyMap` as the main timeline — set it here or there.
+- **Enforcement is per-beat:** `midiSnapPitch(midi, localBeat)` snaps to the key in force at that note's
+  own beat (`scaleSetAtLocalBeat`), so the verse and chorus each enforce their own scale. The audition
+  keyboard + scale-lock follow the region under the playhead (in `midiStartPlay`'s loop).
+- **Pinch / ⌃-scroll zoom** on the roll (`midiZoom` mutates `MR.BEAT_PX`; trackpad pinch = ctrl+wheel,
+  Safari-compatible) plus −/+ buttons. There was no zoom before.
+
+## 55. Per-layer synth voice — each MIDI layer is its own instrument (v1.26)
+- The synth voice (oscillators/filter/envelope/glide) used to be one global object. Now: `GLOBAL_VOICE`
+  is the song default + live-keyboard tone, and `synthParams` is a POINTER reassigned to a layer's own
+  voice while its editor is open (then restored). `cloneVoice()` deep-copies a voice.
+- **MIDI tracks get `track.synth`** (cloned from `GLOBAL_VOICE` at `addTrack`, serialized per track).
+  Arp tracks stay on the global voice (designed in the synth modal) — extending arps to per-layer voice
+  is the documented follow-up.
+- **Scheduled/offline playback passes each track's voice explicitly** (`spawnOscs`/`createFilter`/
+  `playNoteAt` gained a `voice` param) since many layers sound at once — it never relies on the pointer.
+  The live keyboard + audition use the pointer (= the open layer's voice).
+- **Editing reuses the whole synth UI.** Opening the MIDI editor points `synthParams` at the track's
+  voice and *relocates the Filter&Envelope + Oscillators folds* into the editor's "Instrument voice"
+  section (`midiVoiceToModal`/`midiVoiceRestore`), exactly like the keyboard relocation. The folds' home
+  is the synth modal; mutual exclusion keeps only one editor open. Verified: editing one MIDI layer's
+  cutoff/filter doesn't touch the global or another layer, and it round-trips through save/load.
+
+## 54. MIDI editor toolbar polish + per-layer FX access (v1.25.1)
+- `.midi-toolbar` gives every control (selects + `.mini` buttons) a uniform 30 px height with inline
+  field labels (`.midi-tl-field`) so it reads as one tidy row instead of mismatched sizes.
+- **Bars is now a preset dropdown** (`populateMidiBars`): common counts (2/4/8/12/16/24/32) plus
+  **"· whole song"** (the project's bar count), with the clip's current length always selectable —
+  anchored to real musical lengths instead of an arbitrary number field.
+- **🎛 FX button in the MIDI editor** → `openFxModal(midiEd.track)`; `#fxModal` z-index raised to 200 so
+  it stacks above the full-screen editor. Per-layer FX (phaser/chorus/delay/reverb/drive/comp/level)
+  already existed per track — this just surfaces it from the editor. The deeper ask (per-layer *synth
+  voice* — oscillators/filter/envelope, currently global) is the proposed next step.
+
 ## 53. The song's key palette is now first-class in the editors — info, hint, constraint, enforcement (v1.25)
 - **Information + hinting:** `timelineKeys()` returns the distinct (root,mode) pairs actually used across
   the timeline (default region + every key-map change, with the bar each appears at). `renderKeyChips`
