@@ -84,7 +84,7 @@ test("core functions the tests and features depend on are present", () => {
     // key/mode map
     "keyAtBeat","keyChangeSummary","keyMapSorted","renderKeyLane","keyModeName",
     "keySuggestions","scalePCs","modeMood","songDisplayName","refreshSongMeta",
-    "openSynthModal","closeSynthModal","renderInstViz","renderInstVizAll",
+    "openSynthModal","closeSynthModal","renderInstViz","renderInstVizAll","openArpClip","setArpEditTarget",
     "renderPattern","midiLibAdd","midiLibPreview",
     "midiEditorSetKey","syncSynthKeySel","fillKeySelect",
     "timelineKeys","clipKeySpan","renderKeyChips","nearestInScale","midiSnapPitch",

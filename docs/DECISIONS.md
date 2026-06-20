@@ -329,6 +329,15 @@ Two features aimed at the "take a song idea to a music-gen service, then to a DA
 - DEFERRED (noted to user): bidirectional drag-sync (moving a block reorders the lyric declarations) and a
   length×quantity generator. This ships the model + lane + summary + one-way lyric derivation.
 
+## 61. Arp layers are clickable into the editor, with in-place editing (v1.29.2)
+- Only MIDI clips in the section visualizers were wired to open their editor. `renderInstViz` now wires
+  arp clips too: clicking one calls `openArpClip(t,c)` — loads the clip's steps into the arp `sequence`
+  + its rate, selects the track, and opens the synth modal (parity with MIDI's `openMidiEditor`).
+- **In-place editing**: `editingArp`/`setArpEditTarget` track which layer is loaded; the arp "＋ Timeline"
+  button becomes "✓ Update layer" and writes the edited sequence back to that clip instead of adding a
+  new one. `synthEditBtn` (general "open synth keys") clears the target → back to "＋ Timeline" (new arp).
+  Arp clips get `cursor:pointer` + hover like MIDI clips.
+
 ## 60. Tuner instruments + 3-col header + structure↔lyrics one-way removed (v1.29.1)
 - **Tuner**: Mandolin is now 8 strings (doubled GDAE courses); added **12-string Guitar** (12, octave
   pairs on the low courses), **Octave Mandolin** (8), and **Baritone** guitar tunings (B-standard

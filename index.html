@@ -394,8 +394,8 @@
   .inst-viz-lab { width: 92px; flex: none; font-size: 11px; color: var(--muted); display: flex; align-items: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .inst-viz-lane { position: relative; flex: 1; background: #0d0f16; border: 1px solid var(--border); border-radius: 7px; overflow: hidden; }
   .inst-viz-clip { position: absolute; top: 2px; bottom: 2px; background: rgba(110,168,254,0.14); border: 1px solid rgba(110,168,254,0.5); border-radius: 4px; overflow: hidden; }
-  .inst-viz-row.midi .inst-viz-clip { cursor: pointer; }
-  .inst-viz-row.midi .inst-viz-clip:hover { background: rgba(110,168,254,0.28); }
+  .inst-viz-row.midi .inst-viz-clip, .inst-viz-row.arp .inst-viz-clip { cursor: pointer; }
+  .inst-viz-row.midi .inst-viz-clip:hover, .inst-viz-row.arp .inst-viz-clip:hover { background: rgba(124,108,246,0.28); }
   .inst-viz-note { position: absolute; width: 2px; height: 2px; background: #9ec5ff; border-radius: 1px; }
   .inst-viz-empty { font-size: 12px; color: var(--muted); padding: 10px 4px; }
   .inst-viz-del { flex: none; align-self: center; background: transparent; border: 1px solid var(--flat); border-radius: 6px; color: var(--flat); font-size: 13px; line-height: 1; padding: 4px 6px; cursor: pointer; opacity: 0.7; }
@@ -1393,7 +1393,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.29.1";
+const APP_VERSION="1.29.2";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -2077,8 +2077,16 @@ restBtn.addEventListener("click",()=>{ sequence.push({rest:true}); renderSequenc
 arpClearBtn.addEventListener("click",()=>{ sequence.length=0; renderSequence(); arpPreviewStop(); });
 arpPrevBtn.addEventListener("click",()=>{ arpPrev.playing?arpPreviewStop():arpPreviewStart(); });
 rateSel.addEventListener("change", ()=>{ updateMsReadout(); renderSequence(); });
+// when an arp LAYER is clicked in the Synth — keys section, its clip loads here for in-place editing
+let editingArp=null;
+function setArpEditTarget(t,c){ editingArp=(t&&c)?{track:t,clip:c}:null; const b=document.getElementById("arpAddBtn"); if(b){ b.textContent=editingArp?"✓ Update layer":"＋ Timeline"; b.title=editingArp?"Save these changes back to the selected arp layer":"Add this sequence as a new arp layer on the timeline"; } }
 arpAddBtn.addEventListener("click",()=>{
   if (!sequence.length){ flash(arpAddBtn,"Build a sequence first"); return; }
+  if (editingArp && editingArp.clip && project.tracks.includes(editingArp.track)){   // update the clicked layer in place
+    editingArp.clip.steps = sequence.map(s=>({...s})); editingArp.clip.rate = parseFloat(rateSel.value)||2; editingArp.clip.wave = synthParams.oscs[0].wave;
+    editingArp.clip.lengthBeats = naturalBeats(editingArp.track, editingArp.clip);
+    renderTimeline(); scheduleAutosave(); flash(arpAddBtn,"Updated ✓"); return;
+  }
   const track = ensureTrack("arp");
   addClip(track, { id:++clipSeq, steps: sequence.map(s=>({...s})), rate: parseFloat(rateSel.value)||2, wave: synthParams.oscs[0].wave });
 });
@@ -6282,7 +6290,15 @@ function midiToggleRec(){
 (function relocateSynth(){ const c=document.getElementById("synthControls"), host=document.getElementById("synthModalHost"); if(c&&host) host.appendChild(c); })();
 function openSynthModal(){ if(midiEd) closeMidiEditor(); document.getElementById("synthModal").style.display="flex"; document.body.classList.add("modal-locked"); if(typeof syncSynthKeySel==="function") syncSynthKeySel(); if(typeof highlightKbMap==="function") setTimeout(highlightKbMap,30); }
 function closeSynthModal(){ document.getElementById("synthModal").style.display="none"; document.body.classList.remove("modal-locked"); }
-document.getElementById("synthEditBtn").addEventListener("click",openSynthModal);
+// click an arp layer in the Synth — keys section → load its clip into the arp builder and open the editor
+function openArpClip(t,c){
+  sequence.length=0; (c.steps||[]).forEach(s=>sequence.push({...s}));
+  if(rateSel) rateSel.value=String(c.rate||2);
+  if(typeof updateMsReadout==="function") updateMsReadout();
+  if(typeof renderSequence==="function") renderSequence();
+  selectedTrackId=t.id; setArpEditTarget(t,c); openSynthModal();
+}
+document.getElementById("synthEditBtn").addEventListener("click",()=>{ setArpEditTarget(null); openSynthModal(); });   // general open = build a NEW arp layer
 document.getElementById("synthModalClose").addEventListener("click",closeSynthModal);
 document.getElementById("synthModal").addEventListener("mousedown",(e)=>{ if(e.target.id==="synthModal") closeSynthModal(); });
 document.getElementById("midiNewBtn").addEventListener("click",()=>{ const t=addTrack("midi"); const clip={ id:++clipSeq, start:0, lengthBeats:beatsPerBar()*2, notes:[], cc:{bend:[],mod:[],expr:[],sustain:[]}, loopFill:false }; addClip(t,clip); openMidiEditor(t,clip); });
@@ -6307,6 +6323,7 @@ function renderInstViz(containerId, type){
       if(notes.length){ const ms=notes.map(n=>n.midi), lo=Math.min(...ms), hi=Math.max(...ms), span=Math.max(1,hi-lo);
         notes.forEach(n=>{ const d=document.createElement("div"); d.className="inst-viz-note"; d.style.left=Math.min(98,(n.beat/dB)*100)+"%"; d.style.bottom=((n.midi-lo)/span*78+8)+"%"; blk.appendChild(d); }); }
       if(type==="midi") blk.addEventListener("click",()=>openMidiEditor(t,c));
+      else blk.addEventListener("click",()=>openArpClip(t,c));   // arp clip → load it into the synth editor
       lane.appendChild(blk);
     });
     row.appendChild(lane);
