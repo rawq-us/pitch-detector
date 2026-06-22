@@ -329,6 +329,24 @@ Two features aimed at the "take a song idea to a music-gen service, then to a DA
 - DEFERRED (noted to user): bidirectional drag-sync (moving a block reorders the lyric declarations) and a
   length×quantity generator. This ships the model + lane + summary + one-way lyric derivation.
 
+## 62. Per-layer mute / solo on the timeline (v1.30.0)
+- Each track head now carries **M** and **S** chips (between FX and the type-specific buttons), toggling
+  `track.muted` / `track.soloed`. Audibility rule, in one helper trio: `soloActive()` (any track soloed),
+  `trackAudible(t)` = `!t.muted && (!soloActive() || t.soloed)`, and `applyTrackMuteSolo()` which pushes
+  the verdict to each chain.
+- **Implemented as a gain node, not a graph rewire.** `buildTrackChain` gained a `mute` gain right after
+  `input` (`input → mute → level → fx…`). Mute/solo only sets `chain.mute.gain` (0/1), leaving the FX
+  `level` gain — and the user's fader value — untouched, so unmuting restores the exact level. Live
+  playback already routes every event through `ensureTrackChain`, so it respects mute/solo for free;
+  `ensureTrackChain` also seeds the mute gain on first build (covers tracks added mid-session).
+- **Exports honour it too.** `renderMix(filter, eq, respectMuteSolo=true)` folds audibility into a single
+  `pass(tr)` predicate. The full mix and the karaoke render respect mute/solo; **stem exports pass
+  `respectMuteSolo=false`** so every layer still bounces in isolation regardless of its mute state (the
+  whole point of stems). No FORMAT bump — `muted`/`soloed` are additive booleans on each track, defaulting
+  to false on older sessions; persisted in `serializeProject`/`loadProject`, re-applied after load.
+- Visual: muted/silenced heads dim (`.tl-head.muted .tname`), the **M** chip lights red (`var(--flat)`),
+  the **S** chip lights green. Reuses the existing `.thd-btn` sizing so the row stays consistent.
+
 ## 61. Arp layers are clickable into the editor, with in-place editing (v1.29.2)
 - Only MIDI clips in the section visualizers were wired to open their editor. `renderInstViz` now wires
   arp clips too: clicking one calls `openArpClip(t,c)` — loads the clip's steps into the arp `sequence`

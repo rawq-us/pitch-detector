@@ -571,6 +571,9 @@
   .thd-btn:hover { color: var(--text); border-color: #3a4254; }
   .thd-btn.danger { background: transparent; color: var(--flat); border-color: var(--flat); }
   .thd-btn.danger:hover { background: rgba(248,113,113,0.14); color: var(--flat); }
+  .thd-btn.mute.on { color: #fff; background: var(--flat); border-color: transparent; }
+  .thd-btn.solo.on { color: #08240f; background: #34d399; border-color: transparent; font-weight: 600; }
+  .tl-head.muted .tname { opacity: 0.5; }
   .thd-btn.rec { color: #f9a8b4; }
   .thd-btn.rec.recording { color: #fff; background: var(--flat); border-color: transparent; }
   .tl-head .fxbtn { color: var(--accent-2); }
@@ -1393,7 +1396,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.29.2";
+const APP_VERSION="1.30.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -1492,13 +1495,17 @@ function fxComp(ctx){
 // A per-track insert chain: input(level) -> drive -> chorus -> phaser -> delay -> reverb -> comp -> output
 const FX_FACTORIES = { drive:fxDrive, chorus:fxChorus, phaser:fxPhaser, delay:fxDelay, reverb:fxReverb, comp:fxComp };
 function buildTrackChain(ctx, fx){
-  const input=ctx.createGain(), level=ctx.createGain(); input.connect(level);
+  const input=ctx.createGain(), mute=ctx.createGain(), level=ctx.createGain(); input.connect(mute); mute.connect(level);
   let prev=level; const modules={};
   FX_KEYS.forEach(k=>{ modules[k]=FX_FACTORIES[k](ctx); prev.connect(modules[k].node.input); prev=modules[k].node.output; });
-  const chain={ input, output:prev, level, modules, apply(){ level.gain.value=fx.level; FX_KEYS.forEach(k=>modules[k].apply(fx[k])); } };
+  const chain={ input, output:prev, level, mute, modules, apply(){ level.gain.value=fx.level; FX_KEYS.forEach(k=>modules[k].apply(fx[k])); } };
   chain.apply(); return chain;
 }
-function ensureTrackChain(track){ if(!audioCtx||!masterGain) return null; if(!track._chain){ track._chain=buildTrackChain(audioCtx, track.fx); track._chain.output.connect(masterGain); } return track._chain; }
+function ensureTrackChain(track){ if(!audioCtx||!masterGain) return null; if(!track._chain){ track._chain=buildTrackChain(audioCtx, track.fx); track._chain.output.connect(masterGain); track._chain.mute.gain.value=trackAudible(track)?1:0; } return track._chain; }
+// Mute/solo: a track is audible if it isn't muted AND (nothing is soloed, or it is one of the soloed).
+function soloActive(){ return project.tracks.some(t=>t.soloed); }
+function trackAudible(track){ return !track.muted && (!soloActive() || !!track.soloed); }
+function applyTrackMuteSolo(){ project.tracks.forEach(t=>{ if(t._chain) t._chain.mute.gain.value=trackAudible(t)?1:0; }); }
 function applyTrackFx(track){ if(track._chain) track._chain.apply(); }
 // Master 3-band EQ
 let eqLow=null, eqMid=null, eqHigh=null;
@@ -2554,7 +2561,7 @@ function renderTimeline(){
   if (typeof renderLyricsLane==="function") renderLyricsLane(W);   // … then lyrics, then the instrument tracks below
   const beatPx=bu*PX_PER_SEC, barPx=bpb*bu*PX_PER_SEC;
   project.tracks.forEach(track=>{
-    const head=document.createElement("div"); head.className="tl-head "+track.type+(track.id===selectedTrackId?" selected":"");
+    const head=document.createElement("div"); head.className="tl-head "+track.type+(track.id===selectedTrackId?" selected":"")+(trackAudible(track)?"":" muted");
     head.innerHTML='<div class="tname"><span class="badge '+track.type+'">'+track.type+'</span><span class="tnm">'+track.name+'</span></div><div class="tl-head-acts"></div>';
     const tname=head.querySelector(".tname"), acts=head.querySelector(".tl-head-acts");
     // compact meter select on the name row (polymeter) — shows the value, no long label
@@ -2567,6 +2574,8 @@ function renderTimeline(){
     // every action is a consistent chip button; icon-only only where the icon is unambiguous (🗑)
     const mkBtn=(txt,title,cls,fn)=>{ const b=document.createElement("button"); b.className="thd-btn"+(cls?" "+cls:""); b.textContent=txt; b.title=title; b.addEventListener("click",(e)=>{ e.stopPropagation(); fn(); }); acts.appendChild(b); return b; };
     mkBtn("FX","Track FX & level","",()=>openFxModal(track));
+    mkBtn("M", track.muted?"Muted — click to unmute":"Mute this layer", "mute"+(track.muted?" on":""), ()=>{ track.muted=!track.muted; applyTrackMuteSolo(); renderTimeline(); scheduleAutosave(); });
+    mkBtn("S", track.soloed?"Soloed — click to unsolo":"Solo this layer (silences the others)", "solo"+(track.soloed?" on":""), ()=>{ track.soloed=!track.soloed; applyTrackMuteSolo(); renderTimeline(); scheduleAutosave(); });
     if (track.type==="voice"||track.type==="memo"){
       const isRec = track.type==="voice" ? (recording && recTrack===track) : (memoRec && memoRec.track===track);
       mkBtn(isRec?"Stop":"Rec", track.type==="voice"?"Record a voice clip into this layer":"Record a memo — the session length follows the recording", "rec"+(isRec?" recording":""), ()=>{ track.type==="voice"?toggleVoiceRec(track):toggleMemoRec(track); });
@@ -4328,10 +4337,14 @@ function audioBufferToWav(buf){
   for(let i=0;i<len;i++) for(let c=0;c<numCh;c++){ let s=Math.max(-1,Math.min(1,chans[c][i])); dv.setInt16(p, s<0?s*0x8000:s*0x7FFF, true); p+=2; }
   return new Blob([ab],{type:"audio/wav"});
 }
-async function renderMix(trackFilter, applyMasterEq){
+async function renderMix(trackFilter, applyMasterEq, respectMuteSolo){
   const sr=(audioCtx&&audioCtx.sampleRate)||44100;
+  // a track renders if it passes the explicit filter AND (unless opted out) is audible under mute/solo.
+  // stems opt out (respectMuteSolo===false) so every layer bounces in isolation regardless of mute state.
+  const muteSolo=(respectMuteSolo!==false);
+  const pass=(tr)=> (!trackFilter || trackFilter(tr)) && (!muteSolo || trackAudible(tr));
   // tail = longest reverb/delay across the rendered tracks
-  let tail=0.6; for (const tr of project.tracks){ if (trackFilter && !trackFilter(tr)) continue; const f=tr.fx||fxDefaults(); tail=Math.max(tail, (f.reverb.on?f.reverb.decay:0), (f.delay.on?f.delay.time*5:0)); }
+  let tail=0.6; for (const tr of project.tracks){ if (!pass(tr)) continue; const f=tr.fx||fxDefaults(); tail=Math.max(tail, (f.reverb.on?f.reverb.decay:0), (f.delay.on?f.delay.time*5:0)); }
   const total=Math.max(0.2, project.lengthSec)+tail;
   const octx=new OfflineAudioContext(2, Math.ceil(total*sr), sr);
   const master=octx.createGain(); master.gain.value=masterEqParams.level;
@@ -4339,13 +4352,13 @@ async function renderMix(trackFilter, applyMasterEq){
   else master.connect(octx.destination);
   // per-track insert chains
   const chains=new Map();
-  for (const tr of project.tracks){ if (trackFilter && !trackFilter(tr)) continue; const ch=buildTrackChain(octx, tr.fx||fxDefaults()); ch.output.connect(master); chains.set(tr, ch); }
+  for (const tr of project.tracks){ if (!pass(tr)) continue; const ch=buildTrackChain(octx, tr.fx||fxDefaults()); ch.output.connect(master); chains.set(tr, ch); }
   // decode voice blobs into the offline context
   const vbuf={};
-  for (const tr of project.tracks){ if (tr.type!=="voice"&&tr.type!=="memo") continue; if (trackFilter && !trackFilter(tr)) continue; for (const clip of tr.clips){ if (!clip.blob) continue; const b=await decodeBlob(clip.blob, octx); if (b) vbuf[clip.id]=b; } }
+  for (const tr of project.tracks){ if (tr.type!=="voice"&&tr.type!=="memo") continue; if (!pass(tr)) continue; for (const clip of tr.clips){ if (!clip.blob) continue; const b=await decodeBlob(clip.blob, octx); if (b) vbuf[clip.id]=b; } }
   const glidePrev=new Map();
   forEachClipEvent(ev=>{
-    if (trackFilter && !trackFilter(ev.track)) return;
+    if (!pass(ev.track)) return;
     const ch=chains.get(ev.track); if (!ch) return; const dest=ch.input;
     const tr=(ev.track.type==="arp")?(ev.track.transpose||0):0;
     if (ev.kind==="note"){ const m=ev.midi+tr; playNoteAt(m, ev.time, ev.dur, ev.wave, octx, dest, glidePrev.get(ev.track), ev.track&&ev.track.synth); glidePrev.set(ev.track, m); }
@@ -4370,7 +4383,7 @@ async function doExportStems(){
   const old=exportBtn.textContent; exportBtn.disabled=true;
   for (let i=0;i<tracks.length;i++){
     const tr=tracks[i]; exportBtn.textContent="Stem "+(i+1)+"/"+tracks.length+"…";
-    try { const buf=await renderMix(t=>t===tr,false); downloadBlob(audioBufferToWav(buf), safeName()+"_"+tr.name.replace(/\s+/g,"")+".wav"); }
+    try { const buf=await renderMix(t=>t===tr,false,false); downloadBlob(audioBufferToWav(buf), safeName()+"_"+tr.name.replace(/\s+/g,"")+".wav"); }
     catch(e){}
     await new Promise(r=>setTimeout(r,500));
   }
@@ -4470,7 +4483,7 @@ async function exportSongPackage(meta){
     // stems
     setStatus("Rendering stems…");
     const stemTracks=project.tracks.filter(t=>t.clips.length); const stemNames=[];
-    for (const tr of stemTracks){ try { const b=await renderMix(t=>t===tr,false); const nm="stems/"+tr.name.replace(/\s+/g,"")+".wav"; files.push({ name:nm, data:wavBytes16(b,[]) }); stemNames.push({ name:tr.name, type:tr.type, file:nm }); } catch(e){} }
+    for (const tr of stemTracks){ try { const b=await renderMix(t=>t===tr,false,false); const nm="stems/"+tr.name.replace(/\s+/g,"")+".wav"; files.push({ name:nm, data:wavBytes16(b,[]) }); stemNames.push({ name:tr.name, type:tr.type, file:nm }); } catch(e){} }
     // manifest
     files.push({ name:"metadata.json", data:new TextEncoder().encode(songMetadataJson({ ...meta, bpm:project.bpm, durationSec:project.lengthSec, unsyncedLyrics:lyricsText, audioFormat:song.codec }, stemNames)) });
     downloadBlob(makeZip(files), base+"_songpackage.zip");
@@ -4611,7 +4624,7 @@ function serializeProject(){
     lyrics: (typeof lyrSource!=="undefined" && lyrSource) ? { source: lyrSource.value, lineBeats: (lyricsState&&lyricsState.lineBeats)||[] } : undefined,
     tracks: project.tracks.map(function(t){
       return {
-        type: t.type, name: t.name, transpose: t.transpose||0, meter: t.meter||undefined, fx: JSON.parse(JSON.stringify(t.fx||fxDefaults())), synth: t.synth?cloneVoice(t.synth):undefined,
+        type: t.type, name: t.name, transpose: t.transpose||0, meter: t.meter||undefined, muted: !!t.muted, soloed: !!t.soloed, fx: JSON.parse(JSON.stringify(t.fx||fxDefaults())), synth: t.synth?cloneVoice(t.synth):undefined,
         clips: t.clips.map(function(c){
           if (t.type === "arp") return { start:c.start, lengthBeats:c.lengthBeats, loopFill:!!c.loopFill, rate:c.rate, wave:c.wave, steps:c.steps.map(s=>({...s})) };
           if (t.type === "midi") return { start:c.start, lengthBeats:c.lengthBeats, loopFill:!!c.loopFill, notes:(c.notes||[]).map(n=>({...n})), cc: c.cc?JSON.parse(JSON.stringify(c.cc)):undefined };
@@ -4649,10 +4662,10 @@ function loadProject(data){
   project.keyMap=(data.keyMap||[]).map(r=>({ beat:+r.beat||0, root:((+r.root||0)%12+12)%12, mode:r.mode||"ionian" }));
   project.structure=(data.structure||[]).map(s=>({ id:++structSeq, type:s.type, beat:+s.beat||0, bars:Math.max(1,+s.bars||4) }));
   project.samplerKit.forEach(p=>{ if (p&&p.blob) padsToDecode.push(p); });
-  (data.tracks||[]).forEach(t=>{ const tr={id:++trackSeq,type:t.type,name:t.name,clips:[],fx:mergeFx(t.fx),transpose:t.transpose||0,meter:t.meter||undefined}; if(t.type==="midi") tr.synth=t.synth?cloneVoice(t.synth):cloneVoice(GLOBAL_VOICE);
+  (data.tracks||[]).forEach(t=>{ const tr={id:++trackSeq,type:t.type,name:t.name,clips:[],fx:mergeFx(t.fx),transpose:t.transpose||0,meter:t.meter||undefined,muted:!!t.muted,soloed:!!t.soloed}; if(t.type==="midi") tr.synth=t.synth?cloneVoice(t.synth):cloneVoice(GLOBAL_VOICE);
     (t.clips||[]).forEach(c=>{ const clip={id:++clipSeq,start:c.start,lengthBeats:c.lengthBeats,loopFill:!!c.loopFill}; if (t.type==="arp"){ clip.rate=c.rate; clip.wave=c.wave; clip.steps=(c.steps||[]).map(s=>({...s})); } else if (t.type==="midi"){ clip.notes=(c.notes||[]).map(n=>({...n})); clip.cc=c.cc?JSON.parse(JSON.stringify(c.cc)):undefined; } else if (t.type==="sampler"){ clip.kind=c.kind||"grid"; if (clip.kind==="loop"){ clip.pad=c.pad||0; clip.off=c.off||0; } else { clip.grid=(c.grid||[]).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } } else if (t.type==="voice"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if (clip.blob) toDecode.push(clip); } else if (t.type==="memo"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; clip.analysis=c.analysis||null; clip.lyricsText=c.lyricsText||""; clip.lyricsWords=c.lyricsWords||null; clip.analysisKey=c.analysisKey||"auto"; clip.lyricsLang=c.lyricsLang||null; if (clip.blob) toDecode.push(clip); } else { clip.grid=(c.grid||DRUMS.map(()=>new Array(16).fill(false))).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } tr.clips.push(clip); }); project.tracks.push(tr); });
   selectedTrackId=project.tracks[0]?.id||null;
-  project.tracks.forEach(ensureTrackChain);
+  project.tracks.forEach(ensureTrackChain); applyTrackMuteSolo();
   if (data.layout && typeof applySectionLayout==="function"){ applySectionLayout(data.layout); saveLayout(); }
   updateLoopButtons(); updateMsReadout(); renderTimeline();
   if (typeof refreshSampler==="function") refreshSampler();

@@ -92,6 +92,7 @@ test("core functions the tests and features depend on are present", () => {
     "structAdd","renderStructureLane","structToLyrics","structLabel","structSorted",
     "structFromLyrics","kindToStructType","syncStructureToLyrics","lyricsBlocks","structHeader","isSectionHeaderLine",
     "tunerLiveUpdate","syncTunerMic",
+    "trackAudible","soloActive","applyTrackMuteSolo",
   ];
   for (const n of names) assert.ok(src.includes("function " + n) || src.includes(n + "("), "missing " + n);
 });
