@@ -10,7 +10,11 @@ const harness =
   extractFunction(src, "chordQualityFromSuffix") + "\n" +
   extractFunction(src, "parseProgression") + "\n" +
   extractFunction(src, "voiceProgression") + "\n" +
-  "; return { CHORD_QUAL, chordQualityFromSuffix, parseProgression, voiceProgression };";
+  extractFunction(src, "chordsToProgression") + "\n" +
+  extractFunction(src, "backingDrumPattern") + "\n" +
+  extractFunction(src, "buildBacking") + "\n" +
+  extractFunction(src, "buildBackingPrompt") + "\n" +
+  "; return { CHORD_QUAL, chordQualityFromSuffix, parseProgression, voiceProgression, chordsToProgression, backingDrumPattern, buildBacking, buildBackingPrompt };";
 const M = new Function(harness)();
 
 const pcOf = (m) => ((m % 12) + 12) % 12;
@@ -67,4 +71,48 @@ test("a multi-chord progression lays out sequentially by bar", () => {
   assert.equal(lengthBeats, 16, "4 chords × 4 beats");
   assert.equal(Math.min(...notes.map((n) => n.beat)), 0);
   assert.equal(Math.max(...notes.map((n) => n.beat)), 12, "last chord starts at bar 4");
+});
+
+test("chordsToProgression maps detected memo spans through the suffix table", () => {
+  const spans = [
+    { root: 9, quality: "m" }, { root: 5, quality: "" },
+    { root: 0, quality: "maj7" }, { root: 7, quality: "7" }, { root: 11, quality: "dim" },
+  ];
+  assert.deepEqual(M.chordsToProgression(spans), [
+    { root: 9, quality: "min" }, { root: 5, quality: "maj" },
+    { root: 0, quality: "maj7" }, { root: 7, quality: "dom7" }, { root: 11, quality: "dim" },
+  ]);
+  assert.deepEqual(M.chordsToProgression([]), []);
+});
+
+test("backingDrumPattern places kick/snare/hat on a 16-step bar", () => {
+  const straight = M.backingDrumPattern(16, "straight");
+  assert.deepEqual(straight.kick, [0, 8], "kick on beats 1 & 3");
+  assert.deepEqual(straight.snare, [4, 12], "snare on the backbeats");
+  assert.deepEqual(straight.hat, [0, 2, 4, 6, 8, 10, 12, 14], "closed hat on eighths");
+  const swung = M.backingDrumPattern(16, "swung");
+  assert.deepEqual(swung.hat, [0, 4, 8, 12], "swung hat thins to quarters");
+});
+
+test("buildBacking yields one spec per role with the right shape", () => {
+  const prog = M.parseProgression("C G Am F");
+  const specs = M.buildBacking(prog, { roles: ["pad", "bass", "arp", "drums"], bpb: 4 });
+  assert.equal(specs.length, 4);
+  assert.deepEqual(specs.map((s) => s.role), ["pad", "bass", "arp", "drums"]);
+  const pad = specs[0], drums = specs[3];
+  assert.equal(pad.type, "midi");
+  assert.ok(pad.notes.length > 0 && pad.lengthBeats === 16);
+  assert.equal(drums.type, "beat");
+  assert.ok(drums.pattern && drums.pattern.kick.length === 2);
+  assert.equal(drums.lengthBeats, 16);
+  // default roles when none given
+  assert.deepEqual(M.buildBacking(prog).map((s) => s.role), ["pad", "bass", "arp"]);
+});
+
+test("buildBackingPrompt names the key/mode and chord count, no prose leak", () => {
+  const p = M.buildBackingPrompt({ root: 9, mode: "aeolian", bars: 6, style: "neo-soul" });
+  assert.match(p, /A aeolian/);
+  assert.match(p, /6-chord/);
+  assert.match(p, /neo-soul/);
+  assert.match(p, /JSON only/);
 });

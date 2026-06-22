@@ -346,6 +346,33 @@ Three complaints from tuning an actual guitar, three fixes:
   the tone, click it again (or change tuning / close the modal) to silence it; the `.playing` card stays lit
   while it sounds.
 
+## 64. Chord-driven backing generation — UI on the inert engine (Roadmap item 4, v1.31.0)
+The voicing engine (`parseProgression`, `chordQualityFromSuffix`, `voiceProgression`) shipped tested
+but inert in v1.30.1. v1.31.0 adds the orchestration core + UI.
+- **Every role becomes its own track**, not one multi-part clip. `buildBacking(prog, opts)` (DOM-free,
+  tested) maps a source-agnostic progression `[{root,quality}]` to one layer spec per role: pad/bass/arp
+  are **MIDI** stems (`voiceProgression` notes → a notes clip), drums is a **beat** track. This is the
+  whole point of item 4 — generated parts are *born* as isolated, transposable, individually-exportable
+  stems (`track.transpose` per track), editable in the existing MIDI/beat editors. No new clip machinery:
+  `materializeBacking` just calls `addTrack`+`addClip` per spec.
+- **Three chord sources, in priority order.** (1) **Typed** progression box (`parseProgression` — letters
+  only: `A C#m F#m D`). (2) **Detected memo chords** — `chordsToProgression` maps a memo's
+  `analysis.chords` spans to the engine shape; the span suffixes (`""`,`m`,`7`,`maj7`,`m7`,`dim`) already
+  round-trip through `chordQualityFromSuffix`, so detect→voice is lossless. (3) **AI** via `aiComplete`
+  with a strict-JSON system prompt (`BACKING_SYS`) + `buildBackingPrompt` (BYO key, defaults to
+  `keyAtBeat(0)`); reply parsed with the existing `aiParseSpec`, qualities normalized through
+  `chordQualityFromSuffix`. No audio model, no CORS — a chat completion only.
+- **Drums are a static, genre-neutral pattern** (`backingDrumPattern`): kick on beats 1 & 3, snare on the
+  backbeats, closed hat on eighths (straight) or quarters (laid-back). Returned as per-voice step indices
+  so the UI maps kick/snare/hat onto rows 0/1/2 of the full `DRUMS` grid; `loopFill:true` repeats it under
+  the harmonic layers. Kept dumb on purpose — a real beat generator is out of scope for this item.
+- **Why MIDI for the arp role** (not an arp track): `voiceProgression`'s arp is an explicit eighth-note run
+  through the chord tones — a melody, not an auto-arpeggiator pattern. A MIDI clip keeps it editable
+  note-by-note and exportable as a clean stem, consistent with pad/bass.
+- Explicit chords (typed/memo/AI) are absolute and do **not** auto-follow later key-map transpositions —
+  that's musically correct (the user named the chords). The key-map awareness here is the AI path seeding
+  its key from `keyAtBeat(0)`; the Roman-template-from-key-map source is item 5's job and is deferred.
+
 ## 62. Per-layer mute / solo on the timeline (v1.30.0)
 - Each track head now carries **M** and **S** chips (between FX and the type-specific buttons), toggling
   `track.muted` / `track.soloed`. Audibility rule, in one helper trio: `soloActive()` (any track soloed),

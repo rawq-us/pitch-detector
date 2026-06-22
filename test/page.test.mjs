@@ -43,6 +43,9 @@ test("required element ids exist in the markup", () => {
     // song package + AI composer
     "songModal","songTitle","songGenre","songCover","songLyrics","songExportBtn",
     "aiComposeBtn","aiModal","aiProvider","aiModel","aiKey","aiIdea","aiComposeRun","aiOpenSettings",
+    // generate-backing modal (Roadmap item 4)
+    "backingBtn","backingModal","backingClose","backProg","backMemoSel","backAiRoot","backAiMode",
+    "backAiBars","backAiStyle","backPad","backBass","backArp","backDrums","backFeel","backBars","backingRun","backingStatus",
     // settings modal (canonical API-key editor)
     "settingsBtn","settingsModal","settingsSave","settingsTest","settingsClear","settingsStatus",
     // memo editor
@@ -87,6 +90,8 @@ test("core functions the tests and features depend on are present", () => {
     "openSynthModal","closeSynthModal","renderInstViz","renderInstVizAll","openArpClip","setArpEditTarget",
     "renderPattern","midiLibAdd","midiLibPreview",
     "parseProgression","chordQualityFromSuffix","voiceProgression",
+    "chordsToProgression","backingDrumPattern","buildBacking","buildBackingPrompt",
+    "backingSrc","backingMemos","materializeBacking","runBacking","openBackingModal",
     "midiEditorSetKey","syncSynthKeySel","fillKeySelect",
     "timelineKeys","clipKeySpan","renderKeyChips","nearestInScale","midiSnapPitch",
     "keySegmentsInClip","renderMidiKeyRuler","midiAddKeyChange","midiZoom","cloneVoice",

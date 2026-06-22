@@ -314,7 +314,7 @@ entry + Build Ledger check → 7. Version bump → 8. Report; ship on go-ahead. 
 Slice big items (WebRTC, warp) into sub-phases and loop those internally.
 
 ## 5. Build Ledger
-- [ ] **Item 4** — Chord-driven backing generation (chord model · voicing engine · pad/bass/arp/drum generators · AI hook · UI)
+- [x] **Item 4** — Chord-driven backing generation (chord model · voicing engine · pad/bass/arp/drum generators · AI hook · UI) — **shipped v1.31.0.** `buildBacking`/`materializeBacking` turn a typed / detected-memo / AI progression into isolated pad·bass·arp MIDI stems + optional drums, each its own transposable track. (DECISIONS #64)
 - [ ] **Item 1** — Undo/redo command stack (`commit()` envelope, all mutators routed, depth cap)
 - [ ] **Item 2** — Clip editing (split/trim/duplicate/copy-paste/edge-resize · audio buffer offset)
 - [ ] **Item 5** — Harmony assistant (`suggestChords` · `voiceLead` · popups + generator hook)
