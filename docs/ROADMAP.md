@@ -315,7 +315,7 @@ Slice big items (WebRTC, warp) into sub-phases and loop those internally.
 
 ## 5. Build Ledger
 - [x] **Item 4** — Chord-driven backing generation (chord model · voicing engine · pad/bass/arp/drum generators · AI hook · UI) — **shipped v1.31.0.** `buildBacking`/`materializeBacking` turn a typed / detected-memo / AI progression into isolated pad·bass·arp MIDI stems + optional drums, each its own transposable track. (DECISIONS #64)
-- [ ] **Item 1** — Undo/redo command stack (`commit()` envelope, all mutators routed, depth cap)
+- [x] **Item 1** — Undo/redo command stack (`commit()` envelope, all mutators routed, depth cap) — **shipped v1.32.0.** Scoped in-memory snapshots (PCM by reference, no re-decode), ⌘Z/⇧⌘Z + toolbar, MIDI-editor note ops covered, depth 100. (DECISIONS #65)
 - [ ] **Item 2** — Clip editing (split/trim/duplicate/copy-paste/edge-resize · audio buffer offset)
 - [ ] **Item 5** — Harmony assistant (`suggestChords` · `voiceLead` · popups + generator hook)
 - [ ] **Item 7** — Per-track + master meters (shared viz loop, mute/solo-aware)

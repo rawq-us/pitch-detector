@@ -346,6 +346,34 @@ Three complaints from tuning an actual guitar, three fixes:
   the tone, click it again (or change tuning / close the modal) to silence it; the `.playing` card stays lit
   while it sounds.
 
+## 65. Undo / redo — scoped snapshot command stack (Roadmap item 1, v1.32.0)
+A single `commit(label, doFn)` envelope snapshots before a mutation, runs it, and records the
+before-state; `undoEdit`/`redoEdit` swap snapshots. ⌘Z / ⇧⌘Z + a toolbar ↶/↷ (disabled-state +
+label tooltips via `updateUndoUI`).
+- **Snapshot is in-memory and SCOPED, not a serialize/loadProject round-trip.** `snapshotProject`
+  deep-copies only the *arrangement* — `tracks · clips · keyMap · structure · lengthSec · loop ·
+  selectedTrackId`. Decoded PCM (`clip.buffer`) and source blobs are carried **by reference, never
+  copied**, so audio survives undo without re-decoding (the acceptance criterion). `restoreProject`
+  rebuilds tracks from the snapshot, disconnects the old chains, and re-`ensureTrackChain`s — buffers
+  intact. Verified in-browser: `clip.buffer===` the same object after undo.
+- **Why scoped, not whole-project:** snapshot-based undo incorrectly reverts any state a restore
+  touches but no `commit()` recorded. So the snapshot deliberately EXCLUDES synth/GLOBAL_VOICE,
+  master-EQ, song metadata, sampler-kit, lyrics, bpm/timeSig/countIn — none of the wired mutators
+  change them, so restoring never clobbers them. Those domains are simply not undoable yet (documented
+  gap, not a bug). If they're later wired through `commit()`, add them to the snapshot together.
+- **Wired mutators:** add/delete track, add/move/delete clip, loop-fill toggle, mute/solo, key-map
+  add/edit/delete, structure add/edit/delete, backing generation (one atomic entry for all N tracks),
+  and all MIDI-editor note ops (add/move/resize via a gesture-scoped `beginEdit`/`endEdit`, plus
+  delete/clear/quantize/nudge/pattern-insert via `commit`). NOT yet wired: live MIDI recording,
+  key-edge & structure-block drag-resize, synth/fx knob tweaks.
+- **The MIDI editor holds object refs into the project**, which a restore replaces. `restoreProject`
+  re-points `midiEd.track`/`midiEd.clip` by id (clearing the note selection), or closes the editor if
+  its clip was undone away. Ids are preserved through snapshot/restore precisely so this matching works.
+- **Robustness:** `undoEdit`/`redoEdit` restore inside try/finally so a render error can't leave the
+  history muted; `commit` records only after `doFn` returns, so a throwing mutation leaves no bogus
+  entry. History is depth-capped at 100 and cleared on session load (`loadProject`). The `makeHistory`
+  stack is DOM-free and unit-tested (test/history.test.mjs); the snapshot/restore pair is preview-verified.
+
 ## 64. Chord-driven backing generation — UI on the inert engine (Roadmap item 4, v1.31.0)
 The voicing engine (`parseProgression`, `chordQualityFromSuffix`, `voiceProgression`) shipped tested
 but inert in v1.30.1. v1.31.0 adds the orchestration core + UI.

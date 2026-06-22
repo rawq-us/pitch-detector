@@ -728,6 +728,7 @@
       </div>
     </div>
     <div class="row tl-controls" style="margin-bottom:12px">
+      <div class="group"><label>&nbsp;</label><div class="tr-row"><button id="undoBtn" class="mini" title="Nothing to undo" disabled>↶</button><button id="redoBtn" class="mini" title="Nothing to redo" disabled>↷</button></div></div>
       <div class="group"><label>&nbsp;</label><button id="addArpTrackBtn" class="iconbtn" title="Add arp layer">＋🎹</button></div>
       <div class="group"><label>&nbsp;</label><button id="addMidiTrackBtn" class="iconbtn" title="Add a MIDI layer — piano-roll editor (program, record &amp; edit notes)">＋🎼</button></div>
       <div class="group"><label>&nbsp;</label><button id="addBeatTrackBtn" class="iconbtn" title="Add beat layer">＋🥁</button></div>
@@ -1441,7 +1442,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.31.0";
+const APP_VERSION="1.32.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -2727,8 +2728,8 @@ function renderTimeline(){
     // every action is a consistent chip button; icon-only only where the icon is unambiguous (🗑)
     const mkBtn=(txt,title,cls,fn)=>{ const b=document.createElement("button"); b.className="thd-btn"+(cls?" "+cls:""); b.textContent=txt; b.title=title; b.addEventListener("click",(e)=>{ e.stopPropagation(); fn(); }); acts.appendChild(b); return b; };
     mkBtn("FX","Track FX & level","",()=>openFxModal(track));
-    mkBtn("M", track.muted?"Muted — click to unmute":"Mute this layer", "mute"+(track.muted?" on":""), ()=>{ track.muted=!track.muted; applyTrackMuteSolo(); renderTimeline(); scheduleAutosave(); });
-    mkBtn("S", track.soloed?"Soloed — click to unsolo":"Solo this layer (silences the others)", "solo"+(track.soloed?" on":""), ()=>{ track.soloed=!track.soloed; applyTrackMuteSolo(); renderTimeline(); scheduleAutosave(); });
+    mkBtn("M", track.muted?"Muted — click to unmute":"Mute this layer", "mute"+(track.muted?" on":""), ()=>commit(track.muted?"unmute layer":"mute layer",()=>{ track.muted=!track.muted; applyTrackMuteSolo(); renderTimeline(); scheduleAutosave(); }));
+    mkBtn("S", track.soloed?"Soloed — click to unsolo":"Solo this layer (silences the others)", "solo"+(track.soloed?" on":""), ()=>commit(track.soloed?"unsolo layer":"solo layer",()=>{ track.soloed=!track.soloed; applyTrackMuteSolo(); renderTimeline(); scheduleAutosave(); }));
     if (track.type==="voice"||track.type==="memo"){
       const isRec = track.type==="voice" ? (recording && recTrack===track) : (memoRec && memoRec.track===track);
       mkBtn(isRec?"Stop":"Rec", track.type==="voice"?"Record a voice clip into this layer":"Record a memo — the session length follows the recording", "rec"+(isRec?" recording":""), ()=>{ track.type==="voice"?toggleVoiceRec(track):toggleMemoRec(track); });
@@ -2736,7 +2737,7 @@ function renderTimeline(){
     if (track.type==="memo") mkBtn("Import","Import an audio file (WAV/MP3/M4A/OGG…) as a memo and analyze it","",()=>memoImportTo(track));
     if (track.type==="sampler") mkBtn("Pads","Open the Sample-beat editor to load pads & program patterns","",()=>{ const s=document.querySelector('.csec[data-key="sampler"]'); if(s){ setCollapsed(s,false); saveLayout(); s.scrollIntoView({behavior:"smooth",block:"start"}); } });
     if (track.type==="voice") mkBtn("→ Memo","Convert this voice layer to an annotated memo (chords · notes · tempo · lyrics)","",()=>convertVoiceTrack(track));
-    mkBtn("Delete","Delete this layer and its clips","danger",()=>{ if(!confirm("Delete the \""+track.name+"\" layer"+(track.clips.length?(" and its "+track.clips.length+" clip(s)"):"")+"?")) return; project.tracks=project.tracks.filter(t=>t.id!==track.id); if (selectedTrackId===track.id) selectedTrackId=project.tracks[0]?.id||null; renderTimeline(); });
+    mkBtn("Delete","Delete this layer and its clips","danger",()=>{ if(!confirm("Delete the \""+track.name+"\" layer"+(track.clips.length?(" and its "+track.clips.length+" clip(s)"):"")+"?")) return; commit("delete layer",()=>{ project.tracks=project.tracks.filter(t=>t.id!==track.id); if (selectedTrackId===track.id) selectedTrackId=project.tracks[0]?.id||null; renderTimeline(); }); });
     head.addEventListener("click",()=>{ selectedTrackId=track.id; renderTimeline(); });
     tlHeadCol.appendChild(head);
 
@@ -2767,7 +2768,7 @@ function renderTimeline(){
         const lb=el.querySelector(".cloop"); if (lb) lb.addEventListener("click",(e)=>{ e.stopPropagation(); openLoopPopup(track, clip, e.target); });
         if (track.type==="midi") el.addEventListener("dblclick",(e)=>{ e.stopPropagation(); openMidiEditor(track, clip); });
       }
-      el.querySelector(".cdel").addEventListener("click",(e)=>{ e.stopPropagation(); track.clips=track.clips.filter(c=>c.id!==clip.id); renderTimeline(); });
+      el.querySelector(".cdel").addEventListener("click",(e)=>{ e.stopPropagation(); commit("delete clip",()=>{ track.clips=track.clips.filter(c=>c.id!==clip.id); renderTimeline(); }); });
       attachClipDrag(el, track, clip, lane);
       lane.appendChild(el);
     });
@@ -2791,7 +2792,7 @@ function attachClipDrag(el, track, clip, lane){
     if (e.target.classList.contains("cdel") || e.target.classList.contains("cloop") || e.target.classList.contains("m-edit")) return;
     e.preventDefault();
     const laneRect=lane.getBoundingClientRect();
-    drag={ clip, track, grabDx: e.clientX - (laneRect.left + originPx() + clip.start*PX_PER_SEC), lane };
+    drag={ clip, track, grabDx: e.clientX - (laneRect.left + originPx() + clip.start*PX_PER_SEC), lane, before:beginEdit(), moved:false };
     el.setPointerCapture?.(e.pointerId);
   });
 }
@@ -2801,9 +2802,9 @@ window.addEventListener("pointermove",(e)=>{
   let sec = snapSec((e.clientX - laneRect.left - originPx() - drag.grabDx)/PX_PER_SEC);
   const dur = drag.clip.loopFill ? patternSec(drag.track, drag.clip) : clipDuration(drag.track, drag.clip);
   sec = clamp(sec, 0, Math.max(0, project.lengthSec - dur));
-  if (sec !== drag.clip.start){ drag.clip.start = sec; renderTimeline(); }
+  if (sec !== drag.clip.start){ drag.clip.start = sec; drag.moved=true; renderTimeline(); }
 });
-window.addEventListener("pointerup",()=>{ drag=null; });
+window.addEventListener("pointerup",()=>{ if (drag && drag.moved) endEdit("move clip", drag.before); drag=null; });
 
 /* cycle region select on the ruler */
 let loopDrag=null;
@@ -2832,7 +2833,7 @@ function openLoopPopup(track, clip, anchorEl){
 }
 const loopFillBtn=document.getElementById("loopFillBtn");
 function syncLoopFillBtn(){ if (!loopPopupClip) return; loopFillBtn.classList.toggle("on", !!loopPopupClip.loopFill); loopPopupInput.disabled=!!loopPopupClip.loopFill; }
-loopFillBtn.addEventListener("click",()=>{ if (!loopPopupClip) return; loopPopupClip.loopFill=!loopPopupClip.loopFill; syncLoopFillBtn(); renderTimeline(); if (transport.playing){ transportStop(); transportPlay(); } });
+loopFillBtn.addEventListener("click",()=>{ if (!loopPopupClip) return; commit("loop fill",()=>{ loopPopupClip.loopFill=!loopPopupClip.loopFill; syncLoopFillBtn(); renderTimeline(); }); if (transport.playing){ transportStop(); transportPlay(); } });
 function closeLoopPopup(){ loopPopup.style.display="none"; loopPopupClip=null; loopPopupTrack=null; }
 loopPopupInput.addEventListener("input",()=>{ if (!loopPopupClip || loopPopupClip.loopFill) return; loopPopupClip.lengthBeats=clamp(parseInt(loopPopupInput.value||"1",10)||1,1,512); growIfNeeded(loopPopupTrack,loopPopupClip); renderTimeline(); });
 loopPopupInput.addEventListener("keydown",(e)=>{ if (e.key==="Enter"){ closeLoopPopup(); if (transport.playing){ transportStop(); transportPlay(); } } });
@@ -2962,10 +2963,10 @@ playBtn.addEventListener("click",()=>{ transport.playing?transportStop():transpo
 loopBtn.addEventListener("click",()=>{ project.loopEnabled=!project.loopEnabled; updateLoopButtons(); renderTimeline(); if (transport.playing){ transportStop(); transportPlay(); } });
 loopResetBtn.addEventListener("click",()=>{ project.loop.start=0; project.loop.end=project.lengthSec; project.loopEnabled=true; updateLoopButtons(); renderTimeline(); if (transport.playing){ transportStop(); transportPlay(); } });
 document.getElementById("countInSel").addEventListener("change",(e)=>{ project.countInBars=parseInt(e.target.value,10)||0; renderTimeline(); });
-addArpTrackBtn.addEventListener("click",()=>addTrack("arp"));
-addBeatTrackBtn.addEventListener("click",()=>addTrack("beat"));
-document.getElementById("addMidiTrackBtn").addEventListener("click",()=>{ const t=addTrack("midi"); const clip={ id:++clipSeq, start:0, lengthBeats:beatsPerBar()*2, notes:[], loopFill:false }; addClip(t,clip); openMidiEditor(t,clip); });
-document.getElementById("addSamplerTrackBtn").addEventListener("click",()=>{ addTrack("sampler"); const s=document.querySelector('.csec[data-key="sampler"]'); if(s){ setCollapsed(s,false); saveLayout(); s.scrollIntoView({behavior:"smooth",block:"start"}); } });
+addArpTrackBtn.addEventListener("click",()=>commit("add arp layer",()=>addTrack("arp")));
+addBeatTrackBtn.addEventListener("click",()=>commit("add beat layer",()=>addTrack("beat")));
+document.getElementById("addMidiTrackBtn").addEventListener("click",()=>commit("add MIDI layer",()=>{ const t=addTrack("midi"); const clip={ id:++clipSeq, start:0, lengthBeats:beatsPerBar()*2, notes:[], loopFill:false }; addClip(t,clip); openMidiEditor(t,clip); }));
+document.getElementById("addSamplerTrackBtn").addEventListener("click",()=>{ commit("add sampler layer",()=>addTrack("sampler")); const s=document.querySelector('.csec[data-key="sampler"]'); if(s){ setCollapsed(s,false); saveLayout(); s.scrollIntoView({behavior:"smooth",block:"start"}); } });
 
 /* ---- timeline zoom (buttons · ctrl/cmd+scroll · touch pinch) ---- */
 // Zoom updates PX_PER_SEC immediately but coalesces the (expensive) re-render to one per
@@ -3024,7 +3025,7 @@ attachPinch(tlScroll, ()=>PX_PER_SEC, (z,cx)=>setTimelineZoom(z,cx), ()=>{ drag=
 /* ---------- Voice recording (MediaRecorder -> Blob) ---------- */
 const addVoiceTrackBtn=document.getElementById("addVoiceTrackBtn");
 let mediaRec=null, recChunks=[], recording=false, recStream=null, recTrack=null;
-addVoiceTrackBtn.addEventListener("click",()=>addTrack("voice"));
+addVoiceTrackBtn.addEventListener("click",()=>commit("add voice layer",()=>addTrack("voice")));
 function toggleVoiceRec(track){ recording ? stopVoiceRec() : startVoiceRec(track); }
 async function startVoiceRec(track){
   if (recording) return;
@@ -3057,7 +3058,7 @@ async function addVoiceClipFromBlob(blob){
    diatonic-first), the sung/played melody with cents-deviation coloring — plus
    optional in-browser Whisper lyric transcription. Everything exports as a portable
    bundle (24-bit WAV + SMF-1 MIDI with tempo map/markers/lyrics + LRC + Audacity labels). */
-document.getElementById("addMemoTrackBtn").addEventListener("click",()=>addTrack("memo"));
+document.getElementById("addMemoTrackBtn").addEventListener("click",()=>commit("add memo layer",()=>addTrack("memo")));
 const MEMO_QUALS=[ {q:"",iv:[0,4,7]}, {q:"m",iv:[0,3,7]}, {q:"dim",iv:[0,3,6]}, {q:"7",iv:[0,4,7,10]}, {q:"maj7",iv:[0,4,7,11]}, {q:"m7",iv:[0,3,7,10]} ];
 function memoChordLabel(s){ return NOTE_NAMES[s.root]+s.quality+(s.diatonic?"":"?"); }
 function memoTuneColor(c){ const a=Math.abs(c); return a<=10?"#2dd4bf":(a<=35?"#fbbf24":"#f87171"); }
@@ -3529,8 +3530,8 @@ function keyPopEdited(){ if(!keyReg) return;
 }
 keyPopRoot.addEventListener("change",keyPopEdited);
 keyPopMode.addEventListener("change",keyPopEdited);
-document.getElementById("keyPopSave").addEventListener("click",()=>{ keyPopEdited(); closeKeyPopup(); });
-keyPopDel.addEventListener("click",()=>{ if(!keyReg) return; project.keyMap=(project.keyMap||[]).filter(r=>r!==keyReg); closeKeyPopup(); renderTimeline(); if(typeof midiEd!=="undefined"&&midiEd&&typeof renderMidiRoll==="function") renderMidiRoll(); scheduleAutosave(); });
+document.getElementById("keyPopSave").addEventListener("click",()=>{ commit("edit key/mode",()=>keyPopEdited()); closeKeyPopup(); });
+keyPopDel.addEventListener("click",()=>{ if(!keyReg) return; commit("delete key change",()=>{ project.keyMap=(project.keyMap||[]).filter(r=>r!==keyReg); renderTimeline(); if(typeof midiEd!=="undefined"&&midiEd&&typeof renderMidiRoll==="function") renderMidiRoll(); scheduleAutosave(); }); closeKeyPopup(); });
 window.addEventListener("keydown",(e)=>{ if(keyPopup.style.display!=="none" && e.key==="Escape") closeKeyPopup(); });
 document.addEventListener("pointerdown",(e)=>{ if (keyPopup.style.display!=="none" && !keyPopup.contains(e.target) && !e.target.closest(".key-region") && !e.target.closest(".key-lane")) closeKeyPopup(); });
 function auditionChord(s){
@@ -4796,6 +4797,7 @@ function serializeProject(){
   };
 }
 function loadProject(data){
+  if(typeof editHistory!=="undefined"){ editHistory.clear(); if(typeof updateUndoUI==="function") updateUndoUI(); }   // undo doesn't cross a session load
   project.bpm = data.bpm||90; bpmInput.value=project.bpm;
   project.timeSig = data.timeSig||{num:4,den:4}; tsSel.value=project.timeSig.num+"/"+project.timeSig.den;
   project.lengthSec = data.lengthSec||32; lenInput.value=String(projectBars());
@@ -4832,6 +4834,116 @@ function loadProject(data){
     ]).then(()=>{ renderTimeline(); if (typeof refreshSampler==="function") refreshSampler(); });
   }
 }
+/* ===== Undo / redo — snapshot command stack (Roadmap item 1) =====
+   Scope: the arrangement (tracks · clips · keyMap · structure · length/loop · selection).
+   Decoded PCM (clip.buffer) and source blobs are shared by reference, never copied — audio
+   survives undo without re-decoding. Synth/master-EQ/song-metadata/sampler-kit edits are
+   intentionally OUTSIDE undo for now, so a restore never reverts un-tracked state. (DECISIONS) */
+function snapClip(type, c){
+  const o={ id:c.id, start:c.start, lengthBeats:c.lengthBeats, loopFill:!!c.loopFill };
+  if(c.blob!==undefined) o.blob=c.blob;          // shared ref — compressed source
+  if(c.buffer!==undefined) o.buffer=c.buffer;    // shared ref — decoded PCM (never copied)
+  if(type==="arp"){ o.rate=c.rate; o.wave=c.wave; o.steps=(c.steps||[]).map(s=>({...s})); }
+  else if(type==="midi"){ o.notes=(c.notes||[]).map(n=>({...n})); o.cc=c.cc?JSON.parse(JSON.stringify(c.cc)):undefined; }
+  else if(type==="sampler"){ o.kind=c.kind||"grid"; if(o.kind==="loop"){ o.pad=c.pad; o.off=c.off||0; } else { o.grid=(c.grid||[]).map(r=>r.slice()); o.pitch=c.pitch?{...c.pitch}:undefined; } }
+  else if(type==="voice"){ o.audioDur=c.audioDur; }
+  else if(type==="memo"){ o.audioDur=c.audioDur; o.analysis=c.analysis?JSON.parse(JSON.stringify(c.analysis)):null; o.lyricsText=c.lyricsText||""; o.lyricsWords=c.lyricsWords?JSON.parse(JSON.stringify(c.lyricsWords)):null; o.analysisKey=c.analysisKey||"auto"; o.lyricsLang=c.lyricsLang||null; }
+  else { o.grid=(c.grid||[]).map(r=>r.slice()); o.pitch=c.pitch?{...c.pitch}:undefined; }
+  return o;
+}
+function snapTrack(t){
+  const o={ id:t.id, type:t.type, name:t.name, transpose:t.transpose||0, meter:t.meter, muted:!!t.muted, soloed:!!t.soloed, fx:JSON.parse(JSON.stringify(t.fx||fxDefaults())), clips:t.clips.map(c=>snapClip(t.type,c)) };
+  if(t.synth) o.synth=cloneVoice(t.synth);
+  return o;
+}
+function snapshotProject(){
+  return {
+    lengthSec:project.lengthSec, loop:{...project.loop}, loopEnabled:project.loopEnabled,
+    keyMap:(project.keyMap||[]).map(r=>({...r})),
+    structure:(project.structure||[]).map(s=>({...s})),
+    selectedTrackId,
+    tracks:project.tracks.map(snapTrack),
+  };
+}
+function restoreProject(snap){
+  if(!snap) return;
+  const oldChains=project.tracks.map(t=>t._chain).filter(Boolean);
+  project.lengthSec=snap.lengthSec; lenInput.value=String(projectBars());
+  project.loop={...snap.loop}; project.loopEnabled=snap.loopEnabled!==false;
+  project.keyMap=(snap.keyMap||[]).map(r=>({...r}));
+  project.structure=(snap.structure||[]).map(s=>({...s}));
+  project.tracks=snap.tracks.map(t=>{
+    const tr={ id:t.id, type:t.type, name:t.name, transpose:t.transpose||0, meter:t.meter, muted:!!t.muted, soloed:!!t.soloed, fx:mergeFx(t.fx), clips:t.clips.map(c=>snapClip(t.type,c)) };
+    if(t.type==="midi") tr.synth=t.synth?cloneVoice(t.synth):cloneVoice(GLOBAL_VOICE);
+    return tr;
+  });
+  project.tracks.forEach(t=>{ if(t.id>trackSeq) trackSeq=t.id; t.clips.forEach(c=>{ if(c.id>clipSeq) clipSeq=c.id; }); });
+  oldChains.forEach(ch=>{ try{ ch.output.disconnect(); }catch(_){} });   // drop stale graph; PCM buffers are untouched
+  selectedTrackId = (snap.selectedTrackId!=null && project.tracks.some(t=>t.id===snap.selectedTrackId)) ? snap.selectedTrackId : (project.tracks[0]?.id||null);
+  project.tracks.forEach(ensureTrackChain); applyTrackMuteSolo();
+  if(typeof updateLoopButtons==="function") updateLoopButtons();
+  if(typeof updateMsReadout==="function") updateMsReadout();
+  // the MIDI editor holds object refs into the OLD project — repoint by id, or close it if its clip is gone
+  if(typeof midiEd!=="undefined" && midiEd){
+    const tr=project.tracks.find(t=>t.id===midiEd.track.id), cl=tr&&tr.clips.find(c=>c.id===midiEd.clip.id);
+    if(tr&&cl){ midiEd.track=tr; midiEd.clip=cl; midiEd.sel=new Set(); if(typeof renderMidiRoll==="function") renderMidiRoll(); }
+    else if(typeof closeMidiEditor==="function") closeMidiEditor();
+  }
+  renderTimeline(); scheduleAutosave();
+}
+// DOM-free history stack over opaque snapshot entries {label, snap}. push() clears the redo
+// branch; undo()/redo() take the CURRENT entry (so the inverse direction can return to it).
+function makeHistory(depth){
+  depth=depth||100; const u=[], r=[];
+  return {
+    push(entry){ u.push(entry); while(u.length>depth) u.shift(); r.length=0; },
+    undo(cur){ if(!u.length) return null; r.push(cur); return u.pop(); },
+    redo(cur){ if(!r.length) return null; u.push(cur); return r.pop(); },
+    canUndo(){ return u.length>0; }, canRedo(){ return r.length>0; },
+    peekUndo(){ return u.length?u[u.length-1]:null; }, peekRedo(){ return r.length?r[r.length-1]:null; },
+    clear(){ u.length=0; r.length=0; }, sizes(){ return { undo:u.length, redo:r.length }; },
+  };
+}
+const editHistory=makeHistory(100);
+let _histMuted=false;
+// Wrap a discrete mutation so it can be undone: snapshots before, runs the change, records it.
+function commit(label, doFn){
+  if(_histMuted){ if(doFn) doFn(); return; }
+  const before=snapshotProject();
+  if(doFn) doFn();                              // if the mutation throws, we never record — no bogus entry
+  editHistory.push({ label, snap:before });
+  updateUndoUI();
+}
+// Two-phase variant for live drags: grab a before-snapshot at gesture start, record it on release.
+function beginEdit(){ return _histMuted?null:snapshotProject(); }
+function endEdit(label, before){ if(_histMuted||!before) return; editHistory.push({ label, snap:before }); updateUndoUI(); }
+function undoEdit(){
+  if(!editHistory.canUndo()) return;
+  const e=editHistory.undo({ label:editHistory.peekUndo().label, snap:snapshotProject() });
+  _histMuted=true; try { restoreProject(e.snap); } finally { _histMuted=false; }   // never leave history muted on a render error
+  updateUndoUI(); if(typeof statusEl!=="undefined"&&statusEl) statusEl.textContent="Undo "+(e.label||"")+".";
+}
+function redoEdit(){
+  if(!editHistory.canRedo()) return;
+  const e=editHistory.redo({ label:editHistory.peekRedo().label, snap:snapshotProject() });
+  _histMuted=true; try { restoreProject(e.snap); } finally { _histMuted=false; }
+  updateUndoUI(); if(typeof statusEl!=="undefined"&&statusEl) statusEl.textContent="Redo "+(e.label||"")+".";
+}
+function updateUndoUI(){
+  const ub=document.getElementById("undoBtn"), rb=document.getElementById("redoBtn");
+  if(ub){ ub.disabled=!editHistory.canUndo(); ub.title=editHistory.canUndo()?("Undo "+(editHistory.peekUndo().label||"")+"  (⌘Z)"):"Nothing to undo"; }
+  if(rb){ rb.disabled=!editHistory.canRedo(); rb.title=editHistory.canRedo()?("Redo "+(editHistory.peekRedo().label||"")+"  (⇧⌘Z)"):"Nothing to redo"; }
+}
+window.addEventListener("keydown",(e)=>{
+  if(!((e.metaKey||e.ctrlKey) && (e.key==="z"||e.key==="Z"))) return;
+  const t=e.target, tag=t&&t.tagName;
+  if(tag==="INPUT"||tag==="TEXTAREA"||(t&&t.isContentEditable)) return;   // let text fields keep native undo
+  e.preventDefault();
+  if(e.shiftKey) redoEdit(); else undoEdit();
+});
+document.getElementById("undoBtn").addEventListener("click",undoEdit);
+document.getElementById("redoBtn").addEventListener("click",redoEdit);
+
 // id given → overwrite that session (Save); id null → create a new one (Save As). Resolves the id.
 async function saveSession(label, desc, data, id){ const db=await openDB(); const rec={ label, description:desc||"", version:FORMAT_VERSION, savedAt:Date.now(), data: data||serializeProject() }; if(id!=null) rec.id=id; return new Promise((res,rej)=>{ const tx=db.transaction(STORE,"readwrite"); const st=tx.objectStore(STORE); const req=(id!=null)?st.put(rec):st.add(rec); req.onsuccess=()=>res(req.result); tx.onerror=()=>rej(tx.error); }); }
 
@@ -5137,7 +5249,7 @@ async function runBacking(){
       if(!prog.length) throw new Error("empty progression");
     } catch(e){ st.textContent="AI error: "+(e.message||e); return; }
   }
-  const made=materializeBacking(buildBacking(prog, opts));
+  let made=[]; commit("generate backing",()=>{ made=materializeBacking(buildBacking(prog, opts)); });
   st.textContent="Added "+made.length+" layer"+(made.length>1?"s":"")+": "+made.join(", ")+". Each is its own editable stem.";
 }
 document.getElementById("backingBtn").addEventListener("click",openBackingModal);
@@ -5778,8 +5890,7 @@ function keyAddDefaultBeat(){ const last=keyMapSorted().slice(-1)[0]; return Mat
 function addKeyChangeAt(beat){
   beat=Math.round(beat); if (beat<=0) beat=beatsPerBar();
   const k=keyAtBeat(beat); const reg={ beat, root:k.root, mode:k.mode };
-  project.keyMap=project.keyMap||[]; project.keyMap.push(reg);
-  renderTimeline(); scheduleAutosave();
+  commit("add key change",()=>{ project.keyMap=project.keyMap||[]; project.keyMap.push(reg); renderTimeline(); scheduleAutosave(); });
   const nb=[...tlLanes.querySelectorAll(".key-region")].find(b=>b._reg===reg); if (nb) openKeyPopup(reg, nb);
 }
 // drag a change's left edge to move it — live-resizes this block and its left neighbour without a
@@ -5809,8 +5920,8 @@ function attachKeyEdgeDrag(edge, reg, lane){
 function growToStructure(){ const e=structEndBeat(); if(e>0){ const sec=lyrBeatToSec(e); if(sec>project.lengthSec) setLength(Math.ceil(sec+2)); } }
 function structAdd(type){
   const meta=SECTION_TYPES[type]||SECTION_TYPES.verse, sec={ id:++structSeq, type, beat:structEndBeat(), bars:meta.bars };
-  project.structure=project.structure||[]; project.structure.push(sec);
-  structChanged(); return sec;
+  commit("add section",()=>{ project.structure=project.structure||[]; project.structure.push(sec); structChanged(); });
+  return sec;
 }
 function lyrHasSections(){ return (typeof lyricsState!=="undefined") && lyricsState.doc && (lyricsState.doc.sections||[]).length>0; }
 function structFromLyrBtn(){ const b=document.createElement("button"); b.id="structFromLyrBtn"; b.className="struct-act-btn"; b.textContent="↑ from lyrics"; b.title="Infer the song structure from the lyric sections ([Verse 1], [Chorus], [guitar solo]…)"; b.addEventListener("click",()=>structFromLyrics()); return b; }
@@ -5925,8 +6036,8 @@ function structChanged(){ growToStructure(); syncStructureToLyrics(); renderTime
   Object.keys(SECTION_TYPES).forEach(k=>{ const o=document.createElement("option"); o.value=k; o.textContent=SECTION_TYPES[k].label; type.appendChild(o); });
   const save=()=>{ if(!structEditSec) return; structEditSec.type=type.value; structEditSec.bars=clamp(parseInt(bars.value)||4,1,128); structChanged(); };
   type.addEventListener("change",save); bars.addEventListener("change",save);
-  document.getElementById("structSave").addEventListener("click",()=>{ save(); pop.style.display="none"; });
-  document.getElementById("structDel").addEventListener("click",()=>{ if(!structEditSec) return; project.structure=(project.structure||[]).filter(s=>s!==structEditSec); structEditSec=null; pop.style.display="none"; structChanged(); });
+  document.getElementById("structSave").addEventListener("click",()=>{ commit("edit section",()=>save()); pop.style.display="none"; });
+  document.getElementById("structDel").addEventListener("click",()=>{ if(!structEditSec) return; commit("delete section",()=>{ project.structure=(project.structure||[]).filter(s=>s!==structEditSec); structEditSec=null; structChanged(); }); pop.style.display="none"; });
   const btns=document.getElementById("structAddBtns");
   Object.keys(SECTION_TYPES).forEach(k=>{ const b=document.createElement("button"); b.className="mini"; b.textContent=SECTION_TYPES[k].label; b.style.borderLeft="3px solid "+SECTION_TYPES[k].color; b.addEventListener("click",()=>{ const sec=structAdd(k); menu.style.display="none"; const blk=[...tlLanes.querySelectorAll(".struct-seg")].find(x=>x._sec===sec); if(blk) openStructPopup(sec,blk); }); btns.appendChild(b); });
   document.addEventListener("mousedown",(e)=>{ if(pop.style.display!=="none" && !pop.contains(e.target) && !(e.target.closest&&e.target.closest(".struct-seg"))) pop.style.display="none"; if(menu.style.display!=="none" && !menu.contains(e.target) && !(e.target.closest&&e.target.closest(".struct-head"))) menu.style.display="none"; });
@@ -6481,9 +6592,9 @@ function midiToggleRec(){
   const roll=document.getElementById("midiRoll");
   const lx=(e)=>{ const r=roll.getBoundingClientRect(); return { x:e.clientX-r.left, y:e.clientY-r.top }; };
   const beatAt=(x)=>Math.max(0,(x-MR.GUT)/MR.BEAT_PX), midiAt=(y)=>MR.HI-Math.floor(y/MR.ROW_H);
-  let drag=null, marqEl=null;
+  let drag=null, marqEl=null, editBefore=null;   // editBefore: pre-gesture snapshot for undo (recorded only if notes change)
   roll.addEventListener("mousedown",(e)=>{
-    if(!midiEd) return; e.preventDefault(); const nEl=e.target.closest(".mr-note"), p=lx(e);
+    if(!midiEd) return; e.preventDefault(); editBefore=beginEdit(); const nEl=e.target.closest(".mr-note"), p=lx(e);
     if(nEl){
       const i=+nEl.dataset.i;
       if(e.target.classList.contains("mr-rz")){ if(!midiEd.sel.has(i)){midiEd.sel.clear();midiEd.sel.add(i);} drag={mode:"resize",i}; }
@@ -6511,13 +6622,13 @@ function midiToggleRec(){
     }
   });
   document.addEventListener("mouseup",(e)=>{
-    if(!drag||!midiEd){ drag=null; return; }
+    if(!drag||!midiEd){ drag=null; editBefore=null; return; }
     if(drag.mode==="maybe"){ const beat=midiSnapBeat(beatAt(drag.sx)), midi=midiSnapPitch(midiAt(drag.sy), midiSnapBeat(beatAt(drag.sx))), dur=midiSnapUnit();
       if(midi>=MR.LO&&midi<=MR.HI&&beat<midiLenBeats()){ const vel=100;   // new notes start at 100; shape per-note in the Velocity controller lane
-        midiEd.clip.notes.push({midi,beat,dur,vel}); midiEd.sel=new Set([midiEd.clip.notes.length-1]); playNoteAt(midi,getCtx().currentTime+0.01,0.3); renderMidiRoll(); scheduleAutosave(); } }
-    else if(drag.mode==="marquee"){ if(marqEl){ marqEl.remove(); marqEl=null; } renderMidiRoll(); }
-    else if(drag.mode==="move"||drag.mode==="resize"){ scheduleAutosave(); renderMidiRoll(); }
-    drag=null;
+        midiEd.clip.notes.push({midi,beat,dur,vel}); midiEd.sel=new Set([midiEd.clip.notes.length-1]); playNoteAt(midi,getCtx().currentTime+0.01,0.3); renderMidiRoll(); scheduleAutosave(); endEdit("add note", editBefore); } }
+    else if(drag.mode==="marquee"){ if(marqEl){ marqEl.remove(); marqEl=null; } renderMidiRoll(); }   // selection only — not recorded
+    else if(drag.mode==="move"||drag.mode==="resize"){ scheduleAutosave(); renderMidiRoll(); endEdit(drag.mode==="resize"?"resize note":"move notes", editBefore); }
+    drag=null; editBefore=null;
   });
   // control lane (velocity bars or CC/bend automation points)
   const lane=document.getElementById("midiCtrlLane"); let velDrag=null, ccDrag=null;
@@ -6539,8 +6650,8 @@ function midiToggleRec(){
   document.getElementById("midiModal").addEventListener("mousedown",(e)=>{ if(e.target.id==="midiModal") closeMidiEditor(); });
   document.getElementById("midiPlay").addEventListener("click",()=>{ if(midiEd) midiEd.playing?midiStopPlay():midiStartPlay(); });
   document.getElementById("midiRecBtn").addEventListener("click",midiToggleRec);
-  document.getElementById("midiClear").addEventListener("click",()=>{ if(midiEd&&confirm("Remove all notes from this clip?")){ midiEd.clip.notes=[]; midiEd.sel.clear(); renderMidiRoll(); scheduleAutosave(); } });
-  document.getElementById("midiQuant").addEventListener("click",()=>{ if(!midiEd) return; const idx=midiEd.sel.size?[...midiEd.sel]:midiEd.clip.notes.map((_,i)=>i); idx.forEach(i=>midiEd.clip.notes[i].beat=midiSnapBeat(midiEd.clip.notes[i].beat)); renderMidiRoll(); scheduleAutosave(); });
+  document.getElementById("midiClear").addEventListener("click",()=>{ if(midiEd&&confirm("Remove all notes from this clip?")) commit("clear notes",()=>{ midiEd.clip.notes=[]; midiEd.sel.clear(); renderMidiRoll(); scheduleAutosave(); }); });
+  document.getElementById("midiQuant").addEventListener("click",()=>{ if(!midiEd) return; commit("quantize notes",()=>{ const idx=midiEd.sel.size?[...midiEd.sel]:midiEd.clip.notes.map((_,i)=>i); idx.forEach(i=>midiEd.clip.notes[i].beat=midiSnapBeat(midiEd.clip.notes[i].beat)); renderMidiRoll(); scheduleAutosave(); }); });
   document.getElementById("midiBars").addEventListener("change",(e)=>{ if(!midiEd) return; midiEd.clip.lengthBeats=clamp(parseInt(e.target.value)||2,1,256)*beatsPerBar(); renderMidiRoll(); });
   document.getElementById("midiFxBtn").addEventListener("click",()=>{ if(midiEd) openFxModal(midiEd.track); });
   document.getElementById("midiAddKeyBtn").addEventListener("click",midiAddKeyChange);
@@ -6561,11 +6672,15 @@ function midiToggleRec(){
     if(e.key==="ArrowUp"||e.key==="ArrowDown"||e.key==="ArrowLeft"||e.key==="ArrowRight"){
       if(!midiEd.sel.size) return;   // nothing selected → let ↑/↓ bubble to the keyboard octave switch
       const notes=midiEd.clip.notes, sel=[...midiEd.sel];
-      if(e.key==="ArrowUp"||e.key==="ArrowDown"){ const d=(e.key==="ArrowUp"?1:-1)*(e.shiftKey?12:1); sel.forEach(i=>notes[i].midi=clamp(notes[i].midi+d,0,127)); }
-      else { const d=(e.key==="ArrowRight"?1:-1)*midiSnapUnit(); sel.forEach(i=>notes[i].beat=Math.max(0,notes[i].beat+d)); }
-      e.preventDefault(); e.stopPropagation(); renderMidiRoll(); scheduleAutosave(); return;
+      e.preventDefault(); e.stopPropagation();
+      commit("nudge notes",()=>{
+        if(e.key==="ArrowUp"||e.key==="ArrowDown"){ const d=(e.key==="ArrowUp"?1:-1)*(e.shiftKey?12:1); sel.forEach(i=>notes[i].midi=clamp(notes[i].midi+d,0,127)); }
+        else { const d=(e.key==="ArrowRight"?1:-1)*midiSnapUnit(); sel.forEach(i=>notes[i].beat=Math.max(0,notes[i].beat+d)); }
+        renderMidiRoll(); scheduleAutosave();
+      });
+      return;
     }
-    if(e.key==="Delete"||e.key==="Backspace"){ if(midiEd.sel.size){ midiEd.clip.notes=midiEd.clip.notes.filter((_,i)=>!midiEd.sel.has(i)); midiEd.sel.clear(); e.preventDefault(); e.stopPropagation(); renderMidiRoll(); scheduleAutosave(); } return; }
+    if(e.key==="Delete"||e.key==="Backspace"){ if(midiEd.sel.size){ e.preventDefault(); e.stopPropagation(); commit("delete notes",()=>{ midiEd.clip.notes=midiEd.clip.notes.filter((_,i)=>!midiEd.sel.has(i)); midiEd.sel.clear(); renderMidiRoll(); scheduleAutosave(); }); } return; }
     // other keys (letters) fall through → the QWERTY handler plays/records the note
   });
 })();
@@ -6588,7 +6703,7 @@ function openArpClip(t,c){
 document.getElementById("synthEditBtn").addEventListener("click",()=>{ setArpEditTarget(null); openSynthModal(); });   // general open = build a NEW arp layer
 document.getElementById("synthModalClose").addEventListener("click",closeSynthModal);
 document.getElementById("synthModal").addEventListener("mousedown",(e)=>{ if(e.target.id==="synthModal") closeSynthModal(); });
-document.getElementById("midiNewBtn").addEventListener("click",()=>{ const t=addTrack("midi"); const clip={ id:++clipSeq, start:0, lengthBeats:beatsPerBar()*2, notes:[], cc:{bend:[],mod:[],expr:[],sustain:[]}, loopFill:false }; addClip(t,clip); openMidiEditor(t,clip); });
+document.getElementById("midiNewBtn").addEventListener("click",()=>commit("add MIDI layer",()=>{ const t=addTrack("midi"); const clip={ id:++clipSeq, start:0, lengthBeats:beatsPerBar()*2, notes:[], cc:{bend:[],mod:[],expr:[],sustain:[]}, loopFill:false }; addClip(t,clip); openMidiEditor(t,clip); }));
 document.getElementById("midiEditBtn").addEventListener("click",()=>{ const t=project.tracks.find(x=>x.type==="midi"); if(!t||!t.clips.length){ alert('No MIDI layers yet — click "＋ New MIDI layer".'); return; } openMidiEditor(t,t.clips[0]); });
 // mini piano-roll preview of every layer of a type (arp layers for Synth, MIDI clips for MIDI — clickable)
 function renderInstViz(containerId, type){
@@ -6645,12 +6760,14 @@ function midiLibPreview(pat, btn){
   if(btn){ btn.classList.add("playing"); setTimeout(()=>btn.classList.remove("playing"), r.lengthBeats*bu*1000+150); }
 }
 function midiLibAdd(pat){
-  if(!midiEd) return; const bpb=beatsPerBar(), r=renderPattern(pat, currentScaleSet().root, bpb), ns=midiEd.clip.notes;
-  let insBeat=0; if(ns.length){ const end=Math.max(...ns.map(n=>(n.beat||0)+(n.dur||1))); insBeat=Math.ceil(end/bpb)*bpb; }
-  r.notes.forEach(n=>ns.push({ midi:n.midi, beat:insBeat+n.beat, dur:n.dur, vel:n.vel }));
-  const need=insBeat+r.lengthBeats; if((midiEd.clip.lengthBeats||0)<need) midiEd.clip.lengthBeats=Math.ceil(need/bpb)*bpb;
-  populateMidiBars();
-  renderMidiRoll(); scheduleAutosave();
+  if(!midiEd) return; commit("add pattern",()=>{
+    const bpb=beatsPerBar(), r=renderPattern(pat, currentScaleSet().root, bpb), ns=midiEd.clip.notes;
+    let insBeat=0; if(ns.length){ const end=Math.max(...ns.map(n=>(n.beat||0)+(n.dur||1))); insBeat=Math.ceil(end/bpb)*bpb; }
+    r.notes.forEach(n=>ns.push({ midi:n.midi, beat:insBeat+n.beat, dur:n.dur, vel:n.vel }));
+    const need=insBeat+r.lengthBeats; if((midiEd.clip.lengthBeats||0)<need) midiEd.clip.lengthBeats=Math.ceil(need/bpb)*bpb;
+    populateMidiBars();
+    renderMidiRoll(); scheduleAutosave();
+  });
 }
 (function wireMidiLib(){
   const sel=document.getElementById("midiLibGenre"); if(!sel) return;

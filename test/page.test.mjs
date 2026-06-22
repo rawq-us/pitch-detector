@@ -46,6 +46,8 @@ test("required element ids exist in the markup", () => {
     // generate-backing modal (Roadmap item 4)
     "backingBtn","backingModal","backingClose","backProg","backMemoSel","backAiRoot","backAiMode",
     "backAiBars","backAiStyle","backPad","backBass","backArp","backDrums","backFeel","backBars","backingRun","backingStatus",
+    // undo/redo toolbar (Roadmap item 1)
+    "undoBtn","redoBtn",
     // settings modal (canonical API-key editor)
     "settingsBtn","settingsModal","settingsSave","settingsTest","settingsClear","settingsStatus",
     // memo editor
@@ -92,6 +94,8 @@ test("core functions the tests and features depend on are present", () => {
     "parseProgression","chordQualityFromSuffix","voiceProgression",
     "chordsToProgression","backingDrumPattern","buildBacking","buildBackingPrompt",
     "backingSrc","backingMemos","materializeBacking","runBacking","openBackingModal",
+    // undo/redo (Roadmap item 1)
+    "makeHistory","commit","beginEdit","endEdit","undoEdit","redoEdit","snapshotProject","restoreProject","snapClip","snapTrack","updateUndoUI",
     "midiEditorSetKey","syncSynthKeySel","fillKeySelect",
     "timelineKeys","clipKeySpan","renderKeyChips","nearestInScale","midiSnapPitch",
     "keySegmentsInClip","renderMidiKeyRuler","midiAddKeyChange","midiZoom","cloneVoice",
