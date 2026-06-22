@@ -346,6 +346,28 @@ Three complaints from tuning an actual guitar, three fixes:
   the tone, click it again (or change tuning / close the modal) to silence it; the `.playing` card stays lit
   while it sounds.
 
+## 69. Track automation lanes — volume + pan (Roadmap item 8, v1.36.0)
+Per-track timeline automation, gated behind a head toggle, kept to a few core params.
+- **Scope: volume + pan** (the acceptance params). `track.automation = { volume:[{beat,val}], pan:[...] }`,
+  piecewise-linear. Cutoff is deferred — the per-track chain has no master filter, and adding one to
+  every chain wasn't worth the CPU/risk this pass (the serializer already tolerates a `cutoff` key for
+  when it lands).
+- **Engine (DOM-free, tested):** `automationValueAt(points, beat, dflt)` interpolates linearly, holds
+  edge values outside the range, tolerates unsorted points, and returns the default for an empty lane
+  (so absent automation is a true no-op). `serializeAutomation` prunes empty lanes → `undefined` (clean
+  sessions, no FORMAT bump).
+- **Two apply paths.** Live: `applyLiveAutomation(posSec)` runs each transport tick, setting
+  `chain.level.gain.value = fx.level × vol(beat)` and `chain.pan.pan.value = pan(beat)` — follows the
+  playhead and loops naturally; `transportStop` releases the override back to the static fader/centre.
+  Offline: `renderMix` schedules the points as `linearRampToValueAtTime` curves on each chain's
+  `level`/`pan` params, so the bounce matches playback. `buildTrackChain` gained a `StereoPanner`
+  (transparent at 0) for the pan tap. Verified: a 1→0 volume ramp reads ×0.5 at its midpoint live, and
+  the offline bounce renders cleanly.
+- **UI:** a head "Auto" button cycles off → volume → pan; when on, an SVG overlay on the clip lane shows
+  the curve with draggable point handles — click empty to add, drag to shape, right-click to delete.
+  Every edit (add/move/delete) routes through `commit()` so it's undoable. Automation persists via
+  serialize/load and snapshot. Tests: test/automation.test.mjs (5; 84 total).
+
 ## 68. Per-track + master level meters (Roadmap item 7, v1.35.0)
 Live feedback, not a console — a slim meter per track head plus a master meter in the transport row.
 - **Tap, don't rewire.** `buildTrackChain` gained an `AnalyserNode` (`fftSize 256`) fed from the chain's

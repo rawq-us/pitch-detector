@@ -104,6 +104,8 @@ test("core functions the tests and features depend on are present", () => {
     "diatonicChords","triadQuality","romanFor","suggestChords","suggestProgression","voiceLead","progressionToText","chordSuffix",
     // level meters (Roadmap item 7)
     "analyserRms","analyserPeak","linToDb","dbToFrac","meterFrac","readLevel","drawMeters",
+    // track automation (Roadmap item 8)
+    "automationValueAt","serializeAutomation","applyLiveAutomation","buildAutomationOverlay",
     "midiEditorSetKey","syncSynthKeySel","fillKeySelect",
     "timelineKeys","clipKeySpan","renderKeyChips","nearestInScale","midiSnapPitch",
     "keySegmentsInClip","renderMidiKeyRuler","midiAddKeyChange","midiZoom","cloneVoice",

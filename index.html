@@ -1454,7 +1454,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.35.0";
+const APP_VERSION="1.36.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -1554,15 +1554,36 @@ function analyserPeak(buf){ if(!buf||!buf.length) return 0; let p=0; for(let i=0
 function linToDb(lin){ return lin>1e-6 ? 20*Math.log10(lin) : -120; }
 function dbToFrac(db, floorDb){ floorDb=floorDb||-60; return clamp((db-floorDb)/(0-floorDb), 0, 1); }
 function meterFrac(lin, floorDb){ return dbToFrac(linToDb(lin), floorDb); }
+/* ===== Track automation — piecewise-linear value at a beat (Roadmap item 8) =====
+   Points are [{beat,val}] sorted by beat. Before the first point holds the first value, after the
+   last holds the last, between points interpolates linearly. Empty → the default (no effect). */
+function automationValueAt(points, beat, dflt){
+  if(!points||!points.length) return dflt;
+  const p=points.slice().sort((a,b)=>a.beat-b.beat);
+  if(beat<=p[0].beat) return p[0].val;
+  if(beat>=p[p.length-1].beat) return p[p.length-1].val;
+  for(let i=0;i<p.length-1;i++){ const a=p[i], b=p[i+1]; if(beat>=a.beat && beat<=b.beat){ const t=(beat-a.beat)/((b.beat-a.beat)||1); return a.val+(b.val-a.val)*t; } }
+  return p[p.length-1].val;
+}
+// Deep-copy a track's automation, or undefined when there's nothing to store (keeps sessions clean,
+// no FORMAT bump needed since an absent/empty map is a no-op).
+function serializeAutomation(a){
+  if(!a) return undefined;
+  const o={}; let any=false;
+  ["volume","pan","cutoff"].forEach(k=>{ if(a[k]&&a[k].length){ o[k]=a[k].map(pt=>({beat:pt.beat, val:pt.val})); any=true; } });
+  return any?o:undefined;
+}
 // A per-track insert chain: input -> mute -> level -> drive -> chorus -> phaser -> delay -> reverb -> comp -> output
 const FX_FACTORIES = { drive:fxDrive, chorus:fxChorus, phaser:fxPhaser, delay:fxDelay, reverb:fxReverb, comp:fxComp };
 function buildTrackChain(ctx, fx){
   const input=ctx.createGain(), mute=ctx.createGain(), level=ctx.createGain(); input.connect(mute); mute.connect(level);
   let prev=level; const modules={};
   FX_KEYS.forEach(k=>{ modules[k]=FX_FACTORIES[k](ctx); prev.connect(modules[k].node.input); prev=modules[k].node.output; });
-  // level-meter tap on the final output (after mute → reads silent when muted/un-soloed, so it's mute/solo-aware)
+  // stereo panner for pan automation (transparent at 0); then the level-meter tap on the final output
+  // (after mute → reads silent when muted/un-soloed, so the meter is mute/solo-aware)
+  const pan=ctx.createStereoPanner(); prev.connect(pan); prev=pan;
   const meter=ctx.createAnalyser(); meter.fftSize=256; meter.smoothingTimeConstant=0.6; prev.connect(meter);
-  const chain={ input, output:prev, level, mute, meter, modules, apply(){ level.gain.value=fx.level; FX_KEYS.forEach(k=>modules[k].apply(fx[k])); } };
+  const chain={ input, output:prev, level, mute, pan, meter, modules, apply(){ level.gain.value=fx.level; FX_KEYS.forEach(k=>modules[k].apply(fx[k])); } };
   chain.apply(); return chain;
 }
 function ensureTrackChain(track){ if(!audioCtx||!masterGain) return null; if(!track._chain){ track._chain=buildTrackChain(audioCtx, track.fx); track._chain.output.connect(masterGain); track._chain.mute.gain.value=trackAudible(track)?1:0; } return track._chain; }
@@ -2832,6 +2853,7 @@ function renderTimeline(){
     // every action is a consistent chip button; icon-only only where the icon is unambiguous (🗑)
     const mkBtn=(txt,title,cls,fn)=>{ const b=document.createElement("button"); b.className="thd-btn"+(cls?" "+cls:""); b.textContent=txt; b.title=title; b.addEventListener("click",(e)=>{ e.stopPropagation(); fn(); }); acts.appendChild(b); return b; };
     mkBtn("FX","Track FX & level","",()=>openFxModal(track));
+    mkBtn(track._autoParam?("◆ "+AUTO_PARAMS[track._autoParam].label):"Auto", "Automation lane — click to cycle off → volume → pan, then click the lane to add points (drag to shape, right-click to delete)", track._autoParam?"on":"", ()=>{ track._autoParam = track._autoParam==="volume"?"pan":(track._autoParam==="pan"?null:"volume"); renderTimeline(); });
     mkBtn("M", track.muted?"Muted — click to unmute":"Mute this layer", "mute"+(track.muted?" on":""), ()=>commit(track.muted?"unmute layer":"mute layer",()=>{ track.muted=!track.muted; applyTrackMuteSolo(); renderTimeline(); scheduleAutosave(); }));
     mkBtn("S", track.soloed?"Soloed — click to unsolo":"Solo this layer (silences the others)", "solo"+(track.soloed?" on":""), ()=>commit(track.soloed?"unsolo layer":"solo layer",()=>{ track.soloed=!track.soloed; applyTrackMuteSolo(); renderTimeline(); scheduleAutosave(); }));
     if (track.type==="voice"||track.type==="memo"){
@@ -2880,6 +2902,7 @@ function renderTimeline(){
       el.addEventListener("contextmenu",(e)=>{ e.preventDefault(); const laneRect=lane.getBoundingClientRect(); const atSec=snapSec((e.clientX-laneRect.left-originPx())/PX_PER_SEC); selectClip(track,clip); openClipMenu(track,clip,e.clientX,e.clientY,atSec); });
       lane.appendChild(el);
     });
+    if (track._autoParam) buildAutomationOverlay(lane, track, track._autoParam);
     if (memoRec && memoRec.track===track){
       const g=document.createElement("div"); g.className="tl-recghost"; g.id="memoRecGhost";
       g.style.left=(origin+memoRec.startSec*PX_PER_SEC)+"px"; g.style.width="4px"; g.textContent="● rec";
@@ -2985,6 +3008,31 @@ window.addEventListener("pointermove",(e)=>{
   rsz.moved=true; renderTimeline();
 });
 window.addEventListener("pointerup",()=>{ if(rsz && rsz.moved) endEdit("resize clip", rsz.before); rsz=null; });
+
+/* ---- track automation lane overlay (item 8): draw/edit volume·pan points over the clip lane ---- */
+const AUTO_PARAMS = { volume:{min:0,max:1.2,dflt:1,color:"#2be36b",label:"Vol"}, pan:{min:-1,max:1,dflt:0,color:"#6ea8fe",label:"Pan"} };
+function buildAutomationOverlay(lane, track, param){
+  const cfg=AUTO_PARAMS[param]; if(!cfg) return;
+  track.automation=track.automation||{}; const pts=track.automation[param]=track.automation[param]||[];
+  const H=56, bu=beatUnitSec(), NS="http://www.w3.org/2000/svg";
+  const xOf=b=>originPx()+b*bu*PX_PER_SEC, yOf=v=>1+ (H-2)*(1-(v-cfg.min)/(cfg.max-cfg.min));
+  const bOf=x=>Math.max(0,(x-originPx())/PX_PER_SEC/bu), vOf=y=>clamp(cfg.min+(1-(y-1)/(H-2))*(cfg.max-cfg.min),cfg.min,cfg.max);
+  const svg=document.createElementNS(NS,"svg"); svg.setAttribute("class","auto-overlay"); svg.style.cssText="position:absolute;left:0;top:0;height:100%;width:"+(originPx()+project.lengthSec*PX_PER_SEC)+"px;z-index:6;cursor:crosshair;";
+  const sorted=pts.slice().sort((a,b)=>a.beat-b.beat), xN=originPx()+project.lengthSec*PX_PER_SEC;
+  if(sorted.length){
+    let d="M 0 "+yOf(sorted[0].val); sorted.forEach(p=>{ d+=" L "+xOf(p.beat)+" "+yOf(p.val); }); d+=" L "+xN+" "+yOf(sorted[sorted.length-1].val);
+    const poly=document.createElementNS(NS,"path"); poly.setAttribute("d",d); poly.setAttribute("fill","none"); poly.setAttribute("stroke",cfg.color); poly.setAttribute("stroke-width","1.5"); poly.setAttribute("opacity","0.9"); svg.appendChild(poly);
+  }
+  sorted.forEach(p=>{ const c=document.createElementNS(NS,"circle"); c.setAttribute("cx",xOf(p.beat)); c.setAttribute("cy",yOf(p.val)); c.setAttribute("r","5"); c.setAttribute("fill",cfg.color);
+    c.addEventListener("pointerdown",(e)=>{ e.preventDefault(); e.stopPropagation(); const before=beginEdit(); let moved=false;
+      const mv=(ev)=>{ const r=lane.getBoundingClientRect(); p.beat=Math.max(0,bOf(ev.clientX-r.left)); p.val=vOf(ev.clientY-r.top); moved=true; renderTimeline(); };
+      const up=()=>{ window.removeEventListener("pointermove",mv); window.removeEventListener("pointerup",up); if(moved) endEdit("edit automation", before); };
+      window.addEventListener("pointermove",mv); window.addEventListener("pointerup",up); });
+    c.addEventListener("contextmenu",(e)=>{ e.preventDefault(); e.stopPropagation(); commit("delete automation point",()=>{ const i=pts.indexOf(p); if(i>=0) pts.splice(i,1); renderTimeline(); }); });
+    svg.appendChild(c); });
+  svg.addEventListener("pointerdown",(e)=>{ if(e.target!==svg) return; const r=lane.getBoundingClientRect(); commit("add automation point",()=>{ pts.push({beat:Math.max(0,bOf(e.clientX-r.left)), val:vOf(e.clientY-r.top)}); renderTimeline(); }); });
+  lane.appendChild(svg);
+}
 
 /* cycle region select on the ruler */
 let loopDrag=null;
@@ -3110,6 +3158,7 @@ function transportTick(){
   } else {
     if (!project.loopEnabled && elapsed>=transport.loopLen){ transportStop(); return; }
     const pos=transport.loopStart + (elapsed % transport.loopLen);
+    applyLiveAutomation(pos);
     positionPlayhead(pos);
     if (typeof lyrFollowTick==="function") lyrFollowTick(pos);
     if (typeof keyFollowTick==="function") keyFollowTick(pos);
@@ -3130,7 +3179,17 @@ function transportStop(){
   // audio clips (voice/memo) are long-running buffer sources — kill any that are still sounding
   transport.srcs.forEach(s=>{ try { s.onended=null; s.stop(); } catch(_){} });
   transport.srcs.clear();
+  // release any automation override back to the static fader/centre so a stopped track sits at its set level
+  project.tracks.forEach(t=>{ const ch=t._chain; if(!ch) return; if(t.automation&&t.automation.volume&&t.automation.volume.length) ch.level.gain.value=(t.fx||fxDefaults()).level; if(ch.pan && t.automation&&t.automation.pan&&t.automation.pan.length) ch.pan.pan.value=0; });
   playBtn.textContent="▶ Play"; playBtn.classList.add("primary"); playBtn.classList.remove("danger");
+}
+// Follow the playhead: drive each automated track's level/pan from its lane (live transport only).
+function applyLiveAutomation(posSec){
+  const beat=posSec/beatUnitSec();
+  for(const t of project.tracks){ const ch=t._chain, a=t.automation; if(!ch||!a) continue;
+    if(a.volume&&a.volume.length) ch.level.gain.value=((t.fx||fxDefaults()).level)*automationValueAt(a.volume, beat, 1);
+    if(a.pan&&a.pan.length&&ch.pan) ch.pan.pan.value=clamp(automationValueAt(a.pan, beat, 0), -1, 1);
+  }
 }
 
 /* ============================== Timeline controls ============================== */
@@ -4692,6 +4751,11 @@ async function renderMix(trackFilter, applyMasterEq, respectMuteSolo){
   // per-track insert chains
   const chains=new Map();
   for (const tr of project.tracks){ if (!pass(tr)) continue; const ch=buildTrackChain(octx, tr.fx||fxDefaults()); ch.output.connect(master); chains.set(tr, ch); }
+  // schedule track automation as param ramps across the bounce (empty automation schedules nothing → identical render)
+  { const bu=beatUnitSec(); for (const [tr,ch] of chains){ const a=tr.automation; if(!a) continue;
+    if(a.volume&&a.volume.length){ const base=(tr.fx||fxDefaults()).level, pts=a.volume.slice().sort((x,y)=>x.beat-y.beat); ch.level.gain.setValueAtTime(base*pts[0].val,0); pts.forEach(p=>ch.level.gain.linearRampToValueAtTime(base*p.val, Math.max(0,p.beat*bu))); }
+    if(a.pan&&a.pan.length&&ch.pan){ const pts=a.pan.slice().sort((x,y)=>x.beat-y.beat); ch.pan.pan.setValueAtTime(clamp(pts[0].val,-1,1),0); pts.forEach(p=>ch.pan.pan.linearRampToValueAtTime(clamp(p.val,-1,1), Math.max(0,p.beat*bu))); }
+  } }
   // decode voice blobs into the offline context
   const vbuf={};
   for (const tr of project.tracks){ if (tr.type!=="voice"&&tr.type!=="memo") continue; if (!pass(tr)) continue; for (const clip of tr.clips){ if (!clip.blob) continue; const b=await decodeBlob(clip.blob, octx); if (b) vbuf[clip.id]=b; } }
@@ -4963,7 +5027,7 @@ function serializeProject(){
     lyrics: (typeof lyrSource!=="undefined" && lyrSource) ? { source: lyrSource.value, lineBeats: (lyricsState&&lyricsState.lineBeats)||[] } : undefined,
     tracks: project.tracks.map(function(t){
       return {
-        type: t.type, name: t.name, transpose: t.transpose||0, meter: t.meter||undefined, muted: !!t.muted, soloed: !!t.soloed, fx: JSON.parse(JSON.stringify(t.fx||fxDefaults())), synth: t.synth?cloneVoice(t.synth):undefined,
+        type: t.type, name: t.name, transpose: t.transpose||0, meter: t.meter||undefined, muted: !!t.muted, soloed: !!t.soloed, fx: JSON.parse(JSON.stringify(t.fx||fxDefaults())), synth: t.synth?cloneVoice(t.synth):undefined, automation: serializeAutomation(t.automation),
         clips: t.clips.map(function(c){
           if (t.type === "arp") return { start:c.start, lengthBeats:c.lengthBeats, loopFill:!!c.loopFill, rate:c.rate, wave:c.wave, steps:c.steps.map(s=>({...s})) };
           if (t.type === "midi") return { start:c.start, lengthBeats:c.lengthBeats, loopFill:!!c.loopFill, notes:(c.notes||[]).map(n=>({...n})), cc: c.cc?JSON.parse(JSON.stringify(c.cc)):undefined };
@@ -5002,7 +5066,7 @@ function loadProject(data){
   project.keyMap=(data.keyMap||[]).map(r=>({ beat:+r.beat||0, root:((+r.root||0)%12+12)%12, mode:r.mode||"ionian" }));
   project.structure=(data.structure||[]).map(s=>({ id:++structSeq, type:s.type, beat:+s.beat||0, bars:Math.max(1,+s.bars||4) }));
   project.samplerKit.forEach(p=>{ if (p&&p.blob) padsToDecode.push(p); });
-  (data.tracks||[]).forEach(t=>{ const tr={id:++trackSeq,type:t.type,name:t.name,clips:[],fx:mergeFx(t.fx),transpose:t.transpose||0,meter:t.meter||undefined,muted:!!t.muted,soloed:!!t.soloed}; if(t.type==="midi") tr.synth=t.synth?cloneVoice(t.synth):cloneVoice(GLOBAL_VOICE);
+  (data.tracks||[]).forEach(t=>{ const tr={id:++trackSeq,type:t.type,name:t.name,clips:[],fx:mergeFx(t.fx),transpose:t.transpose||0,meter:t.meter||undefined,muted:!!t.muted,soloed:!!t.soloed,automation:serializeAutomation(t.automation)}; if(t.type==="midi") tr.synth=t.synth?cloneVoice(t.synth):cloneVoice(GLOBAL_VOICE);
     (t.clips||[]).forEach(c=>{ const clip={id:++clipSeq,start:c.start,lengthBeats:c.lengthBeats,loopFill:!!c.loopFill}; if (t.type==="arp"){ clip.rate=c.rate; clip.wave=c.wave; clip.steps=(c.steps||[]).map(s=>({...s})); } else if (t.type==="midi"){ clip.notes=(c.notes||[]).map(n=>({...n})); clip.cc=c.cc?JSON.parse(JSON.stringify(c.cc)):undefined; } else if (t.type==="sampler"){ clip.kind=c.kind||"grid"; if (clip.kind==="loop"){ clip.pad=c.pad||0; clip.off=c.off||0; } else { clip.grid=(c.grid||[]).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } } else if (t.type==="voice"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if(c.offset) clip.offset=c.offset; if(c.length!=null) clip.length=c.length; if (clip.blob) toDecode.push(clip); } else if (t.type==="memo"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if(c.offset) clip.offset=c.offset; if(c.length!=null) clip.length=c.length; clip.analysis=c.analysis||null; clip.lyricsText=c.lyricsText||""; clip.lyricsWords=c.lyricsWords||null; clip.analysisKey=c.analysisKey||"auto"; clip.lyricsLang=c.lyricsLang||null; if (clip.blob) toDecode.push(clip); } else { clip.grid=(c.grid||DRUMS.map(()=>new Array(16).fill(false))).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } tr.clips.push(clip); }); project.tracks.push(tr); });
   selectedTrackId=project.tracks[0]?.id||null;
   project.tracks.forEach(ensureTrackChain); applyTrackMuteSolo();
@@ -5037,7 +5101,7 @@ function snapClip(type, c){
   return o;
 }
 function snapTrack(t){
-  const o={ id:t.id, type:t.type, name:t.name, transpose:t.transpose||0, meter:t.meter, muted:!!t.muted, soloed:!!t.soloed, fx:JSON.parse(JSON.stringify(t.fx||fxDefaults())), clips:t.clips.map(c=>snapClip(t.type,c)) };
+  const o={ id:t.id, type:t.type, name:t.name, transpose:t.transpose||0, meter:t.meter, muted:!!t.muted, soloed:!!t.soloed, fx:JSON.parse(JSON.stringify(t.fx||fxDefaults())), automation:serializeAutomation(t.automation), clips:t.clips.map(c=>snapClip(t.type,c)) };
   if(t.synth) o.synth=cloneVoice(t.synth);
   return o;
 }
@@ -5058,7 +5122,7 @@ function restoreProject(snap){
   project.keyMap=(snap.keyMap||[]).map(r=>({...r}));
   project.structure=(snap.structure||[]).map(s=>({...s}));
   project.tracks=snap.tracks.map(t=>{
-    const tr={ id:t.id, type:t.type, name:t.name, transpose:t.transpose||0, meter:t.meter, muted:!!t.muted, soloed:!!t.soloed, fx:mergeFx(t.fx), clips:t.clips.map(c=>snapClip(t.type,c)) };
+    const tr={ id:t.id, type:t.type, name:t.name, transpose:t.transpose||0, meter:t.meter, muted:!!t.muted, soloed:!!t.soloed, fx:mergeFx(t.fx), automation:serializeAutomation(t.automation), clips:t.clips.map(c=>snapClip(t.type,c)) };
     if(t.type==="midi") tr.synth=t.synth?cloneVoice(t.synth):cloneVoice(GLOBAL_VOICE);
     return tr;
   });
