@@ -621,8 +621,14 @@
   .tl-clip:active { cursor: grabbing; }
   .tl-clip .ctitle { font-weight: 700; pointer-events: none; }
   .tl-clip .cmeta { opacity: 0.85; pointer-events: none; font-size: 10px; }
-  .tl-clip .cdel { position: absolute; top: 2px; right: 5px; font-size: 11px; opacity: 0.7; cursor: pointer; }
+  .tl-clip .cdel { position: absolute; top: 2px; right: 5px; font-size: 11px; opacity: 0.7; cursor: pointer; z-index: 4; }
   .tl-clip .cdel:hover { opacity: 1; }
+  .tl-clip .cresize { position: absolute; top: 0; right: 0; width: 7px; height: 100%; cursor: ew-resize; z-index: 4; }
+  .tl-clip .cresize:hover { background: rgba(255,255,255,0.25); }
+  .tl-clip.sel { outline: 2px solid var(--accent, #6ea8fe); outline-offset: -1px; }
+  .clip-menu { position: fixed; z-index: 200; background: #1b1f2a; border: 1px solid var(--border, #333); border-radius: 8px; padding: 4px; display: flex; flex-direction: column; min-width: 150px; box-shadow: 0 8px 28px rgba(0,0,0,0.5); }
+  .clip-menu button { background: transparent; border: 0; color: var(--text, #e8e8ea); text-align: left; padding: 7px 10px; font-size: 12px; border-radius: 5px; cursor: pointer; }
+  .clip-menu button:hover { background: rgba(255,255,255,0.08); }
   .tl-clip .cloop { position: absolute; bottom: 3px; right: 4px; font-size: 10px; background: rgba(0,0,0,0.4); border-radius: 5px; padding: 1px 5px; cursor: pointer; }
   .tl-clip .cloop:hover { background: rgba(0,0,0,0.7); }
   .tl-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.7); z-index: 5; pointer-events: none; display: none; }
@@ -1442,7 +1448,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.32.0";
+const APP_VERSION="1.33.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -2632,7 +2638,7 @@ function patternSec(track, clip){
 }
 function naturalBeats(track, clip){ return Math.max(1, Math.round(patternSec(track,clip)/beatUnitSec())); }
 function clipDuration(track, clip){
-  if (track.type==="voice"||track.type==="memo") return clip.audioDur||1;
+  if (track.type==="voice"||track.type==="memo") return clip.length!=null ? clip.length : (clip.audioDur||1);
   if (clip.loopFill) return Math.max(patternSec(track,clip), project.lengthSec - clip.start); // ∞: repeat to the end of the session
   return (clip.lengthBeats||naturalBeats(track,clip)) * beatUnitSec();
 }
@@ -2764,12 +2770,16 @@ function renderTimeline(){
         }
         else if (track.type==="midi"){ title="🎹 MIDI"; meta=((clip.notes||[]).length)+" notes — dbl-click"; loopBadge='<div class="cloop">'+(clip.loopFill?'∞ fill':'⟳ '+(clip.lengthBeats||naturalBeats(track,clip)))+'</div>'; }
         else { title="🎙 Voice"; meta=(clip.audioDur||0).toFixed(1)+"s"+(clip.buffer?"":" …"); }
-        el.innerHTML='<div class="ctitle">'+title+'</div><div class="cmeta">'+meta+'</div><div class="cdel">✕</div>'+loopBadge;
+        el.innerHTML='<div class="ctitle">'+title+'</div><div class="cmeta">'+meta+'</div><div class="cdel">✕</div><div class="cresize" title="Drag the edge to resize"></div>'+loopBadge;
         const lb=el.querySelector(".cloop"); if (lb) lb.addEventListener("click",(e)=>{ e.stopPropagation(); openLoopPopup(track, clip, e.target); });
+        const rh=el.querySelector(".cresize"); if (rh) attachClipResize(rh, track, clip, lane);
         if (track.type==="midi") el.addEventListener("dblclick",(e)=>{ e.stopPropagation(); openMidiEditor(track, clip); });
       }
       el.querySelector(".cdel").addEventListener("click",(e)=>{ e.stopPropagation(); commit("delete clip",()=>{ track.clips=track.clips.filter(c=>c.id!==clip.id); renderTimeline(); }); });
       attachClipDrag(el, track, clip, lane);
+      if(selectedClip && selectedClip.trackId===track.id && selectedClip.clipId===clip.id) el.classList.add("sel");
+      el.addEventListener("click",(e)=>{ if(e.target.classList.contains("cdel")||e.target.classList.contains("cloop")||e.target.classList.contains("cresize")) return; selectClip(track,clip); });
+      el.addEventListener("contextmenu",(e)=>{ e.preventDefault(); const laneRect=lane.getBoundingClientRect(); const atSec=snapSec((e.clientX-laneRect.left-originPx())/PX_PER_SEC); selectClip(track,clip); openClipMenu(track,clip,e.clientX,e.clientY,atSec); });
       lane.appendChild(el);
     });
     if (memoRec && memoRec.track===track){
@@ -2789,7 +2799,7 @@ function fmtBars(sec){ const bu=beatUnitSec(), bpb=beatsPerBar(); const beats=se
 let drag=null;
 function attachClipDrag(el, track, clip, lane){
   el.addEventListener("pointerdown",(e)=>{
-    if (e.target.classList.contains("cdel") || e.target.classList.contains("cloop") || e.target.classList.contains("m-edit")) return;
+    if (e.target.classList.contains("cdel") || e.target.classList.contains("cloop") || e.target.classList.contains("cresize") || e.target.classList.contains("m-edit")) return;
     e.preventDefault();
     const laneRect=lane.getBoundingClientRect();
     drag={ clip, track, grabDx: e.clientX - (laneRect.left + originPx() + clip.start*PX_PER_SEC), lane, before:beginEdit(), moved:false };
@@ -2805,6 +2815,78 @@ window.addEventListener("pointermove",(e)=>{
   if (sec !== drag.clip.start){ drag.clip.start = sec; drag.moved=true; renderTimeline(); }
 });
 window.addEventListener("pointerup",()=>{ if (drag && drag.moved) endEdit("move clip", drag.before); drag=null; });
+
+/* ---- clip selection · context actions · edge-resize (item 2) ---- */
+let selectedClip=null;   // {trackId, clipId} of the clip last clicked (for keyboard ops)
+function clipLenBeats(track, clip){ return clip.lengthBeats||naturalBeats(track,clip); }
+function selClipRefs(){ const t=project.tracks.find(t=>selectedClip&&t.id===selectedClip.trackId); const c=t&&t.clips.find(c=>c.id===selectedClip.clipId); return t&&c?{track:t,clip:c}:null; }
+function selectClip(track, clip){ selectedClip={ trackId:track.id, clipId:clip.id }; selectedTrackId=track.id; renderTimeline(); }
+function duplicateClip(track, clip){
+  commit("duplicate clip", ()=>{
+    const d=cloneClipData(track.type, clip); d.id=++clipSeq; d.start=snapSec(clip.start+clipDuration(track,clip));
+    track.clips.push(d); selectedClip={trackId:track.id,clipId:d.id}; growIfNeeded(track,d); renderTimeline(); scheduleAutosave();
+  });
+}
+function copyClip(track, clip){ clipboard={ type:track.type, data:cloneClipData(track.type, clip) }; if(typeof statusEl!=="undefined"&&statusEl) statusEl.textContent="Clip copied — paste into a "+track.type+" track."; }
+function pasteClipAt(track, sec){
+  if(!clipboard || !track || track.type!==clipboard.type){ if(typeof statusEl!=="undefined"&&statusEl) statusEl.textContent=clipboard?("Select a "+clipboard.type+" track to paste into."):"Nothing copied."; return false; }
+  commit("paste clip", ()=>{
+    const d=cloneClipData(clipboard.type, clipboard.data); d.id=++clipSeq; d.start=snapSec(Math.max(0,sec));
+    track.clips.push(d); selectedClip={trackId:track.id,clipId:d.id}; growIfNeeded(track,d); renderTimeline(); scheduleAutosave();
+  });
+  return true;
+}
+function splitClipAt(track, clip, atSec){
+  const local=atSec-clip.start;
+  if(track.type==="midi"){
+    const bu=beatUnitSec(), atBeat=local/bu, lenB=clipLenBeats(track,clip), parts=splitClipData("midi", clip, atBeat, lenB);
+    if(!parts){ if(typeof statusEl!=="undefined"&&statusEl) statusEl.textContent="Click inside the clip to split."; return; }
+    commit("split clip", ()=>{
+      const idx=track.clips.indexOf(clip); if(idx<0) return;
+      const L={...parts.left, id:clip.id, start:clip.start}, R={...parts.right, id:++clipSeq, start:snapSec(clip.start+atBeat*bu)};
+      track.clips.splice(idx,1,L,R);
+      if(typeof midiEd!=="undefined"&&midiEd&&midiEd.clip===clip){ midiEd.clip=L; }   // keep an open editor pointed at the head
+      renderTimeline(); scheduleAutosave();
+    });
+  } else if(track.type==="voice"||track.type==="memo"){
+    const total=clipDuration(track,clip);
+    if(!(local>0.02 && local<total-0.02)){ if(typeof statusEl!=="undefined"&&statusEl) statusEl.textContent="Click inside the clip to split."; return; }
+    commit("split clip", ()=>{
+      const off=clip.offset||0;
+      const R={ ...cloneClipData(track.type, clip), id:++clipSeq, start:snapSec(clip.start+local), offset:off+local, length:total-local };
+      clip.length=local; track.clips.push(R); renderTimeline(); scheduleAutosave();
+    });
+  } else if(typeof statusEl!=="undefined"&&statusEl) statusEl.textContent="Split supports MIDI and audio clips.";
+}
+let clipMenuEl=null;
+function closeClipMenu(){ if(clipMenuEl){ clipMenuEl.remove(); clipMenuEl=null; } }
+function openClipMenu(track, clip, x, y, atSec){
+  closeClipMenu();
+  const m=document.createElement("div"); m.className="clip-menu"; clipMenuEl=m;
+  const add=(label,fn)=>{ const b=document.createElement("button"); b.textContent=label; b.addEventListener("click",(e)=>{ e.stopPropagation(); closeClipMenu(); fn(); }); m.appendChild(b); };
+  if(track.type==="midi"||track.type==="voice"||track.type==="memo") add("✂ Split here", ()=>splitClipAt(track, clip, atSec));
+  add("⧉ Duplicate", ()=>duplicateClip(track, clip));
+  add("📋 Copy", ()=>copyClip(track, clip));
+  if(clipboard && clipboard.type===track.type) add("📎 Paste here", ()=>pasteClipAt(track, atSec));
+  add("🗑 Delete", ()=>commit("delete clip",()=>{ track.clips=track.clips.filter(c=>c.id!==clip.id); renderTimeline(); }));
+  document.body.appendChild(m);
+  m.style.left=Math.min(x, window.innerWidth-170)+"px"; m.style.top=Math.min(y, window.innerHeight-m.offsetHeight-8)+"px";
+}
+window.addEventListener("pointerdown",(e)=>{ if(clipMenuEl && !clipMenuEl.contains(e.target)) closeClipMenu(); }, true);
+// right-edge resize: event clips change lengthBeats (snap to beat); audio clips trim their play length
+let rsz=null;
+function attachClipResize(handle, track, clip, lane){
+  handle.addEventListener("pointerdown",(e)=>{ e.preventDefault(); e.stopPropagation(); rsz={ track, clip, lane, before:beginEdit(), moved:false }; handle.setPointerCapture?.(e.pointerId); });
+}
+window.addEventListener("pointermove",(e)=>{
+  if(!rsz) return;
+  const laneRect=rsz.lane.getBoundingClientRect();
+  let durSec=(e.clientX-laneRect.left-originPx())/PX_PER_SEC - rsz.clip.start;
+  if(rsz.track.type==="voice"||rsz.track.type==="memo"){ const max=(rsz.clip.audioDur||1)-(rsz.clip.offset||0); durSec=clamp(durSec,0.1,max); rsz.clip.length=durSec; }
+  else { const bu=beatUnitSec(); rsz.clip.lengthBeats=Math.max(1,Math.round(durSec/bu)); rsz.clip.loopFill=false; }
+  rsz.moved=true; renderTimeline();
+});
+window.addEventListener("pointerup",()=>{ if(rsz && rsz.moved) endEdit("resize clip", rsz.before); rsz=null; });
 
 /* cycle region select on the ruler */
 let loopDrag=null;
@@ -2861,7 +2943,7 @@ function forEachClipEvent(cb){
   const spq=quarterSec();
   for (const tr of project.tracks){
     for (const clip of tr.clips){
-      if (tr.type==="voice"||tr.type==="memo"){ if (clip.buffer || clip.blob) cb({ kind:"voice", time:clip.start, clip, track:tr }); continue; }
+      if (tr.type==="voice"||tr.type==="memo"){ if (clip.buffer || clip.blob) cb({ kind:"voice", time:clip.start, clip, track:tr, aoff:clip.offset||0, alen:clipDuration(tr,clip) }); continue; }
       if (tr.type==="sampler"){
         const clipDur=clipDuration(tr,clip);
         samplerClipEvents(clip, { stepSec:spq/4, clipDur, patSec:patternSec(tr,clip), clipStart:clip.start })
@@ -2887,7 +2969,7 @@ function forEachClipEvent(cb){
 }
 function buildEvents(){
   const start=project.loop.start, end=project.loop.end, evs=[];
-  forEachClipEvent(ev=>{ if (ev.time>=start && ev.time<end){ if (ev.kind==="voice") evs.push({ t:ev.time-start, kind:"voice", buffer:ev.clip.buffer, track:ev.track }); else evs.push({ t:ev.time-start, kind:ev.kind, midi:ev.midi, dur:ev.dur, wave:ev.wave, drum:ev.drum, pad:ev.pad, loop:ev.loop, off:ev.off, track:ev.track }); } });
+  forEachClipEvent(ev=>{ if (ev.time>=start && ev.time<end){ if (ev.kind==="voice") evs.push({ t:ev.time-start, kind:"voice", buffer:ev.clip.buffer, aoff:ev.aoff, alen:ev.alen, track:ev.track }); else evs.push({ t:ev.time-start, kind:ev.kind, midi:ev.midi, dur:ev.dur, wave:ev.wave, drum:ev.drum, pad:ev.pad, loop:ev.loop, off:ev.off, track:ev.track }); } });
   evs.sort((a,b)=>a.t-b.t);
   transport.events=evs; transport.loopStart=start; transport.loopLen=Math.max(0.1, end-start);
 }
@@ -2915,7 +2997,7 @@ function transportScheduler(){
       const tr=(e.track&&e.track.type==="arp")?(e.track.transpose||0):0;
       if (e.kind==="note"){ const m=e.midi+tr, gp=transport._glidePrev||(transport._glidePrev=new Map()); playNoteAt(m,evCtx,e.dur,e.wave,ctx,dest,gp.get(e.track), e.track&&e.track.synth); gp.set(e.track,m); }
       else if (e.kind==="drum") playDrumAt(e.drum,evCtx,semiToRate(e.off),ctx,dest);
-      else if (e.kind==="voice" && e.buffer){ const s=ctx.createBufferSource(); s.buffer=e.buffer; s.connect(dest); s.onended=()=>transport.srcs.delete(s); transport.srcs.add(s); s.start(evCtx); }
+      else if (e.kind==="voice" && e.buffer){ const s=ctx.createBufferSource(); s.buffer=e.buffer; s.connect(dest); s.onended=()=>transport.srcs.delete(s); transport.srcs.add(s); if(e.alen!=null) s.start(evCtx, e.aoff||0, e.alen); else s.start(evCtx, e.aoff||0); }
       else if (e.kind==="sample"){ const pad=project.samplerKit&&project.samplerKit[e.pad]; if (pad&&pad.buffer){ const s=ctx.createBufferSource(); s.buffer=pad.buffer; if (e.loop) s.loop=true; if (e.off) s.playbackRate.value=semiToRate(e.off); const g=ctx.createGain(); g.gain.value=(pad.gain==null?1:pad.gain); s.connect(g); g.connect(dest); s.onended=()=>transport.srcs.delete(s); transport.srcs.add(s); s.start(evCtx); if (e.loop && e.dur) s.stop(evCtx+e.dur); } }
     }
     transport.evIdx++;
@@ -2937,6 +3019,11 @@ function transportTick(){
   transport.raf=requestAnimationFrame(transportTick);
 }
 function positionPlayhead(pos){ if (pos==null){ if (!transport.playing){ tlPlayhead.style.display="none"; return; } pos=transport.loopStart; } tlPlayhead.style.left=(originPx()+pos*PX_PER_SEC)+"px"; }
+// Current insertion point in timeline seconds: the live playhead while playing, else the cycle-region start.
+function playheadSec(){
+  if(transport.playing){ const ctx=getCtx(), elapsed=ctx.currentTime-transport.musicCtx; if(elapsed>=0) return transport.loopStart + (elapsed % transport.loopLen); }
+  return (project.loop&&project.loop.start)||0;
+}
 function transportStop(){
   transport.playing=false;
   if (transport.timer) clearInterval(transport.timer); if (transport.raf) cancelAnimationFrame(transport.raf);
@@ -4517,7 +4604,7 @@ async function renderMix(trackFilter, applyMasterEq, respectMuteSolo){
     const tr=(ev.track.type==="arp")?(ev.track.transpose||0):0;
     if (ev.kind==="note"){ const m=ev.midi+tr; playNoteAt(m, ev.time, ev.dur, ev.wave, octx, dest, glidePrev.get(ev.track), ev.track&&ev.track.synth); glidePrev.set(ev.track, m); }
     else if (ev.kind==="drum") playDrumAt(ev.drum, ev.time, semiToRate(ev.off), octx, dest);
-    else if (ev.kind==="voice"){ const b=vbuf[ev.clip.id]; if (b){ const s=octx.createBufferSource(); s.buffer=b; s.connect(dest); s.start(ev.time); } }
+    else if (ev.kind==="voice"){ const b=vbuf[ev.clip.id]; if (b){ const s=octx.createBufferSource(); s.buffer=b; s.connect(dest); if(ev.alen!=null) s.start(ev.time, ev.aoff||0, ev.alen); else s.start(ev.time, ev.aoff||0); } }
     else if (ev.kind==="sample"){ const pad=project.samplerKit&&project.samplerKit[ev.pad]; if (pad&&pad.buffer){ const s=octx.createBufferSource(); s.buffer=pad.buffer; if (ev.loop) s.loop=true; if (ev.off) s.playbackRate.value=semiToRate(ev.off); const g=octx.createGain(); g.gain.value=(pad.gain==null?1:pad.gain); s.connect(g); g.connect(dest); s.start(ev.time); if (ev.loop && ev.dur) s.stop(ev.time+ev.dur); } }
   });
   return await octx.startRendering();
@@ -4785,8 +4872,8 @@ function serializeProject(){
           if (t.type === "sampler"){ return c.kind==="loop"
             ? { start:c.start, lengthBeats:c.lengthBeats, loopFill:!!c.loopFill, kind:"loop", pad:c.pad, off:c.off||0 }
             : { start:c.start, lengthBeats:c.lengthBeats, loopFill:!!c.loopFill, kind:"grid", grid:(c.grid||[]).map(r=>r.slice()), pitch:c.pitch?{...c.pitch}:undefined }; }
-          if (t.type === "voice") return { start:c.start, audioDur:c.audioDur, blob:c.blob };
-          if (t.type === "memo") return { start:c.start, audioDur:c.audioDur, blob:c.blob,
+          if (t.type === "voice") return { start:c.start, audioDur:c.audioDur, blob:c.blob, offset:c.offset||undefined, length:c.length!=null?c.length:undefined };
+          if (t.type === "memo") return { start:c.start, audioDur:c.audioDur, blob:c.blob, offset:c.offset||undefined, length:c.length!=null?c.length:undefined,
             analysis: c.analysis?JSON.parse(JSON.stringify(c.analysis)):null,
             lyricsText: c.lyricsText||"", lyricsWords: c.lyricsWords?JSON.parse(JSON.stringify(c.lyricsWords)):null,
             analysisKey: c.analysisKey||"auto", lyricsLang: c.lyricsLang||null };
@@ -4818,7 +4905,7 @@ function loadProject(data){
   project.structure=(data.structure||[]).map(s=>({ id:++structSeq, type:s.type, beat:+s.beat||0, bars:Math.max(1,+s.bars||4) }));
   project.samplerKit.forEach(p=>{ if (p&&p.blob) padsToDecode.push(p); });
   (data.tracks||[]).forEach(t=>{ const tr={id:++trackSeq,type:t.type,name:t.name,clips:[],fx:mergeFx(t.fx),transpose:t.transpose||0,meter:t.meter||undefined,muted:!!t.muted,soloed:!!t.soloed}; if(t.type==="midi") tr.synth=t.synth?cloneVoice(t.synth):cloneVoice(GLOBAL_VOICE);
-    (t.clips||[]).forEach(c=>{ const clip={id:++clipSeq,start:c.start,lengthBeats:c.lengthBeats,loopFill:!!c.loopFill}; if (t.type==="arp"){ clip.rate=c.rate; clip.wave=c.wave; clip.steps=(c.steps||[]).map(s=>({...s})); } else if (t.type==="midi"){ clip.notes=(c.notes||[]).map(n=>({...n})); clip.cc=c.cc?JSON.parse(JSON.stringify(c.cc)):undefined; } else if (t.type==="sampler"){ clip.kind=c.kind||"grid"; if (clip.kind==="loop"){ clip.pad=c.pad||0; clip.off=c.off||0; } else { clip.grid=(c.grid||[]).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } } else if (t.type==="voice"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if (clip.blob) toDecode.push(clip); } else if (t.type==="memo"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; clip.analysis=c.analysis||null; clip.lyricsText=c.lyricsText||""; clip.lyricsWords=c.lyricsWords||null; clip.analysisKey=c.analysisKey||"auto"; clip.lyricsLang=c.lyricsLang||null; if (clip.blob) toDecode.push(clip); } else { clip.grid=(c.grid||DRUMS.map(()=>new Array(16).fill(false))).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } tr.clips.push(clip); }); project.tracks.push(tr); });
+    (t.clips||[]).forEach(c=>{ const clip={id:++clipSeq,start:c.start,lengthBeats:c.lengthBeats,loopFill:!!c.loopFill}; if (t.type==="arp"){ clip.rate=c.rate; clip.wave=c.wave; clip.steps=(c.steps||[]).map(s=>({...s})); } else if (t.type==="midi"){ clip.notes=(c.notes||[]).map(n=>({...n})); clip.cc=c.cc?JSON.parse(JSON.stringify(c.cc)):undefined; } else if (t.type==="sampler"){ clip.kind=c.kind||"grid"; if (clip.kind==="loop"){ clip.pad=c.pad||0; clip.off=c.off||0; } else { clip.grid=(c.grid||[]).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } } else if (t.type==="voice"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if(c.offset) clip.offset=c.offset; if(c.length!=null) clip.length=c.length; if (clip.blob) toDecode.push(clip); } else if (t.type==="memo"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if(c.offset) clip.offset=c.offset; if(c.length!=null) clip.length=c.length; clip.analysis=c.analysis||null; clip.lyricsText=c.lyricsText||""; clip.lyricsWords=c.lyricsWords||null; clip.analysisKey=c.analysisKey||"auto"; clip.lyricsLang=c.lyricsLang||null; if (clip.blob) toDecode.push(clip); } else { clip.grid=(c.grid||DRUMS.map(()=>new Array(16).fill(false))).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } tr.clips.push(clip); }); project.tracks.push(tr); });
   selectedTrackId=project.tracks[0]?.id||null;
   project.tracks.forEach(ensureTrackChain); applyTrackMuteSolo();
   if (data.layout && typeof applySectionLayout==="function"){ applySectionLayout(data.layout); saveLayout(); }
@@ -4846,8 +4933,8 @@ function snapClip(type, c){
   if(type==="arp"){ o.rate=c.rate; o.wave=c.wave; o.steps=(c.steps||[]).map(s=>({...s})); }
   else if(type==="midi"){ o.notes=(c.notes||[]).map(n=>({...n})); o.cc=c.cc?JSON.parse(JSON.stringify(c.cc)):undefined; }
   else if(type==="sampler"){ o.kind=c.kind||"grid"; if(o.kind==="loop"){ o.pad=c.pad; o.off=c.off||0; } else { o.grid=(c.grid||[]).map(r=>r.slice()); o.pitch=c.pitch?{...c.pitch}:undefined; } }
-  else if(type==="voice"){ o.audioDur=c.audioDur; }
-  else if(type==="memo"){ o.audioDur=c.audioDur; o.analysis=c.analysis?JSON.parse(JSON.stringify(c.analysis)):null; o.lyricsText=c.lyricsText||""; o.lyricsWords=c.lyricsWords?JSON.parse(JSON.stringify(c.lyricsWords)):null; o.analysisKey=c.analysisKey||"auto"; o.lyricsLang=c.lyricsLang||null; }
+  else if(type==="voice"){ o.audioDur=c.audioDur; if(c.offset) o.offset=c.offset; if(c.length!=null) o.length=c.length; }
+  else if(type==="memo"){ o.audioDur=c.audioDur; if(c.offset) o.offset=c.offset; if(c.length!=null) o.length=c.length; o.analysis=c.analysis?JSON.parse(JSON.stringify(c.analysis)):null; o.lyricsText=c.lyricsText||""; o.lyricsWords=c.lyricsWords?JSON.parse(JSON.stringify(c.lyricsWords)):null; o.analysisKey=c.analysisKey||"auto"; o.lyricsLang=c.lyricsLang||null; }
   else { o.grid=(c.grid||[]).map(r=>r.slice()); o.pitch=c.pitch?{...c.pitch}:undefined; }
   return o;
 }
@@ -4943,6 +5030,47 @@ window.addEventListener("keydown",(e)=>{
 });
 document.getElementById("undoBtn").addEventListener("click",undoEdit);
 document.getElementById("redoBtn").addEventListener("click",redoEdit);
+// timeline clip shortcuts (⌘D duplicate · ⌘C copy · ⌘V paste) — the MIDI editor owns the keyboard while open
+window.addEventListener("keydown",(e)=>{
+  if(typeof midiEd!=="undefined" && midiEd) return;
+  const t=e.target, tag=t&&t.tagName; if(tag==="INPUT"||tag==="TEXTAREA"||(t&&t.isContentEditable)) return;
+  if(!(e.metaKey||e.ctrlKey) || e.shiftKey) return;
+  const k=(e.key||"").toLowerCase();
+  if(k==="d"){ const r=selClipRefs(); if(r){ e.preventDefault(); duplicateClip(r.track,r.clip); } }
+  else if(k==="c"){ const r=selClipRefs(); if(r){ e.preventDefault(); copyClip(r.track,r.clip); } }
+  else if(k==="v"){ if(clipboard){ e.preventDefault(); pasteClipAt(project.tracks.find(t=>t.id===selectedTrackId), playheadSec()); } }
+});
+
+/* ===== Clip editing — split · duplicate · copy/paste · edge-resize (Roadmap item 2) =====
+   DOM-free model ops on the in-memory clip shape; the UI (context menu / keys / edge drag) routes
+   them through commit(). Audio clips gain offset/length (seconds into the buffer), honored by both
+   the live scheduler and the offline bounce; event clips adjust notes / lengthBeats. */
+let clipboard=null;   // { type, data } — a cloned clip payload, paste-able onto any matching track
+function cloneClipData(type, c){ const o=snapClip(type, c); delete o.id; delete o.start; return o; }
+// Partition MIDI notes at a beat. A note straddling the cut is split — head stays (clamped to the
+// cut), tail starts the right clip at beat 0. Returns {left, right} (right rebased to 0).
+function splitMidiNotes(notes, atBeat){
+  const left=[], right=[];
+  (notes||[]).forEach(n=>{
+    const b=n.beat||0, d=n.dur||0, end=b+d;
+    if(end<=atBeat+1e-6) left.push({...n});
+    else if(b>=atBeat-1e-6) right.push({...n, beat:b-atBeat});
+    else { left.push({...n, dur:atBeat-b}); right.push({...n, beat:0, dur:end-atBeat}); }
+  });
+  return { left, right };
+}
+// Split a MIDI clip at a local beat (0 < atBeat < lenBeats) → {left, right} payloads (no id/start),
+// or null if it can't be split. Audio clips are split inline in the UI (offset/length arithmetic);
+// arp/beat/sampler clips loop a pattern, so splitting them isn't meaningful.
+function splitClipData(type, c, atBeat, lenBeats){
+  if(type!=="midi") return null;
+  if(!(atBeat>1e-6) || !(atBeat<lenBeats-1e-6)) return null;
+  const parts=splitMidiNotes(c.notes, atBeat);
+  const L=cloneClipData("midi",c), R=cloneClipData("midi",c);
+  L.notes=parts.left;  L.lengthBeats=atBeat;
+  R.notes=parts.right; R.lengthBeats=lenBeats-atBeat;
+  return { left:L, right:R };
+}
 
 // id given → overwrite that session (Save); id null → create a new one (Save As). Resolves the id.
 async function saveSession(label, desc, data, id){ const db=await openDB(); const rec={ label, description:desc||"", version:FORMAT_VERSION, savedAt:Date.now(), data: data||serializeProject() }; if(id!=null) rec.id=id; return new Promise((res,rej)=>{ const tx=db.transaction(STORE,"readwrite"); const st=tx.objectStore(STORE); const req=(id!=null)?st.put(rec):st.add(rec); req.onsuccess=()=>res(req.result); tx.onerror=()=>rej(tx.error); }); }

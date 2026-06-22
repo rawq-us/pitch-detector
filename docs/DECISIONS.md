@@ -346,6 +346,28 @@ Three complaints from tuning an actual guitar, three fixes:
   the tone, click it again (or change tuning / close the modal) to silence it; the `.playing` card stays lit
   while it sounds.
 
+## 66. Clip editing — split · duplicate · copy/paste · edge-resize (Roadmap item 2, v1.33.0)
+Operates on the in-memory clip model; every op routes through item-1 `commit()` so it's undoable.
+- **DOM-free core (tested):** `splitMidiNotes(notes, atBeat)` partitions notes around a cut, splitting
+  any straddling note into a clamped head + a rebased tail; `splitClipData` wraps it into two MIDI
+  clip payloads; `cloneClipData` deep-copies a clip's editable payload (sharing `buffer`/`blob` by
+  reference, dropping id/start) — built on the undo `snapClip` cloner.
+- **Audio clips gain `offset`/`length` (seconds into the buffer).** This is the buffer-offset render
+  path the roadmap called for: `clipDuration` honors `length`; `forEachClipEvent` emits `aoff`/`alen`
+  on voice events; both the live scheduler (`transportScheduler`) and the **offline bounce**
+  (`renderMix`) call `bufferSource.start(when, offset, duration)`. An untrimmed clip passes
+  `offset 0, duration audioDur` → identical to before. Splitting an audio clip is pure offset/length
+  arithmetic (no PCM copied); verified a 6 s clip splits into 0–2.5 s / 2.5–6 s halves sharing one buffer.
+- **UX:** click selects a clip (outline); right-click opens a context menu (Split here · Duplicate ·
+  Copy · Paste here · Delete) acting at the click point; ⌘D/⌘C/⌘V act on the selection (gated off
+  while the MIDI editor owns the keyboard); a right-edge `.cresize` handle drags to change `lengthBeats`
+  (event clips, snaps to beat, clears loop-fill) or `length` (audio trim). Paste lands on the
+  selected same-type track at the playhead (`playheadSec()` = live head while playing, else cycle start).
+- **Split keeps an open MIDI editor valid** by repointing `midiEd.clip` to the head half (the left
+  reuses the original clip id). Offset/length persist via serialize/load and snapshot (undo).
+- Split is offered for MIDI + audio only — arp/beat/sampler clips loop a pattern, so a positional cut
+  isn't meaningful (they're resized/duplicated instead). Tests: test/clipedit.test.mjs (5; 67 total).
+
 ## 65. Undo / redo — scoped snapshot command stack (Roadmap item 1, v1.32.0)
 A single `commit(label, doFn)` envelope snapshots before a mutation, runs it, and records the
 before-state; `undoEdit`/`redoEdit` swap snapshots. ⌘Z / ⇧⌘Z + a toolbar ↶/↷ (disabled-state +

@@ -96,6 +96,8 @@ test("core functions the tests and features depend on are present", () => {
     "backingSrc","backingMemos","materializeBacking","runBacking","openBackingModal",
     // undo/redo (Roadmap item 1)
     "makeHistory","commit","beginEdit","endEdit","undoEdit","redoEdit","snapshotProject","restoreProject","snapClip","snapTrack","updateUndoUI",
+    // clip editing (Roadmap item 2)
+    "cloneClipData","splitMidiNotes","splitClipData","duplicateClip","copyClip","pasteClipAt","splitClipAt","openClipMenu","attachClipResize","playheadSec","selectClip",
     "midiEditorSetKey","syncSynthKeySel","fillKeySelect",
     "timelineKeys","clipKeySpan","renderKeyChips","nearestInScale","midiSnapPitch",
     "keySegmentsInClip","renderMidiKeyRuler","midiAddKeyChange","midiZoom","cloneVoice",
