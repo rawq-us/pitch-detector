@@ -1127,7 +1127,7 @@
       </div>
     </div>
     <div class="group" id="backTypedRow"><label for="backProg">Progression <span class="dim">— e.g. <code>A C#m F#m D</code> · <code>Am, G, F</code> · <code>Cmaj7 | Dm7 | G7</code></span></label>
-      <input id="backProg" type="text" placeholder="A C#m F#m D" style="width:100%"></div>
+      <div class="tr-row" style="gap:6px"><input id="backProg" type="text" placeholder="A C#m F#m D" style="flex:1"><button id="backSuggest" class="mini" title="Suggest a diatonic progression in the session key (harmony assistant)">✨ Suggest</button></div></div>
     <div class="group" id="backMemoRow" style="display:none"><label for="backMemoSel">Memo</label>
       <select id="backMemoSel" style="width:100%"></select></div>
     <div id="backAiRow" style="display:none">
@@ -1448,17 +1448,14 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.33.0";
+const APP_VERSION="1.34.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
 /* ============================== Music theory ============================== */
 const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 const A4 = 440, A4_MIDI = 69;
-const SCALES = {
-  ionian:[0,2,4,5,7,9,11], dorian:[0,2,3,5,7,9,10], phrygian:[0,1,3,5,7,8,10],
-  lydian:[0,2,4,6,7,9,11], mixolydian:[0,2,4,5,7,9,10], aeolian:[0,2,3,5,7,8,10], locrian:[0,1,3,5,6,8,10],
-};
+const SCALES = { ionian:[0,2,4,5,7,9,11], dorian:[0,2,3,5,7,9,10], phrygian:[0,1,3,5,7,8,10], lydian:[0,2,4,6,7,9,11], mixolydian:[0,2,4,5,7,9,10], aeolian:[0,2,3,5,7,8,10], locrian:[0,1,3,5,6,8,10] };
 const MODE_COLORS = { ionian:"#2dd4bf", dorian:"#818cf8", phrygian:"#f472b6", lydian:"#a3e635", mixolydian:"#fbbf24", aeolian:"#38bdf8", locrian:"#fb7185" };
 const midiToFreq = (m) => A4 * Math.pow(2, (m - A4_MIDI) / 12);
 const freqToMidiFloat = (f) => 69 + 12 * Math.log2(f / A4);
@@ -1970,6 +1967,90 @@ function buildBackingPrompt(ctx){
   return "Key: "+key+" "+mode+". Bars: "+bars+"."+(style?(" Style: "+style+".") : "")
     + " Return a "+bars+"-chord progression as JSON only.";
 }
+/* ===== Harmony assistant — mode-aware chord suggestions + voice leading (Roadmap item 5) =====
+   Pure theory (DOM-free, tested): diatonic chords of a mode with Roman numerals, next-chord
+   suggestions from functional tendencies (+ optional borrowed / secondary-dominant colour), a
+   whole-progression generator, and minimal-motion voice leading. Feeds the backing generator. */
+const ROMAN_BASE = ["I","II","III","IV","V","VI","VII"];
+function triadQuality(thirdIv, fifthIv){
+  if(thirdIv===4 && fifthIv===7) return "maj";
+  if(thirdIv===3 && fifthIv===7) return "min";
+  if(thirdIv===3 && fifthIv===6) return "dim";
+  if(thirdIv===4 && fifthIv===8) return "aug";
+  return "maj";
+}
+function romanFor(degree, quality){
+  let r=ROMAN_BASE[degree%7];
+  if(quality==="min"||quality==="dim") r=r.toLowerCase();
+  if(quality==="dim") r+="°"; else if(quality==="aug") r+="+";
+  return r;
+}
+// Diatonic triads of (root, mode): one per scale degree → {degree, root pc, quality, roman}.
+function diatonicChords(root, mode){
+  const sc=SCALES[mode]||SCALES.ionian, out=[];
+  for(let d=0; d<7; d++){
+    const r=(root+sc[d])%12;
+    const third=((sc[(d+2)%7]-sc[d])+12)%12, fifth=((sc[(d+4)%7]-sc[d])+12)%12;
+    const q=triadQuality(third, fifth);
+    out.push({ degree:d, root:((r%12)+12)%12, quality:q, roman:romanFor(d,q) });
+  }
+  return out;
+}
+// Functional next-chord tendencies keyed by the last chord's scale degree (0=tonic). Ranked by strength.
+const HARMONY_TENDENCY = { 0:[[4,"sets up an authentic cadence"],[3,"opens the subdominant area"],[5,"deceptive turn to the relative"],[1,"pre-dominant lift"]], 1:[[4,"ii→V, the classic pre-dominant"],[6,"softer pre-dominant"]], 2:[[5,"iii→vi, descending fifths"],[3,"iii→IV, a stepwise lift"]], 3:[[4,"IV→V, builds the tension"],[0,"plagal 'amen' resolution"],[1,"IV→ii, deepen the pre-dominant"]], 4:[[0,"V→I, the authentic cadence"],[5,"deceptive V→vi"]], 5:[[3,"vi→IV, the pop turnaround"],[1,"vi→ii, descending fifths"],[4,"vi→V, restart the tension"]], 6:[[0,"vii°→I, leading-tone resolution"]] };
+// Rank next-chord candidates after `prev` (array of {root,quality}). opts.borrow adds parallel-mode
+// chords; opts.secondaryDominants adds V7/x. Returns [{root,quality,roman,rationale,score,...}] best-first.
+function suggestChords(root, mode, prev, opts){
+  opts=opts||{}; root=(((root%12)+12)%12);
+  const dia=diatonicChords(root, mode), out=[];
+  const last=(prev&&prev.length)?prev[prev.length-1]:null;
+  let lastDeg=null; if(last){ const i=dia.findIndex(c=>c.root===(((last.root%12)+12)%12)); if(i>=0) lastDeg=i; }
+  const push=(deg,why,score)=>{ const c=dia[((deg%7)+7)%7]; out.push({ root:c.root, quality:c.quality, roman:c.roman, rationale:why, score }); };
+  if(lastDeg==null){ [[0,"tonic — home base",10],[4,"dominant — pulls home",8],[3,"subdominant — open, stable",7],[5,"relative colour",6]].forEach(a=>push(a[0],a[1],a[2])); }
+  else {
+    const t=HARMONY_TENDENCY[lastDeg]||[];
+    t.forEach((p,i)=>push(p[0],p[1],10-i));
+    if(lastDeg!==0 && !t.some(p=>p[0]===0)) push(0,"return home to the tonic",3);
+  }
+  if(opts.borrow){
+    const parallel=(mode==="ionian")?"aeolian":(mode==="aeolian"?"ionian":"ionian");
+    diatonicChords(root, parallel).forEach(c=>{ if(!dia.some(d=>d.root===c.root&&d.quality===c.quality)) out.push({ root:c.root, quality:c.quality, roman:"("+c.roman+")", rationale:"borrowed from parallel "+(MODE_LABEL[parallel]||parallel), score:2, borrowed:true }); });
+  }
+  if(opts.secondaryDominants){
+    dia.forEach((c,d)=>{ if(d===0||c.quality==="dim") return; const vroot=(c.root+7)%12; out.push({ root:vroot, quality:"dom7", roman:"V7/"+ROMAN_BASE[d], rationale:"secondary dominant — tonicizes "+c.roman, score:1, secondary:true }); });
+  }
+  const best=new Map();
+  out.forEach(o=>{ const k=o.root+":"+o.quality; if(!best.has(k)||best.get(k).score<o.score) best.set(k,o); });
+  return [...best.values()].sort((a,b)=>b.score-a.score);
+}
+// Build an N-chord diatonic progression, starting on the tonic and following the strongest non-repeat
+// tendency each step (deterministic — a sensible default the user can then tweak).
+function suggestProgression(root, mode, bars, opts){
+  bars=Math.max(2, bars||4); const dia=diatonicChords(root, mode);
+  const prog=[{ root:dia[0].root, quality:dia[0].quality }];
+  const key=c=>c.root+":"+c.quality;
+  for(let i=1;i<bars;i++){
+    const cand=suggestChords(root, mode, prog, opts);
+    const recent=new Set(prog.slice(-2).map(key));   // avoid the last two chords → richer motion (e.g. I–V–vi–IV)
+    const pick=cand.find(c=>!recent.has(key(c))) || cand.find(c=>key(c)!==key(prog[prog.length-1])) || cand[0] || dia[0];
+    prog.push({ root:pick.root, quality:pick.quality });
+  }
+  return prog;
+}
+// Minimal-motion voice leading: place each target pitch-class in the octave nearest the previous
+// voicing's centre, so the chord moves with the least total semitone travel.
+function voiceLead(fromMidi, toPCs){
+  const ref=(fromMidi&&fromMidi.length)?fromMidi:[60,64,67];
+  const center=Math.round(ref.reduce((s,m)=>s+m,0)/ref.length);
+  return (toPCs||[]).map(pc=>{ pc=(((pc%12)+12)%12);
+    let m=center-(((center-pc)%12)+12)%12;            // highest note ≤ center with this pc
+    if(Math.abs(m+12-center)<Math.abs(m-center)) m+=12;
+    return m;
+  }).sort((a,b)=>a-b);
+}
+// Quality → the ASCII suffix parseProgression understands, so a suggested progression round-trips to text.
+function chordSuffix(q){ return ({maj:"",min:"m",dim:"dim",aug:"aug",maj7:"maj7",min7:"m7",dom7:"7",sus4:"sus4"})[q]!=null?({maj:"",min:"m",dim:"dim",aug:"aug",maj7:"maj7",min7:"m7",dom7:"7",sus4:"sus4"})[q]:""; }
+function progressionToText(prog){ return (prog||[]).map(c=>NOTE_NAMES[(((c.root%12)+12)%12)]+chordSuffix(c.quality)).join(" "); }
 function globalKey(){ return { root: parseInt(rootSel.value,10)||0, mode: modeSel.value }; }
 function keyMapSorted(){ return (project.keyMap||[]).slice().sort((a,b)=>a.beat-b.beat); }
 function keyAtBeat(beat){ let cur=globalKey(); for (const r of keyMapSorted()){ if (r.beat<=beat+1e-6) cur={root:r.root,mode:r.mode}; else break; } return cur; }
@@ -5385,6 +5466,7 @@ document.getElementById("backingClose").addEventListener("click",closeBackingMod
 document.getElementById("backingModal").addEventListener("click",(e)=>{ if(e.target===document.getElementById("backingModal")) closeBackingModal(); });
 document.querySelectorAll('input[name="backSrc"]').forEach(r=>r.addEventListener("change",backingSyncRows));
 document.getElementById("backAiSettings").addEventListener("click",()=>openSettings());
+document.getElementById("backSuggest").addEventListener("click",()=>{ const k=keyAtBeat(0), n=clamp(parseInt(document.getElementById("backAiBars").value,10)||4,2,8); document.getElementById("backProg").value=progressionToText(suggestProgression(k.root, k.mode, n)); document.querySelector('input[name="backSrc"][value="typed"]').checked=true; backingSyncRows(); });
 document.getElementById("backingRun").addEventListener("click",runBacking);
 
 // ---- Settings modal: the single, canonical editor of ps_ai_cfg (keys live in this browser only) ----

@@ -98,6 +98,8 @@ test("core functions the tests and features depend on are present", () => {
     "makeHistory","commit","beginEdit","endEdit","undoEdit","redoEdit","snapshotProject","restoreProject","snapClip","snapTrack","updateUndoUI",
     // clip editing (Roadmap item 2)
     "cloneClipData","splitMidiNotes","splitClipData","duplicateClip","copyClip","pasteClipAt","splitClipAt","openClipMenu","attachClipResize","playheadSec","selectClip",
+    // harmony assistant (Roadmap item 5)
+    "diatonicChords","triadQuality","romanFor","suggestChords","suggestProgression","voiceLead","progressionToText","chordSuffix",
     "midiEditorSetKey","syncSynthKeySel","fillKeySelect",
     "timelineKeys","clipKeySpan","renderKeyChips","nearestInScale","midiSnapPitch",
     "keySegmentsInClip","renderMidiKeyRuler","midiAddKeyChange","midiZoom","cloneVoice",

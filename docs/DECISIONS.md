@@ -346,6 +346,26 @@ Three complaints from tuning an actual guitar, three fixes:
   the tone, click it again (or change tuning / close the modal) to silence it; the `.playing` card stays lit
   while it sounds.
 
+## 67. Harmony assistant — mode-aware suggestions + voice leading (Roadmap item 5, v1.34.0)
+A pure-theory engine (DOM-free, tested) that feeds the backing generator and explains itself.
+- **`diatonicChords(root, mode)`** builds the seven triads of any mode from `SCALES`, deriving each
+  quality from its third/fifth intervals (`triadQuality`) and a Roman numeral (`romanFor`: case by
+  quality, `°`/`+` for dim/aug). C major → I ii iii IV V vi vii°; A Dorian keeps its signature major IV.
+- **`suggestChords(root, mode, prev, opts)`** ranks the next chord from a functional-tendency table
+  keyed by the last chord's scale degree (V→I strongest, ii→V, vi→IV…), each with a one-line rationale.
+  `opts.borrow` adds parallel-mode chords (C major → Fm/A♭/B♭, flagged `borrowed`); `opts.secondaryDominants`
+  adds `V7/x` a fifth above each diatonic target. De-duped by root+quality, best-first.
+- **`suggestProgression(root, mode, bars, opts)`** chains the suggester, starting on the tonic and
+  avoiding the last two chords each step so the default is musical, not I–V–I–V — A major yields the
+  "A E F#m D" axis, C major over 6 bars resolves home ("C G Am F G C").
+- **`voiceLead(fromMidi, toPCs)`** places each target pitch-class in the octave nearest the previous
+  voicing's centre, so chords move with minimal total semitone travel (no octave leaps).
+- **UI:** a "✨ Suggest" button in the backing modal fills the progression box from the session key
+  (`keyAtBeat(0)`) for the chosen chord count, then runs through Item 4. Deeper hooks (next-chord chips
+  in the chord/key popups, AI-augmented "make it more neo-soul") are deferred — the deterministic engine
+  is the foundation. Tests: test/harmony.test.mjs (7; 74 total). SCALES/HARMONY_TENDENCY were collapsed
+  to one line each so `extractConstLine` can lift them for the harness.
+
 ## 66. Clip editing — split · duplicate · copy/paste · edge-resize (Roadmap item 2, v1.33.0)
 Operates on the in-memory clip model; every op routes through item-1 `commit()` so it's undoable.
 - **DOM-free core (tested):** `splitMidiNotes(notes, atBeat)` partitions notes around a cut, splitting
