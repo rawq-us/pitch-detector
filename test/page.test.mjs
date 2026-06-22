@@ -48,6 +48,8 @@ test("required element ids exist in the markup", () => {
     "backAiBars","backAiStyle","backPad","backBass","backArp","backDrums","backFeel","backBars","backingRun","backingStatus",
     // undo/redo toolbar (Roadmap item 1)
     "undoBtn","redoBtn",
+    // master level meter (Roadmap item 7)
+    "masterMeter","masterMeterFill",
     // settings modal (canonical API-key editor)
     "settingsBtn","settingsModal","settingsSave","settingsTest","settingsClear","settingsStatus",
     // memo editor
@@ -100,6 +102,8 @@ test("core functions the tests and features depend on are present", () => {
     "cloneClipData","splitMidiNotes","splitClipData","duplicateClip","copyClip","pasteClipAt","splitClipAt","openClipMenu","attachClipResize","playheadSec","selectClip",
     // harmony assistant (Roadmap item 5)
     "diatonicChords","triadQuality","romanFor","suggestChords","suggestProgression","voiceLead","progressionToText","chordSuffix",
+    // level meters (Roadmap item 7)
+    "analyserRms","analyserPeak","linToDb","dbToFrac","meterFrac","readLevel","drawMeters",
     "midiEditorSetKey","syncSynthKeySel","fillKeySelect",
     "timelineKeys","clipKeySpan","renderKeyChips","nearestInScale","midiSnapPitch",
     "keySegmentsInClip","renderMidiKeyRuler","midiAddKeyChange","midiZoom","cloneVoice",

@@ -629,6 +629,11 @@
   .clip-menu { position: fixed; z-index: 200; background: #1b1f2a; border: 1px solid var(--border, #333); border-radius: 8px; padding: 4px; display: flex; flex-direction: column; min-width: 150px; box-shadow: 0 8px 28px rgba(0,0,0,0.5); }
   .clip-menu button { background: transparent; border: 0; color: var(--text, #e8e8ea); text-align: left; padding: 7px 10px; font-size: 12px; border-radius: 5px; cursor: pointer; }
   .clip-menu button:hover { background: rgba(255,255,255,0.08); }
+  .tl-head { position: relative; }
+  .tl-meter { position: absolute; right: 3px; top: 5px; bottom: 5px; width: 4px; background: rgba(255,255,255,0.09); border-radius: 2px; overflow: hidden; pointer-events: none; }
+  .tl-meter > i { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: linear-gradient(to top, #2be36b 0%, #2be36b 60%, #ffcc1a 80%, #ff4d4d 100%); transition: height 0.04s linear; }
+  .tl-meter.h { position: relative; right: auto; top: auto; bottom: auto; width: 84px; height: 9px; display: inline-block; }
+  .tl-meter.h > i { left: 0; bottom: 0; top: 0; height: auto; width: 0%; background: linear-gradient(to right, #2be36b 0%, #2be36b 60%, #ffcc1a 80%, #ff4d4d 100%); transition: width 0.04s linear; }
   .tl-clip .cloop { position: absolute; bottom: 3px; right: 4px; font-size: 10px; background: rgba(0,0,0,0.4); border-radius: 5px; padding: 1px 5px; cursor: pointer; }
   .tl-clip .cloop:hover { background: rgba(0,0,0,0.7); }
   .tl-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.7); z-index: 5; pointer-events: none; display: none; }
@@ -745,6 +750,7 @@
       <div class="group"><label>&nbsp;</label><button id="aiComposeBtn" class="iconbtn" title="AI Composer — generate arrangement &amp; lyrics into isolated stems">🤖 AI</button></div>
       <div class="group"><label>&nbsp;</label><span class="dim" style="font-size:11px">Save / Open / Export &amp; New are in the <b>File</b> menu ↑</span></div>
       <div class="spacer"></div>
+      <div class="group"><label>Master</label><div id="masterMeter" class="tl-meter h" title="Master output level"><i id="masterMeterFill"></i></div></div>
       <div class="group"><label>Zoom</label><div class="tr-row"><button id="tlZoomOut" class="mini" title="Zoom out">−</button><button id="tlZoomReset" class="mini" title="Back to 100%">100%</button><button id="tlZoomIn" class="mini" title="Zoom in">＋</button></div></div>
     </div>
     <div class="tl-body">
@@ -1448,7 +1454,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.34.0";
+const APP_VERSION="1.35.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -1541,13 +1547,22 @@ function fxComp(ctx){
   const x=xfade(ctx), comp=ctx.createDynamicsCompressor(); x.input.connect(comp); comp.connect(x.wet);
   return { node:x, apply(p){ comp.threshold.value=p.threshold; comp.ratio.value=p.ratio; comp.attack.value=0.003; comp.release.value=0.25; comp.knee.value=24; x.wet.gain.value=p.on?1:0; x.dry.gain.value=p.on?0:1; } };
 }
-// A per-track insert chain: input(level) -> drive -> chorus -> phaser -> delay -> reverb -> comp -> output
+/* ===== Level meters — DOM-free signal math (Roadmap item 7) =====
+   RMS/peak of an analyser's time-domain frame, mapped to a 0..1 bar over a dB floor. */
+function analyserRms(buf){ if(!buf||!buf.length) return 0; let s=0; for(let i=0;i<buf.length;i++){ const v=buf[i]; s+=v*v; } return Math.sqrt(s/buf.length); }
+function analyserPeak(buf){ if(!buf||!buf.length) return 0; let p=0; for(let i=0;i<buf.length;i++){ const a=Math.abs(buf[i]); if(a>p) p=a; } return p; }
+function linToDb(lin){ return lin>1e-6 ? 20*Math.log10(lin) : -120; }
+function dbToFrac(db, floorDb){ floorDb=floorDb||-60; return clamp((db-floorDb)/(0-floorDb), 0, 1); }
+function meterFrac(lin, floorDb){ return dbToFrac(linToDb(lin), floorDb); }
+// A per-track insert chain: input -> mute -> level -> drive -> chorus -> phaser -> delay -> reverb -> comp -> output
 const FX_FACTORIES = { drive:fxDrive, chorus:fxChorus, phaser:fxPhaser, delay:fxDelay, reverb:fxReverb, comp:fxComp };
 function buildTrackChain(ctx, fx){
   const input=ctx.createGain(), mute=ctx.createGain(), level=ctx.createGain(); input.connect(mute); mute.connect(level);
   let prev=level; const modules={};
   FX_KEYS.forEach(k=>{ modules[k]=FX_FACTORIES[k](ctx); prev.connect(modules[k].node.input); prev=modules[k].node.output; });
-  const chain={ input, output:prev, level, mute, modules, apply(){ level.gain.value=fx.level; FX_KEYS.forEach(k=>modules[k].apply(fx[k])); } };
+  // level-meter tap on the final output (after mute → reads silent when muted/un-soloed, so it's mute/solo-aware)
+  const meter=ctx.createAnalyser(); meter.fftSize=256; meter.smoothingTimeConstant=0.6; prev.connect(meter);
+  const chain={ input, output:prev, level, mute, meter, modules, apply(){ level.gain.value=fx.level; FX_KEYS.forEach(k=>modules[k].apply(fx[k])); } };
   chain.apply(); return chain;
 }
 function ensureTrackChain(track){ if(!audioCtx||!masterGain) return null; if(!track._chain){ track._chain=buildTrackChain(audioCtx, track.fx); track._chain.output.connect(masterGain); track._chain.mute.gain.value=trackAudible(track)?1:0; } return track._chain; }
@@ -2805,6 +2820,8 @@ function renderTimeline(){
     const head=document.createElement("div"); head.className="tl-head "+track.type+(track.id===selectedTrackId?" selected":"")+(trackAudible(track)?"":" muted");
     head.innerHTML='<div class="tname"><span class="badge '+track.type+'">'+track.type+'</span><span class="tnm">'+track.name+'</span></div><div class="tl-head-acts"></div>';
     const tname=head.querySelector(".tname"), acts=head.querySelector(".tl-head-acts");
+    // live level meter (item 7): a slim vertical bar on the head's right edge; the viz loop drives ._meterFill
+    const mtr=document.createElement("div"); mtr.className="tl-meter"; mtr.innerHTML='<i></i>'; head.appendChild(mtr); track._meterFill=mtr.firstChild;
     // compact meter select on the name row (polymeter) — shows the value, no long label
     const met=document.createElement("select"); met.className="trk-meter"; met.title="Layer meter — run this track in its own time signature against the global one (polymeter)";
     met.innerHTML='<option value="">global</option>'+["4/4","3/4","2/4","6/8","5/4","7/8","12/8"].map(v=>'<option value="'+v+'">'+v+'</option>').join("");
@@ -6284,7 +6301,15 @@ function attachLyrChipDrag(chip, ln, lane){
 /* ============================== EQ / spectrum visualizers ============================== */
 const synthEqCanvas=document.getElementById("synthEq"), masterEqCanvas=document.getElementById("masterEq");
 let vizStarted=false, fSynth=null, tSynth=null, fMaster=null;
-function startViz(){ if (vizStarted) return; vizStarted=true; const loop=()=>{ drawSynthEq(); drawMasterEq(); requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
+// Read a 0..1 level from an analyser's time-domain frame (buffer cached on the node). Item 7.
+function readLevel(an){ if(!an) return 0; const b=an._buf||(an._buf=new Float32Array(an.fftSize)); an.getFloatTimeDomainData(b); return meterFrac(analyserRms(b)); }
+// Drive every track head meter + the master meter from the shared viz rAF (no extra loop). Fast
+// attack, eased release so the bar reads naturally. A muted/un-soloed track's tap is silent → reads 0.
+function drawMeters(){
+  for(const t of project.tracks){ const fill=t._meterFill; if(!fill) continue; const target=readLevel(t._chain&&t._chain.meter)*100, prev=parseFloat(fill.style.height)||0; fill.style.height=(target>prev?target:Math.max(target,prev-5))+"%"; }
+  const mf=document.getElementById("masterMeterFill"); if(mf){ const target=readLevel(masterAnalyser)*100, prev=parseFloat(mf.style.width)||0; mf.style.width=(target>prev?target:Math.max(target,prev-5))+"%"; }
+}
+function startViz(){ if (vizStarted) return; vizStarted=true; const loop=()=>{ drawSynthEq(); drawMasterEq(); drawMeters(); requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
 function fitCanvas(cv){ const w=cv.clientWidth, h=cv.clientHeight; if (w && cv.width!==w) cv.width=w; if (h && cv.height!==h) cv.height=h; return { w:cv.width, h:cv.height }; }
 function drawSynthEq(){
   if (!synthEqCanvas) return;

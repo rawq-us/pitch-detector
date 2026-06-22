@@ -346,6 +346,20 @@ Three complaints from tuning an actual guitar, three fixes:
   the tone, click it again (or change tuning / close the modal) to silence it; the `.playing` card stays lit
   while it sounds.
 
+## 68. Per-track + master level meters (Roadmap item 7, v1.35.0)
+Live feedback, not a console — a slim meter per track head plus a master meter in the transport row.
+- **Tap, don't rewire.** `buildTrackChain` gained an `AnalyserNode` (`fftSize 256`) fed from the chain's
+  final output — which sits *after* the mute gain, so a muted or un-soloed track's tap is silent and the
+  meter reads 0 with zero extra logic (mute/solo-aware for free). The master meter reuses the existing
+  `masterAnalyser`. Offline `renderMix` builds its own chains and never reads these, so the bounce is
+  unaffected.
+- **DOM-free signal math (tested):** `analyserRms`/`analyserPeak` over a time-domain frame, `linToDb`
+  (0 dB at full scale), `dbToFrac` (0..1 over a −60 dB floor, clamped), `meterFrac`. Verified a
+  −13 dBFS tone reads ~0.76.
+- **One shared rAF.** `drawMeters` is called from the existing `startViz` loop (no new animation frame);
+  `readLevel` caches a Float32 buffer on each analyser node. Fast attack, eased release (−5%/frame). Track
+  fills are stored on `track._meterFill` and refreshed on each `renderTimeline` head rebuild.
+
 ## 67. Harmony assistant — mode-aware suggestions + voice leading (Roadmap item 5, v1.34.0)
 A pure-theory engine (DOM-free, tested) that feeds the backing generator and explains itself.
 - **`diatonicChords(root, mode)`** builds the seven triads of any mode from `SCALES`, deriving each

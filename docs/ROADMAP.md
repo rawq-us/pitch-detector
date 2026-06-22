@@ -318,7 +318,7 @@ Slice big items (WebRTC, warp) into sub-phases and loop those internally.
 - [x] **Item 1** — Undo/redo command stack (`commit()` envelope, all mutators routed, depth cap) — **shipped v1.32.0.** Scoped in-memory snapshots (PCM by reference, no re-decode), ⌘Z/⇧⌘Z + toolbar, MIDI-editor note ops covered, depth 100. (DECISIONS #65)
 - [x] **Item 2** — Clip editing (split/trim/duplicate/copy-paste/edge-resize · audio buffer offset) — **shipped v1.33.0.** Context menu + ⌘D/⌘C/⌘V + edge-resize; audio clips gained offset/length honored by live + offline render; all routed through commit(). (DECISIONS #66)
 - [x] **Item 5** — Harmony assistant (`suggestChords` · `voiceLead` · popups + generator hook) — **shipped v1.34.0.** diatonicChords/suggestChords/suggestProgression/voiceLead (DOM-free, tested) + a ✨ Suggest button in the backing modal. Popup chips + AI-augment deferred. (DECISIONS #67)
-- [ ] **Item 7** — Per-track + master meters (shared viz loop, mute/solo-aware)
+- [x] **Item 7** — Per-track + master meters (shared viz loop, mute/solo-aware) — **shipped v1.35.0.** AnalyserNode tap after the mute gain (silent when muted), dB-scaled bars driven by the existing startViz rAF. DOM-free dB math tested. (DECISIONS #68)
 - [ ] **Item 8** — Track automation lanes (volume/pan/cutoff · scheduler + offline apply)
 - [ ] **WebRTC** — live collab: (a) transport+presence · (b) shared edit ops · (c) locking/conflict · (d) optional voice
 - [ ] **Item 3** — Tempo/meter conductor lane (centralized `beatToSec` integrator · no-op default)
