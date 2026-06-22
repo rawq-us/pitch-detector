@@ -320,7 +320,7 @@ Slice big items (WebRTC, warp) into sub-phases and loop those internally.
 - [x] **Item 5** — Harmony assistant (`suggestChords` · `voiceLead` · popups + generator hook) — **shipped v1.34.0.** diatonicChords/suggestChords/suggestProgression/voiceLead (DOM-free, tested) + a ✨ Suggest button in the backing modal. Popup chips + AI-augment deferred. (DECISIONS #67)
 - [x] **Item 7** — Per-track + master meters (shared viz loop, mute/solo-aware) — **shipped v1.35.0.** AnalyserNode tap after the mute gain (silent when muted), dB-scaled bars driven by the existing startViz rAF. DOM-free dB math tested. (DECISIONS #68)
 - [x] **Item 8** — Track automation lanes (volume/pan/cutoff · scheduler + offline apply) — **shipped v1.36.0** for **volume + pan** (cutoff deferred — no per-track filter yet). Piecewise-linear, applied live per tick + offline as param ramps; SVG point editor per track, all edits undoable. (DECISIONS #69)
-- [ ] **WebRTC** — live collab: (a) transport+presence · (b) shared edit ops · (c) locking/conflict · (d) optional voice
+- [x] **WebRTC** — live collab: (a) transport+presence · (b) shared edit ops — **shipped v1.37.0.** Copy/paste SDP handshake (no server), validated JSON protocol, presence, shared transport, and edit sync via audio-stripped arrangement snapshots over the existing commit() layer (LWW). (c) locking/conflict polish + (d) optional voice chat remain. Needs 2-browser manual smoke test. (DECISIONS #70)
 - [ ] **Item 3** — Tempo/meter conductor lane (centralized `beatToSec` integrator · no-op default)
 - [ ] **Item 6** — Audio warp/flex: (a) loop tempo-match · (b) per-transient flex
 

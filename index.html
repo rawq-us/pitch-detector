@@ -748,6 +748,7 @@
       <div class="group"><label>&nbsp;</label><button id="addMemoTrackBtn" class="iconbtn" title="Add annotated memo layer (chords · notes · tempo · lyrics)">＋📝</button></div>
       <div class="group"><label>&nbsp;</label><button id="backingBtn" class="iconbtn" title="Generate backing — turn a chord progression into in-key pad / bass / arp / drum layers, each its own editable, transposable stem">🎸 Backing</button></div>
       <div class="group"><label>&nbsp;</label><button id="aiComposeBtn" class="iconbtn" title="AI Composer — generate arrangement &amp; lyrics into isolated stems">🤖 AI</button></div>
+      <div class="group"><label>&nbsp;</label><button id="collabBtn" class="iconbtn" title="Live collaborate — connect a second browser peer-to-peer; edits &amp; transport sync live (no server)">👥 Collab</button></div>
       <div class="group"><label>&nbsp;</label><span class="dim" style="font-size:11px">Save / Open / Export &amp; New are in the <b>File</b> menu ↑</span></div>
       <div class="spacer"></div>
       <div class="group"><label>Master</label><div id="masterMeter" class="tl-meter h" title="Master output level"><i id="masterMeterFill"></i></div></div>
@@ -1121,6 +1122,26 @@
 </div>
 
 <!-- AI Composer modal -->
+<div id="collabModal" class="modal" style="display:none">
+  <div class="modal-box" style="max-width:640px">
+    <div class="modal-head"><b>👥 Live collaborate (peer-to-peer)</b><button id="collabClose">✕</button></div>
+    <div class="hint" style="margin-top:0">Connect two browsers directly — <b>no server, no account</b>. Edits and transport sync live over a WebRTC data channel. Audio clips sync their structure (positions, notes); share the saved session for the actual audio. Exchange the codes below over any channel (chat, email).</div>
+    <div class="ai-cfg-line"><span id="collabStatus" class="dim">Not connected.</span><span id="collabPeers" class="dim" style="margin-left:auto"></span></div>
+    <div class="row knobrow" style="gap:12px">
+      <div class="group" style="flex:1"><label for="collabName">Your name</label><input id="collabName" type="text" placeholder="e.g. Alex" style="width:100%"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin:8px 0;flex-wrap:wrap">
+      <button id="collabHost" class="primary">① Create invite</button>
+      <button id="collabJoinMode">① Join an invite</button>
+      <button id="collabDisconnect" class="danger" style="display:none">Disconnect</button>
+    </div>
+    <div class="group" id="collabOfferRow" style="display:none"><label id="collabOfferLbl">Invite code — send this to your peer</label><textarea id="collabOffer" rows="3" style="width:100%;resize:vertical;font-size:11px" readonly></textarea></div>
+    <div class="group" id="collabAnswerInRow" style="display:none"><label id="collabAnswerInLbl">② Paste your peer's reply code here</label><textarea id="collabAnswerIn" rows="3" style="width:100%;resize:vertical;font-size:11px" placeholder="paste the reply code…"></textarea><button id="collabAnswerInBtn" class="mini" style="margin-top:6px">Connect</button></div>
+    <div class="group" id="collabJoinRow" style="display:none"><label>① Paste the invite code from your peer</label><textarea id="collabJoinIn" rows="3" style="width:100%;resize:vertical;font-size:11px" placeholder="paste the invite code…"></textarea><button id="collabJoinBtn" class="mini" style="margin-top:6px">Generate reply</button></div>
+    <div class="group" id="collabReplyRow" style="display:none"><label>② Send this reply code back to your peer</label><textarea id="collabReply" rows="3" style="width:100%;resize:vertical;font-size:11px" readonly></textarea></div>
+  </div>
+</div>
+
 <div id="backingModal" class="modal" style="display:none">
   <div class="modal-box" style="max-width:620px">
     <div class="modal-head"><b>🎸 Generate backing</b><button id="backingClose">✕</button></div>
@@ -1454,7 +1475,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.36.0";
+const APP_VERSION="1.37.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -3034,6 +3055,88 @@ function buildAutomationOverlay(lane, track, param){
   lane.appendChild(svg);
 }
 
+/* ===== WebRTC live collaboration — P2P shared transport + edits (Roadmap item: WebRTC) =====
+   No server we host: a copy/paste SDP handshake opens an RTCDataChannel; STUN (public) helps NAT.
+   Messages are validated JSON. Edits sync as scoped arrangement snapshots (audio stripped — peers keep
+   their own decoded audio by clip id); transport (play/stop) and presence sync too. Last-writer-wins. */
+const RTC_PROTO=1, RTC_MSG_TYPES=["hello","bye","transport","state","cursor"];
+function rtcEncode(type, data){ return JSON.stringify({ v:RTC_PROTO, type, data:(data===undefined?null:data) }); }
+function rtcDecode(str){
+  let m; try{ m=JSON.parse(str); }catch(e){ return null; }
+  if(!m || typeof m!=="object" || m.v!==RTC_PROTO || typeof m.type!=="string" || RTC_MSG_TYPES.indexOf(m.type)<0) return null;
+  return { type:m.type, data:(m.data==null?null:m.data) };
+}
+function peerColor(seed){ seed=String(seed||""); let h=0; for(let i=0;i<seed.length;i++) h=(h*31+seed.charCodeAt(i))>>>0; return "hsl("+(h%360)+",70%,60%)"; }
+// strip un-serializable audio (AudioBuffer) and heavy blobs from a snapshot before sending
+function rtcStateForWire(){ const s=snapshotProject(); s.tracks.forEach(t=>t.clips.forEach(c=>{ delete c.buffer; delete c.blob; })); return s; }
+function applyRemoteState(snap){
+  if(!snap||!snap.tracks) return;
+  const bufById=new Map(); project.tracks.forEach(t=>t.clips.forEach(c=>{ if(c.buffer) bufById.set(c.id,c.buffer); }));
+  snap.tracks.forEach(t=>t.clips.forEach(c=>{ const b=bufById.get(c.id); if(b) c.buffer=b; }));
+  _rtcApplying=true; _histMuted=true; try{ restoreProject(snap); } finally { _histMuted=false; _rtcApplying=false; }
+}
+let _rtcApplying=false;
+const collab={ pc:null, dc:null, role:null, selfName:"", peerName:"", connected:false };
+function rtcConnected(){ return !!(collab.dc && collab.dc.readyState==="open"); }
+function rtcSend(str){ if(rtcConnected()){ try{ collab.dc.send(str); }catch(e){} } }
+function rtcBroadcastState(){ if(rtcConnected() && !_rtcApplying) rtcSend(rtcEncode("state", rtcStateForWire())); }
+function rtcSendTransport(action,pos){ if(rtcConnected() && !_rtcApplying) rtcSend(rtcEncode("transport",{action,pos:pos||0})); }
+function rtcStatus(msg){ const el=document.getElementById("collabStatus"); if(el) el.textContent=msg; }
+function rtcPeersReadout(){ const el=document.getElementById("collabPeers"); if(!el) return; el.textContent=collab.connected?("● "+(collab.peerName||"peer")):""; if(collab.connected) el.style.color=peerColor(collab.peerName); }
+function rtcOnMessage(str){
+  const m=rtcDecode(str); if(!m) return;                          // inbound is validated — bad/unknown dropped
+  if(m.type==="hello"){ collab.peerName=(m.data&&m.data.name)||"peer"; collab.connected=true; rtcStatus("Connected to "+collab.peerName+"."); rtcPeersReadout(); }
+  else if(m.type==="bye"){ rtcTeardown("Peer disconnected."); }
+  else if(m.type==="state"){ applyRemoteState(m.data); }
+  else if(m.type==="transport"){ const a=m.data&&m.data.action; _rtcApplying=true; try{ if(a==="play"){ if(!transport.playing) transportPlay(); } else if(a==="stop"){ if(transport.playing) transportStop(); } } finally { _rtcApplying=false; } }
+}
+function wireDataChannel(dc){
+  collab.dc=dc;
+  dc.onopen=()=>{ collab.connected=true; rtcStatus("Channel open — syncing."); rtcSend(rtcEncode("hello",{name:collab.selfName||"Anon"})); rtcBroadcastState(); document.getElementById("collabDisconnect").style.display=""; };
+  dc.onclose=()=>rtcTeardown("Channel closed.");
+  dc.onmessage=(e)=>rtcOnMessage(e.data);
+}
+function newPeer(){ const pc=new RTCPeerConnection({ iceServers:[{urls:"stun:stun.l.google.com:19302"}] }); collab.pc=pc; return pc; }
+function iceComplete(pc){ return new Promise(res=>{ if(pc.iceGatheringState==="complete") return res(); const chk=()=>{ if(pc.iceGatheringState==="complete"){ pc.removeEventListener("icegatheringstatechange",chk); res(); } }; pc.addEventListener("icegatheringstatechange",chk); setTimeout(res,2500); }); }
+async function rtcHost(){
+  collab.role="host"; const pc=newPeer(); wireDataChannel(pc.createDataChannel("ps"));
+  const offer=await pc.createOffer(); await pc.setLocalDescription(offer); await iceComplete(pc);
+  document.getElementById("collabOffer").value=JSON.stringify(pc.localDescription);
+  document.getElementById("collabOfferRow").style.display=""; document.getElementById("collabAnswerInRow").style.display="";
+  rtcStatus("Invite created — send it, then paste your peer's reply.");
+}
+async function rtcHostAccept(answerStr){
+  let a; try{ a=JSON.parse(answerStr); }catch(e){ rtcStatus("That reply code isn't valid."); return; }
+  try{ await collab.pc.setRemoteDescription(a); rtcStatus("Connecting…"); }catch(e){ rtcStatus("Couldn't connect: "+e.message); }
+}
+async function rtcJoin(offerStr){
+  let o; try{ o=JSON.parse(offerStr); }catch(e){ rtcStatus("That invite code isn't valid."); return; }
+  collab.role="join"; const pc=newPeer(); pc.ondatachannel=(e)=>wireDataChannel(e.channel);
+  try{ await pc.setRemoteDescription(o); const ans=await pc.createAnswer(); await pc.setLocalDescription(ans); await iceComplete(pc);
+    document.getElementById("collabReply").value=JSON.stringify(pc.localDescription); document.getElementById("collabReplyRow").style.display="";
+    rtcStatus("Reply generated — send it back to your peer."); }
+  catch(e){ rtcStatus("Couldn't join: "+e.message); }
+}
+function rtcTeardown(msg){
+  try{ rtcSend(rtcEncode("bye")); }catch(e){}
+  try{ collab.dc&&collab.dc.close(); }catch(e){} try{ collab.pc&&collab.pc.close(); }catch(e){}
+  collab.dc=collab.pc=null; collab.connected=false; collab.peerName="";
+  rtcStatus(msg||"Not connected."); rtcPeersReadout();
+  const d=document.getElementById("collabDisconnect"); if(d) d.style.display="none";
+}
+(function wireCollab(){
+  const $=id=>document.getElementById(id);
+  $("collabBtn").addEventListener("click",()=>{ $("collabName").value=collab.selfName||localStorage.getItem("ps_collab_name")||""; $("collabModal").style.display="flex"; });
+  $("collabClose").addEventListener("click",()=>{ $("collabModal").style.display="none"; });
+  $("collabModal").addEventListener("click",(e)=>{ if(e.target===$("collabModal")) $("collabModal").style.display="none"; });
+  $("collabName").addEventListener("input",()=>{ collab.selfName=$("collabName").value.trim(); try{ localStorage.setItem("ps_collab_name",collab.selfName); }catch(e){} });
+  $("collabHost").addEventListener("click",()=>{ collab.selfName=$("collabName").value.trim()||"Host"; $("collabJoinRow").style.display="none"; $("collabReplyRow").style.display="none"; rtcHost(); });
+  $("collabJoinMode").addEventListener("click",()=>{ collab.selfName=$("collabName").value.trim()||"Guest"; $("collabJoinRow").style.display=""; $("collabOfferRow").style.display="none"; $("collabAnswerInRow").style.display="none"; rtcStatus("Paste the invite code, then generate your reply."); });
+  $("collabAnswerInBtn").addEventListener("click",()=>rtcHostAccept($("collabAnswerIn").value.trim()));
+  $("collabJoinBtn").addEventListener("click",()=>rtcJoin($("collabJoinIn").value.trim()));
+  $("collabDisconnect").addEventListener("click",()=>rtcTeardown("Disconnected."));
+})();
+
 /* cycle region select on the ruler */
 let loopDrag=null;
 tlRuler.addEventListener("pointerdown",(e)=>{ const rect=tlRuler.getBoundingClientRect(); loopDrag={ anchor: clamp(snapSec((e.clientX-rect.left-originPx())/PX_PER_SEC),0,project.lengthSec) }; tlRuler.setPointerCapture?.(e.pointerId); });
@@ -3130,6 +3233,7 @@ function transportPlay(){
   if (ci>0){ const bu=beatUnitSec(), bpb=beatsPerBar(), n=project.countInBars*bpb; for(let i=0;i<n;i++) playClick(startCtx+i*bu, (i%bpb)===0); }
   transport.timer=setInterval(transportScheduler,25); transport.raf=requestAnimationFrame(transportTick);
   tlPlayhead.style.display="block"; playBtn.textContent="■ Stop"; playBtn.classList.remove("primary"); playBtn.classList.add("danger");
+  if(typeof rtcSendTransport==="function") rtcSendTransport("play", transport.loopStart);
 }
 function transportScheduler(){
   const ctx=getCtx(), ahead=ctx.currentTime+0.12, ev=transport.events;
@@ -3182,6 +3286,7 @@ function transportStop(){
   // release any automation override back to the static fader/centre so a stopped track sits at its set level
   project.tracks.forEach(t=>{ const ch=t._chain; if(!ch) return; if(t.automation&&t.automation.volume&&t.automation.volume.length) ch.level.gain.value=(t.fx||fxDefaults()).level; if(ch.pan && t.automation&&t.automation.pan&&t.automation.pan.length) ch.pan.pan.value=0; });
   playBtn.textContent="▶ Play"; playBtn.classList.add("primary"); playBtn.classList.remove("danger");
+  if(typeof rtcSendTransport==="function") rtcSendTransport("stop");
 }
 // Follow the playhead: drive each automated track's level/pan from its lane (live transport only).
 function applyLiveAutomation(posSec){
@@ -5162,21 +5267,24 @@ function commit(label, doFn){
   if(doFn) doFn();                              // if the mutation throws, we never record — no bogus entry
   editHistory.push({ label, snap:before });
   updateUndoUI();
+  if(typeof rtcBroadcastState==="function") rtcBroadcastState();
 }
 // Two-phase variant for live drags: grab a before-snapshot at gesture start, record it on release.
 function beginEdit(){ return _histMuted?null:snapshotProject(); }
-function endEdit(label, before){ if(_histMuted||!before) return; editHistory.push({ label, snap:before }); updateUndoUI(); }
+function endEdit(label, before){ if(_histMuted||!before) return; editHistory.push({ label, snap:before }); updateUndoUI(); if(typeof rtcBroadcastState==="function") rtcBroadcastState(); }
 function undoEdit(){
   if(!editHistory.canUndo()) return;
   const e=editHistory.undo({ label:editHistory.peekUndo().label, snap:snapshotProject() });
   _histMuted=true; try { restoreProject(e.snap); } finally { _histMuted=false; }   // never leave history muted on a render error
   updateUndoUI(); if(typeof statusEl!=="undefined"&&statusEl) statusEl.textContent="Undo "+(e.label||"")+".";
+  if(typeof rtcBroadcastState==="function") rtcBroadcastState();
 }
 function redoEdit(){
   if(!editHistory.canRedo()) return;
   const e=editHistory.redo({ label:editHistory.peekRedo().label, snap:snapshotProject() });
   _histMuted=true; try { restoreProject(e.snap); } finally { _histMuted=false; }
   updateUndoUI(); if(typeof statusEl!=="undefined"&&statusEl) statusEl.textContent="Redo "+(e.label||"")+".";
+  if(typeof rtcBroadcastState==="function") rtcBroadcastState();
 }
 function updateUndoUI(){
   const ub=document.getElementById("undoBtn"), rb=document.getElementById("redoBtn");

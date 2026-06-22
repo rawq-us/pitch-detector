@@ -346,6 +346,30 @@ Three complaints from tuning an actual guitar, three fixes:
   the tone, click it again (or change tuning / close the modal) to silence it; the `.playing` card stays lit
   while it sounds.
 
+## 70. WebRTC live collaboration — P2P transport + edit sync (Roadmap WebRTC, v1.37.0)
+Two browsers edit the same session live, with **no server we host and no accounts**.
+- **Signaling is copy/paste SDP** (non-trickle): host clicks "Create invite" → `createOffer` →
+  `iceComplete` waits for gathering (2.5 s cap) → the full `localDescription` JSON is shown to copy.
+  The joiner pastes it, `createAnswer`s, and pastes the reply back. A public Google STUN server helps
+  NAT traversal (not ours; BYO/relay is the documented upgrade path). One `RTCDataChannel` carries everything.
+- **Wire protocol (DOM-free, tested):** `rtcEncode(type,data)` / `rtcDecode(str)` frame versioned JSON
+  and **validate every inbound message** — bad JSON, wrong version, missing or unknown type are dropped
+  (acceptance: "inbound ops are validated"). Types: `hello`/`bye` (presence), `transport`, `state`,
+  `cursor`. `peerColor` derives a stable hue from a name.
+- **Edit sync reuses the snapshot layer, not a separate op format.** Rather than build an operation
+  protocol, every local `commit`/`endEdit`/`undo`/`redo` broadcasts the scoped arrangement snapshot with
+  audio stripped (`rtcStateForWire` deletes `buffer`/`blob` — AudioBuffers aren't serializable and blobs
+  are heavy). The peer applies it via `applyRemoteState`, which re-attaches its OWN decoded audio by
+  clip id, then runs `restoreProject` under `_histMuted` + `_rtcApplying` (so remote edits don't enter
+  local undo and don't echo back). Last-writer-wins. Trade-off: audio bytes don't cross the wire — peers
+  share the saved session for actual audio; structure/MIDI/automation/keymap all sync live.
+- **Transport sync:** `transportPlay`/`transportStop` broadcast `{action,pos}`; the receiver starts/stops
+  under `_rtcApplying` so it doesn't bounce back.
+- **What's verified vs. manual:** the protocol is unit-tested (test/collab.test.mjs); offer generation
+  produces a valid data-channel SDP in-browser (checked in preview). A true two-peer connection needs two
+  real browsers + network and is the documented manual smoke test — the headless single-page loopback
+  can't reliably complete ICE.
+
 ## 69. Track automation lanes — volume + pan (Roadmap item 8, v1.36.0)
 Per-track timeline automation, gated behind a head toggle, kept to a few core params.
 - **Scope: volume + pan** (the acceptance params). `track.automation = { volume:[{beat,val}], pan:[...] }`,

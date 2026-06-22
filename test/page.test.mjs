@@ -50,6 +50,9 @@ test("required element ids exist in the markup", () => {
     "undoBtn","redoBtn",
     // master level meter (Roadmap item 7)
     "masterMeter","masterMeterFill",
+    // live collaboration (Roadmap WebRTC)
+    "collabBtn","collabModal","collabClose","collabName","collabHost","collabJoinMode","collabDisconnect",
+    "collabOffer","collabAnswerIn","collabAnswerInBtn","collabJoinIn","collabJoinBtn","collabReply","collabStatus",
     // settings modal (canonical API-key editor)
     "settingsBtn","settingsModal","settingsSave","settingsTest","settingsClear","settingsStatus",
     // memo editor
@@ -106,6 +109,8 @@ test("core functions the tests and features depend on are present", () => {
     "analyserRms","analyserPeak","linToDb","dbToFrac","meterFrac","readLevel","drawMeters",
     // track automation (Roadmap item 8)
     "automationValueAt","serializeAutomation","applyLiveAutomation","buildAutomationOverlay",
+    // live collaboration (Roadmap WebRTC)
+    "rtcEncode","rtcDecode","peerColor","rtcStateForWire","applyRemoteState","rtcBroadcastState","rtcSendTransport","rtcOnMessage","rtcHost","rtcJoin","rtcTeardown",
     "midiEditorSetKey","syncSynthKeySel","fillKeySelect",
     "timelineKeys","clipKeySpan","renderKeyChips","nearestInScale","midiSnapPitch",
     "keySegmentsInClip","renderMidiKeyRuler","midiAddKeyChange","midiZoom","cloneVoice",
