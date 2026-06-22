@@ -329,6 +329,23 @@ Two features aimed at the "take a song idea to a music-gen service, then to a DA
 - DEFERRED (noted to user): bidirectional drag-sync (moving a block reorders the lyric declarations) and a
   length×quantity generator. This ships the model + lane + summary + one-way lyric derivation.
 
+## 63. Tuner made usable for a real instrument (v1.30.1)
+Three complaints from tuning an actual guitar, three fixes:
+- **Over-aggressive noise gate** — `autoCorrelate` only returned a pitch above `rms 0.01`, so only hard
+  strums registered. Lowered to `0.0035` (+ edge-trim `thres` 0.2→0.12) and added a **clarity gate**
+  (`maxval/c[0] < 0.38 → reject`): the peak-autocorrelation-to-zero-lag-energy ratio is high for periodic
+  tones and low for broadband room noise, so sensitivity can go up without phantom notes appearing.
+- **Note didn't persist while ringing** — `detectLoop` cleared to "listening…" the instant one frame fell
+  below the gate. Now it **holds the last reading for `DET_HOLD_MS` (2.5 s)** (`detHoldMidi`/`detHoldAt`),
+  re-rendering it with a "ringing…" tag. Refactored the display body into `renderDetection(midiFloat, held,
+  freq)` so both the live and held paths share it; `tunerLiveUpdate` gained a `held` arg (dims the meter via
+  `.holding`). Fresh detections keep refreshing the hold, so a decaying string stays on screen.
+- **Reference tone didn't sustain** — string cards played a fixed 1.5 s `playNoteAt`, useless for tuning by
+  ear. Replaced with a **toggleable drone** (`startTunerDrone`/`stopTunerDrone`): sine + a slightly detuned
+  triangle straight to `ctx.destination` (always audible regardless of master level). Click a string to hold
+  the tone, click it again (or change tuning / close the modal) to silence it; the `.playing` card stays lit
+  while it sounds.
+
 ## 62. Per-layer mute / solo on the timeline (v1.30.0)
 - Each track head now carries **M** and **S** chips (between FX and the type-specific buttons), toggling
   `track.muted` / `track.soloed`. Audibility rule, in one helper trio: `soloActive()` (any track soloed),

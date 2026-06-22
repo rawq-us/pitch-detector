@@ -469,6 +469,7 @@
   .tm-cents { text-align: center; font-size: 12px; color: var(--muted); margin-top: 5px; min-height: 16px; }
   .tuner-meter.in-tune .tm-cents { color: #34d399; font-weight: 600; }
   #tunerMicBtn.on { background: var(--flat); color: #fff; border-color: transparent; }
+  .tuner-meter.holding { opacity: 0.78; }
   .tuner-str.target { border-color: var(--accent-2); box-shadow: inset 0 0 0 1px var(--accent-2); }
   .tuner-strings { display: flex; flex-wrap: wrap; gap: 10px; }
   .tuner-str { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 66px; padding: 12px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-2); cursor: pointer; user-select: none; }
@@ -1396,7 +1397,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.30.0";
+const APP_VERSION="1.30.1";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -1829,6 +1830,57 @@ function renderPattern(pat, keyRoot, bpb){
   });
   return { notes, lengthBeats: pat.chords.length*bpb };
 }
+/* ===== Chord-driven backing generation (Roadmap item 4) =====
+   Source-agnostic: a progression is [{root:0-11, quality}]. Sources that fill it: typed text
+   (parseProgression), a memo's detected chords ({root,quality} already), the key map + a Roman
+   template, or AI. Role voicers turn a progression into per-track note lists — each role becomes
+   its own isolated, transposable layer, so generated parts are born as clean stems. */
+function chordQualityFromSuffix(suf){
+  suf=(suf||"").trim();
+  if(suf==="maj7"||suf==="M7"||suf==="Maj7"||suf==="Δ"||suf==="Δ7") return "maj7";
+  if(suf==="m7"||suf==="min7"||suf==="-7") return "min7";
+  if(suf==="7"||suf==="dom7") return "dom7";
+  if(suf==="dim"||suf==="o"||suf==="dim7"||suf==="m7b5"||suf==="ø") return "dim";
+  if(suf==="sus4"||suf==="sus"||suf==="sus2") return "sus4";
+  if(suf===""||suf==="maj"||suf==="major"||suf==="M") return "maj";
+  if(suf==="m"||suf==="min"||suf==="minor"||suf==="-") return "min";
+  return (suf.charAt(0)==="m" && suf.indexOf("maj")!==0) ? "min" : "maj";   // fallback: leading m → minor
+}
+// "A C#m F#m D" / "Am, G, F" / "ii7 | V7 | Imaj7"(letters only) → [{root,quality}]
+function parseProgression(text){
+  const LET={C:0,D:2,E:4,F:5,G:7,A:9,B:11}, out=[];
+  if(!text) return out;
+  text.trim().split(/[\s,|/]+/).forEach(tok=>{
+    if(!tok) return;
+    const m=tok.match(/^([A-Ga-g])([#b♯♭]?)(.*)$/); if(!m) return;
+    let root=LET[m[1].toUpperCase()]; if(root==null) return;
+    if(m[2]==="#"||m[2]==="♯") root=(root+1)%12; else if(m[2]==="b"||m[2]==="♭") root=(root+11)%12;
+    out.push({ root, quality:chordQualityFromSuffix(m[3]) });
+  });
+  return out;
+}
+// One role (bass | pad | arp) of a progression → {notes:[{midi,beat,dur,vel}], lengthBeats, role}.
+// barsPerChord lets one chord span multiple bars; qual defaults to the app's CHORD_QUAL (testable: pass opts.qual).
+function voiceProgression(prog, role, bpb, opts){
+  opts=opts||{}; const Q=opts.qual||(typeof CHORD_QUAL!=="undefined"?CHORD_QUAL:{maj:[0,4,7],min:[0,3,7],dim:[0,3,6],maj7:[0,4,7,11],min7:[0,3,7,10],dom7:[0,4,7,10],sus4:[0,5,7]});
+  const bars=Math.max(1,opts.barsPerChord||1), span=bpb*bars, notes=[];
+  (prog||[]).forEach((ch,i)=>{
+    const ivs=Q[ch.quality]||Q.maj, t0=i*span;
+    if(role==="bass"){
+      const base=36+((ch.root%12)+12)%12;                 // ~C2 register; root on 1, fifth mid-bar
+      notes.push({ midi:base, beat:t0, dur:span*0.5*0.96, vel:98 });
+      notes.push({ midi:base+7, beat:t0+span*0.5, dur:span*0.5*0.96, vel:86 });
+    } else if(role==="pad"){
+      const base=48+((ch.root%12)+12)%12;                 // C3-aligned octave (base+root keeps the pc); held block voicing
+      ivs.forEach(iv=>notes.push({ midi:base+iv, beat:t0, dur:span*0.98, vel:62 }));
+    } else { // arp — eighth-note run through the chord tones, octave-wrapping on the second pass
+      const base=60+((ch.root%12)+12)%12, tones=ivs.map(iv=>base+iv), order=[...tones, tones[tones.length-2]||tones[0]];
+      const step=0.5, n=Math.round(span/step);
+      for(let s=0;s<n;s++) notes.push({ midi:order[s%order.length]+(s>=order.length?12:0), beat:t0+s*step, dur:step*0.9, vel:82 });
+    }
+  });
+  return { notes, lengthBeats:(prog||[]).length*span, role };
+}
 function globalKey(){ return { root: parseInt(rootSel.value,10)||0, mode: modeSel.value }; }
 function keyMapSorted(){ return (project.keyMap||[]).slice().sort((a,b)=>a.beat-b.beat); }
 function keyAtBeat(beat){ let cur=globalKey(); for (const r of keyMapSorted()){ if (r.beat<=beat+1e-6) cur={root:r.root,mode:r.mode}; else break; } return cur; }
@@ -1869,8 +1921,10 @@ function stopMic(){
 const buf = new Float32Array(2048);
 function autoCorrelate(buffer, sampleRate){
   const SIZE=buffer.length; let rms=0; for (let i=0;i<SIZE;i++) rms+=buffer[i]*buffer[i];
-  rms=Math.sqrt(rms/SIZE); if (rms<0.01) return -1;
-  let r1=0,r2=SIZE-1,thres=0.2;
+  // Gate set low (was 0.01) so a string ringing out — not just a hard strum — keeps detecting.
+  // Quiet-room garbage is suppressed downstream by the autocorrelation clarity check below.
+  rms=Math.sqrt(rms/SIZE); if (rms<0.0035) return -1;
+  let r1=0,r2=SIZE-1,thres=0.12;
   for (let i=0;i<SIZE/2;i++) if (Math.abs(buffer[i])<thres){ r1=i; break; }
   for (let i=1;i<SIZE/2;i++) if (Math.abs(buffer[SIZE-i])<thres){ r2=SIZE-i; break; }
   const b=buffer.slice(r1,r2), n=b.length, c=new Array(n).fill(0);
@@ -1878,17 +1932,21 @@ function autoCorrelate(buffer, sampleRate){
   let d=0; while (d<n-1 && c[d]>c[d+1]) d++;
   let maxval=-1,maxpos=-1; for (let i=d;i<n;i++) if (c[i]>maxval){ maxval=c[i]; maxpos=i; }
   let T0=maxpos; if (T0<=0) return -1;
+  // clarity = peak autocorrelation / zero-lag energy. Periodic (plucked/bowed/sung) tones score high;
+  // broadband room noise scores low — so we can keep the gate sensitive without showing phantom notes.
+  if (c[0]>0 && maxval/c[0] < 0.38) return -1;
   const x1=c[T0-1]||0,x2=c[T0],x3=c[T0+1]||0, a=(x1+x3-2*x2)/2, bb=(x3-x1)/2; if (a) T0=T0-bb/(2*a);
   return sampleRate/T0;
 }
-function detectLoop(){
-  detectRAF=requestAnimationFrame(detectLoop); if (!analyser) return;
-  analyser.getFloatTimeDomainData(buf);
-  const freq=autoCorrelate(buf, micCtx.sampleRate);
-  if (freq<=0 || freq<27 || freq>4500){ freqOut.textContent="listening…"; scaleGuessEl.textContent="—"; tunerEl.classList.remove("in-tune"); if(typeof tunerLiveUpdate==="function") tunerLiveUpdate(null); return; }
-  const midiFloat=freqToMidiFloat(freq), midi=Math.round(midiFloat), cents=Math.round((midiFloat-midi)*100), {name,octave,full}=noteName(midi);
+// Pitch readout holds for a beat after the signal drops, so a note ringing/decaying out doesn't
+// flicker off the moment a single frame falls below the gate — you can finish tuning a struck string.
+let detHoldMidi=null, detHoldAt=0; const DET_HOLD_MS=2500;
+function nowMs(){ return (typeof performance!=="undefined"&&performance.now)?performance.now():Date.now(); }
+function renderDetection(midiFloat, held, freqIn){
+  const freq = freqIn!=null ? freqIn : midiToFreq(midiFloat);
+  const midi=Math.round(midiFloat), cents=Math.round((midiFloat-midi)*100), {name,octave,full}=noteName(midi);
   noteBig.innerHTML = name + '<span class="oct">'+octave+'</span>';
-  freqOut.textContent = freq.toFixed(1)+" Hz · "+(cents>=0?"+":"")+cents+"¢";
+  freqOut.textContent = freq.toFixed(1)+" Hz · "+(cents>=0?"+":"")+cents+"¢"+(held?" · ringing…":"");
   const sMidi=nearestScaleMidi(midiFloat);
   if (sMidi!=null){ const sc=Math.round((midiFloat-sMidi)*100); scaleGuessEl.innerHTML = noteName(sMidi).full + ' <span style="color:var(--muted);font-weight:400">in '+keyLabel()+' ('+(sc>=0?"+":"")+sc+'¢)</span>'; }
   else scaleGuessEl.textContent="—";
@@ -1896,7 +1954,20 @@ function detectLoop(){
   const inTune=Math.abs(cents)<=5; tunerEl.classList.toggle("in-tune",inTune);
   statusEl.textContent = inTune ? "✓ In tune ("+full+")" : (cents<0?"♭ Flat — pitch up":"♯ Sharp — pitch down");
   highlightDetected(midi);
-  if(typeof tunerLiveUpdate==="function") tunerLiveUpdate(midiFloat);
+  if(typeof tunerLiveUpdate==="function") tunerLiveUpdate(midiFloat, held);
+}
+function detectLoop(){
+  detectRAF=requestAnimationFrame(detectLoop); if (!analyser) return;
+  analyser.getFloatTimeDomainData(buf);
+  const freq=autoCorrelate(buf, micCtx.sampleRate);
+  if (freq<=0 || freq<27 || freq>4500){
+    if (detHoldMidi!=null && nowMs()-detHoldAt < DET_HOLD_MS){ renderDetection(detHoldMidi, true); return; }  // hold the ring-out
+    freqOut.textContent="listening…"; scaleGuessEl.textContent="—"; tunerEl.classList.remove("in-tune");
+    if(typeof tunerLiveUpdate==="function") tunerLiveUpdate(null); return;
+  }
+  const midiFloat=freqToMidiFloat(freq);
+  detHoldMidi=midiFloat; detHoldAt=nowMs();
+  renderDetection(midiFloat, false, freq);
 }
 function clearDetected(){ if (lastDetectedMidi!=null && keyEls.has(lastDetectedMidi)) keyEls.get(lastDetectedMidi).classList.remove("detected"); lastDetectedMidi=null; }
 function highlightDetected(midi){
@@ -5979,8 +6050,26 @@ const TUNINGS = {
 };
 // live mic tuning meter — detectLoop() (the pitch detector) feeds tunerLiveUpdate when the modal is open
 let tunerOpen=false, tunerStrings=[];   // [{midi, name, idx}]
+// Reference-tone drone: a sustained, gently-detuned pair of oscillators you can hold against the
+// string and tune by ear. Toggles on/off per string (click the same string again to silence).
+let tunerDrone=null;
+function stopTunerDrone(){
+  if(!tunerDrone) return; const {ctx,oscs,g}=tunerDrone; const t=ctx.currentTime;
+  try{ g.gain.cancelScheduledValues(t); g.gain.setTargetAtTime(0.0001,t,0.04); oscs.forEach(o=>o.stop(t+0.25)); }catch(_){}
+  tunerDrone=null;
+  document.querySelectorAll("#tunerStrings .tuner-str.playing").forEach(x=>x.classList.remove("playing"));
+}
+function startTunerDrone(midi){
+  stopTunerDrone();
+  let ctx; try{ ctx=getCtx(); ctx.resume&&ctx.resume(); }catch(_){ return; }
+  const f=midiToFreq(midi), t=ctx.currentTime, g=ctx.createGain();
+  g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(0.16,t+0.04);
+  const oscs=[["sine",0],["triangle",0.4]].map(([type,detune])=>{ const o=ctx.createOscillator(); o.type=type; o.frequency.value=f; o.detune.value=detune; o.connect(g); o.start(t); return o; });
+  g.connect(ctx.destination);   // straight to output so the reference is always audible regardless of master level
+  tunerDrone={ctx,oscs,g,midi};
+}
 function syncTunerMic(){ const b=document.getElementById("tunerMicBtn"); if(!b) return; const on=!!(micStream&&micStream.active); b.textContent=on?"⏹ Stop mic":"🎤 Enable mic"; b.classList.toggle("on",on); }
-function tunerLiveUpdate(midiFloat){
+function tunerLiveUpdate(midiFloat, held){
   if(!tunerOpen) return; const meter=document.getElementById("tunerMeter"); if(!meter) return;
   const note=document.getElementById("tmNote"), tgt=document.getElementById("tmTarget"), needle=document.getElementById("tmNeedle"), centsEl=document.getElementById("tmCents");
   if(midiFloat==null || !tunerStrings.length){
@@ -5992,8 +6081,8 @@ function tunerLiveUpdate(midiFloat){
   note.innerHTML=nm.name+'<span class="oct">'+nm.octave+'</span>';
   tgt.innerHTML='→ tuning to <b>'+best.name+'</b> (string '+best.idx+')';
   needle.style.left=clamp(50+c,2,98)+"%";
-  const inTune=Math.abs(c)<=5; meter.classList.add("live"); meter.classList.toggle("in-tune",inTune);
-  centsEl.textContent = inTune ? "✓ in tune" : ((c>=0?"+":"")+c+"¢ · "+(c<0?"♭ too flat — tune up":"♯ too sharp — tune down"));
+  const inTune=Math.abs(c)<=5; meter.classList.add("live"); meter.classList.toggle("in-tune",inTune); meter.classList.toggle("holding",!!held);
+  centsEl.textContent = (inTune ? "✓ in tune" : ((c>=0?"+":"")+c+"¢ · "+(c<0?"♭ too flat — tune up":"♯ too sharp — tune down")))+(held?" · ringing…":"");
   document.querySelectorAll("#tunerStrings .tuner-str").forEach(x=>x.classList.toggle("target", x._smidi===best.midi));
 }
 (function wireTuner(){
@@ -6002,13 +6091,17 @@ function tunerLiveUpdate(midiFloat){
   Object.keys(TUNINGS).forEach(k=>{ const o=document.createElement("option"); o.value=k; o.textContent=k; inst.appendChild(o); });
   function fillTunings(){ tun.innerHTML=""; Object.keys(TUNINGS[inst.value]||{}).forEach(t=>{ const o=document.createElement("option"); o.value=t; o.textContent=t; tun.appendChild(o); }); }
   function renderStrings(){
+    stopTunerDrone();
     host.innerHTML=""; const notes=(TUNINGS[inst.value]||{})[tun.value]||[]; tunerStrings=[];
     notes.forEach((n,i)=>{
       const midi=noteNameToMidi(n), idx=notes.length-i; if(midi!=null) tunerStrings.push({midi, name:n, idx});
       const b=document.createElement("div"); b.className="tuner-str"; b._smidi=midi;
       b.innerHTML='<span class="ts-idx">'+idx+(i===0?" · low":(i===notes.length-1?" · high":""))+'</span><span class="ts-note">'+n+'</span>';
-      b.addEventListener("click",()=>{ if(midi==null) return; try{ getCtx().resume&&getCtx().resume(); playNoteAt(midi, getCtx().currentTime+0.02, 1.5); }catch(_){}
-        host.querySelectorAll(".tuner-str.playing").forEach(x=>x.classList.remove("playing")); b.classList.add("playing"); setTimeout(()=>b.classList.remove("playing"),1500); });
+      b.addEventListener("click",()=>{ if(midi==null) return;
+        const already=tunerDrone && tunerDrone.midi===midi;
+        stopTunerDrone();                                  // clears all .playing
+        if(already) return;                                // clicking the sounding string silences it
+        startTunerDrone(midi); b.classList.add("playing"); });
       host.appendChild(b);
     });
   }
@@ -6017,7 +6110,7 @@ function tunerLiveUpdate(midiFloat){
   fillTunings(); renderStrings();
   document.getElementById("tunerMicBtn").addEventListener("click",()=>{ document.getElementById("micBtn").click(); setTimeout(syncTunerMic,300); });
   const open=()=>{ modal.style.display="flex"; tunerOpen=true; syncTunerMic(); tunerLiveUpdate(null); };
-  const close=()=>{ modal.style.display="none"; tunerOpen=false; };
+  const close=()=>{ modal.style.display="none"; tunerOpen=false; stopTunerDrone(); };
   document.getElementById("tunerBtn").addEventListener("click",open);
   document.getElementById("tunerClose").addEventListener("click",close);
   modal.addEventListener("click",(e)=>{ if(e.target===modal) close(); });

@@ -86,12 +86,13 @@ test("core functions the tests and features depend on are present", () => {
     "keySuggestions","scalePCs","modeMood","songDisplayName","refreshSongMeta",
     "openSynthModal","closeSynthModal","renderInstViz","renderInstVizAll","openArpClip","setArpEditTarget",
     "renderPattern","midiLibAdd","midiLibPreview",
+    "parseProgression","chordQualityFromSuffix","voiceProgression",
     "midiEditorSetKey","syncSynthKeySel","fillKeySelect",
     "timelineKeys","clipKeySpan","renderKeyChips","nearestInScale","midiSnapPitch",
     "keySegmentsInClip","renderMidiKeyRuler","midiAddKeyChange","midiZoom","cloneVoice",
     "structAdd","renderStructureLane","structToLyrics","structLabel","structSorted",
     "structFromLyrics","kindToStructType","syncStructureToLyrics","lyricsBlocks","structHeader","isSectionHeaderLine",
-    "tunerLiveUpdate","syncTunerMic",
+    "tunerLiveUpdate","syncTunerMic","renderDetection","startTunerDrone","stopTunerDrone",
     "trackAudible","soloActive","applyTrackMuteSolo",
   ];
   for (const n of names) assert.ok(src.includes("function " + n) || src.includes(n + "("), "missing " + n);
