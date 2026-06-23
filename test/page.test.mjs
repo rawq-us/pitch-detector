@@ -53,6 +53,7 @@ test("required element ids exist in the markup", () => {
     // live collaboration (Roadmap WebRTC)
     "collabBtn","collabModal","collabClose","collabName","collabHost","collabJoinMode","collabDisconnect",
     "collabOffer","collabAnswerIn","collabAnswerInBtn","collabJoinIn","collabJoinBtn","collabReply","collabStatus",
+    "collabOfferCopy","collabReplyCopy","collabOfferQR","collabReplyQR",
     // settings modal (canonical API-key editor)
     "settingsBtn","settingsModal","settingsSave","settingsTest","settingsClear","settingsStatus","settingsResetLayout",
     // memo editor
@@ -111,6 +112,7 @@ test("core functions the tests and features depend on are present", () => {
     "automationValueAt","serializeAutomation","applyLiveAutomation","buildAutomationOverlay",
     // live collaboration (Roadmap WebRTC)
     "rtcEncode","rtcDecode","peerColor","rtcStateForWire","rtcBroadcastState","rtcSendTransport","rtcOnMessage","rtcHost","rtcJoin","rtcTeardown",
+    "bytesToB64url","b64urlToBytes","buildSignalUrl","parseSignalHash","packSignal","unpackSignal","checkInviteUrl","showSignalOut",
     // P2P sync spec (docs/P2P_SYNC_SPEC.md)
     "uuid","myPeerId","ensureSessionId","trackHash","computeSyncBase","trackSyncMeta","reconcile","clockMedianOffset","mergeRemoteState","bumpChangedRevs",
     "midiEditorSetKey","syncSynthKeySel","fillKeySelect",

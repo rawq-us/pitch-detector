@@ -1150,10 +1150,12 @@
       <button id="collabJoinMode">① Join an invite</button>
       <button id="collabDisconnect" class="danger" style="display:none">Disconnect</button>
     </div>
-    <div class="group" id="collabOfferRow" style="display:none"><label id="collabOfferLbl">Invite code — send this to your peer</label><textarea id="collabOffer" rows="3" style="width:100%;resize:vertical;font-size:11px" readonly></textarea></div>
-    <div class="group" id="collabAnswerInRow" style="display:none"><label id="collabAnswerInLbl">② Paste your peer's reply code here</label><textarea id="collabAnswerIn" rows="3" style="width:100%;resize:vertical;font-size:11px" placeholder="paste the reply code…"></textarea><button id="collabAnswerInBtn" class="mini" style="margin-top:6px">Connect</button></div>
-    <div class="group" id="collabJoinRow" style="display:none"><label>① Paste the invite code from your peer</label><textarea id="collabJoinIn" rows="3" style="width:100%;resize:vertical;font-size:11px" placeholder="paste the invite code…"></textarea><button id="collabJoinBtn" class="mini" style="margin-top:6px">Generate reply</button></div>
-    <div class="group" id="collabReplyRow" style="display:none"><label>② Send this reply code back to your peer</label><textarea id="collabReply" rows="3" style="width:100%;resize:vertical;font-size:11px" readonly></textarea></div>
+    <div class="group" id="collabOfferRow" style="display:none"><label id="collabOfferLbl">① Invite link — send this to your peer (link, QR, or the raw code)</label><textarea id="collabOffer" rows="2" style="width:100%;resize:vertical;font-size:11px" readonly></textarea>
+      <div class="tr-row" style="gap:8px;margin-top:6px;align-items:flex-start"><button id="collabOfferCopy" class="mini">📋 Copy link</button><div class="collab-qr" id="collabOfferQR"></div></div></div>
+    <div class="group" id="collabAnswerInRow" style="display:none"><label id="collabAnswerInLbl">② Paste your peer's reply link here</label><textarea id="collabAnswerIn" rows="2" style="width:100%;resize:vertical;font-size:11px" placeholder="paste the reply link…"></textarea><button id="collabAnswerInBtn" class="mini" style="margin-top:6px">Connect</button></div>
+    <div class="group" id="collabJoinRow" style="display:none"><label>① Paste the invite link from your peer (or just open their link)</label><textarea id="collabJoinIn" rows="2" style="width:100%;resize:vertical;font-size:11px" placeholder="paste the invite link…"></textarea><button id="collabJoinBtn" class="mini" style="margin-top:6px">Generate reply</button></div>
+    <div class="group" id="collabReplyRow" style="display:none"><label>② Send this reply link back to your peer (link, QR, or the raw code)</label><textarea id="collabReply" rows="2" style="width:100%;resize:vertical;font-size:11px" readonly></textarea>
+      <div class="tr-row" style="gap:8px;margin-top:6px;align-items:flex-start"><button id="collabReplyCopy" class="mini">📋 Copy link</button><div class="collab-qr" id="collabReplyQR"></div></div></div>
   </div>
 </div>
 
@@ -1496,7 +1498,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.41.0";
+const APP_VERSION="1.42.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -3205,26 +3207,72 @@ function wireDataChannel(dc){
   dc.onclose=()=>rtcTeardown("Channel closed.");
   dc.onmessage=(e)=>rtcOnMessage(e.data);
 }
+/* ===== Signaling payload codec — compress an SDP to a short, link-safe string (no backend) =====
+   WebRTC needs a two-way exchange (offer ↔ answer), so we can't do it in one link — but each leg can
+   be a clickable URL with the (deflate-compressed) payload in the #hash. base64url + btoa/atob are
+   DOM-free (work in Node too), so the codec is unit-testable; CompressionStream is browser/Node-18+. */
+function bytesToB64url(bytes){ let bin=""; for(let i=0;i<bytes.length;i++) bin+=String.fromCharCode(bytes[i]); return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""); }
+function b64urlToBytes(str){ str=String(str).replace(/-/g,"+").replace(/_/g,"/"); while(str.length%4) str+="="; const bin=atob(str), out=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i); return out; }
+function signalBaseUrl(){ return location.origin+location.pathname; }
+function buildSignalUrl(base, kind, packed){ return base+"#"+kind+"="+packed; }   // kind: "invite" | "reply"
+function parseSignalHash(urlOrHash){ const m=String(urlOrHash||"").match(/#(invite|reply)=([A-Za-z0-9\-_]+)/); return m?{ kind:m[1], payload:m[2] }:null; }
+async function _deflate(bytes){ const cs=new CompressionStream("deflate-raw"); const w=cs.writable.getWriter(); w.write(bytes); w.close(); return new Uint8Array(await new Response(cs.readable).arrayBuffer()); }
+async function _inflate(bytes){ const ds=new DecompressionStream("deflate-raw"); const w=ds.writable.getWriter(); w.write(bytes); w.close(); return new Uint8Array(await new Response(ds.readable).arrayBuffer()); }
+// pack: JSON → deflate (if it helps & is available) → base64url, prefixed "c" (compressed) or "u" (raw).
+async function packSignal(obj){
+  const bytes=new TextEncoder().encode(JSON.stringify(obj));
+  if(typeof CompressionStream!=="undefined"){ try{ const z=await _deflate(bytes); if(z.length<bytes.length) return "c"+bytesToB64url(z); }catch(e){} }
+  return "u"+bytesToB64url(bytes);
+}
+async function unpackSignal(str){
+  str=String(str||"").trim(); if(!str) return null;
+  const tag=str[0], bytes=b64urlToBytes(str.slice(1));
+  try{
+    if(tag==="c") return JSON.parse(new TextDecoder().decode(await _inflate(bytes)));
+    if(tag==="u") return JSON.parse(new TextDecoder().decode(bytes));
+  }catch(e){}
+  try{ return JSON.parse(str); }catch(e){ return null; }   // tolerate a pasted raw-JSON code
+}
 function newPeer(){ const pc=new RTCPeerConnection({ iceServers:[{urls:"stun:stun.l.google.com:19302"}] }); collab.pc=pc; return pc; }
 function iceComplete(pc){ return new Promise(res=>{ if(pc.iceGatheringState==="complete") return res(); const chk=()=>{ if(pc.iceGatheringState==="complete"){ pc.removeEventListener("icegatheringstatechange",chk); res(); } }; pc.addEventListener("icegatheringstatechange",chk); setTimeout(res,2500); }); }
+// fill the output textarea with the link and (if available) render a QR for it
+function showSignalOut(kind, url){
+  const ta=document.getElementById(kind==="invite"?"collabOffer":"collabReply"); if(ta) ta.value=url;
+  if(typeof renderCollabQR==="function") renderCollabQR(kind, url);
+}
 async function rtcHost(){
   collab.role="host"; const pc=newPeer(); wireDataChannel(pc.createDataChannel("ps"));
   const offer=await pc.createOffer(); await pc.setLocalDescription(offer); await iceComplete(pc);
-  document.getElementById("collabOffer").value=JSON.stringify(pc.localDescription);
+  showSignalOut("invite", buildSignalUrl(signalBaseUrl(),"invite", await packSignal(pc.localDescription)));
   document.getElementById("collabOfferRow").style.display=""; document.getElementById("collabAnswerInRow").style.display="";
-  rtcStatus("Invite created — send it, then paste your peer's reply.");
+  rtcStatus("Invite link ready — send it, then paste your peer's reply link.");
 }
-async function rtcHostAccept(answerStr){
-  let a; try{ a=JSON.parse(answerStr); }catch(e){ rtcStatus("That reply code isn't valid."); return; }
+async function rtcHostAccept(input){
+  const sig=parseSignalHash(input); const a=await unpackSignal(sig?sig.payload:input);
+  if(!a){ rtcStatus("That reply link/code isn't valid."); return; }
   try{ await collab.pc.setRemoteDescription(a); rtcStatus("Connecting…"); }catch(e){ rtcStatus("Couldn't connect: "+e.message); }
 }
-async function rtcJoin(offerStr){
-  let o; try{ o=JSON.parse(offerStr); }catch(e){ rtcStatus("That invite code isn't valid."); return; }
+async function rtcJoin(input){
+  const sig=parseSignalHash(input); const o=await unpackSignal(sig?sig.payload:input);
+  if(!o){ rtcStatus("That invite link/code isn't valid."); return; }
   collab.role="join"; const pc=newPeer(); pc.ondatachannel=(e)=>wireDataChannel(e.channel);
   try{ await pc.setRemoteDescription(o); const ans=await pc.createAnswer(); await pc.setLocalDescription(ans); await iceComplete(pc);
-    document.getElementById("collabReply").value=JSON.stringify(pc.localDescription); document.getElementById("collabReplyRow").style.display="";
-    rtcStatus("Reply generated — send it back to your peer."); }
+    showSignalOut("reply", buildSignalUrl(signalBaseUrl(),"reply", await packSignal(pc.localDescription)));
+    document.getElementById("collabReplyRow").style.display="";
+    rtcStatus("Reply link ready — send it back to your peer."); }
   catch(e){ rtcStatus("Couldn't join: "+e.message); }
+}
+// clicked an invite link → auto-open collab in join mode and generate the reply
+function checkInviteUrl(){
+  const sig=parseSignalHash(location.hash); if(!sig || sig.kind!=="invite") return;
+  const m=document.getElementById("collabModal"); if(!m) return;
+  collab.selfName=(localStorage.getItem("ps_collab_name")||"Guest");
+  document.getElementById("collabName").value=collab.selfName;
+  m.style.display="flex"; document.getElementById("collabJoinRow").style.display="";
+  document.getElementById("collabJoinIn").value=location.href;
+  rtcStatus("Invite detected — generating your reply link…");
+  rtcJoin(location.href);
+  try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){}   // don't re-trigger on refresh
 }
 function rtcTeardown(msg){
   try{ rtcSend(rtcEncode("bye")); }catch(e){}
@@ -3244,6 +3292,10 @@ function rtcTeardown(msg){
   $("collabAnswerInBtn").addEventListener("click",()=>rtcHostAccept($("collabAnswerIn").value.trim()));
   $("collabJoinBtn").addEventListener("click",()=>rtcJoin($("collabJoinIn").value.trim()));
   $("collabDisconnect").addEventListener("click",()=>rtcTeardown("Disconnected."));
+  const copyLink=(taId,btn)=>{ const ta=$(taId); if(!ta||!ta.value) return; try{ navigator.clipboard.writeText(ta.value); }catch(e){ ta.select(); document.execCommand&&document.execCommand("copy"); } const o=btn.textContent; btn.textContent="✓ Copied"; setTimeout(()=>btn.textContent=o,1200); };
+  $("collabOfferCopy").addEventListener("click",()=>copyLink("collabOffer",$("collabOfferCopy")));
+  $("collabReplyCopy").addEventListener("click",()=>copyLink("collabReply",$("collabReplyCopy")));
+  setTimeout(checkInviteUrl, 300);   // auto-join if the page was opened from an invite link
 })();
 
 /* cycle region select on the ruler */
