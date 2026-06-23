@@ -54,7 +54,7 @@ test("required element ids exist in the markup", () => {
     "collabBtn","collabModal","collabClose","collabName","collabHost","collabJoinMode","collabDisconnect",
     "collabOffer","collabAnswerIn","collabAnswerInBtn","collabJoinIn","collabJoinBtn","collabReply","collabStatus",
     // settings modal (canonical API-key editor)
-    "settingsBtn","settingsModal","settingsSave","settingsTest","settingsClear","settingsStatus",
+    "settingsBtn","settingsModal","settingsSave","settingsTest","settingsClear","settingsStatus","settingsResetLayout",
     // memo editor
     "tunerBtn","tunerModal","tunerInst","tunerTuning","tunerStrings","tunerMicBtn","tunerMeter","tmNote","tmNeedle","tmCents","tmTarget",
     "memoModal","memoCanvas","memoChips","memoSummary","memoKeySel","memoReanalyze",
@@ -81,7 +81,7 @@ test("core functions the tests and features depend on are present", () => {
     "samplerClipEvents","spawnOscs","buildId3","memoSrt","songMetadataJson","wavBytes16",
     "encodeSongAudio","exportSongPackage","applyProjectSpec","aiParseSpec",
     "aiProjectSummary","applyProjectOps","applySectionLayout","popOutSection","saveAutosave","bindKnob",
-    "openSettings","aiCfgSummary","aiLoadCfg","aiSaveCfg","aiChat","aiComplete",
+    "openSettings","aiCfgSummary","aiLoadCfg","aiSaveCfg","aiChat","aiComplete","resetAppSettings",
     "buildLyricsWizPrompt","buildMulliganPrompt","parseAiVariations",
     "newSession","saveCurrent","openSession","saveSession","setCurrentLabel","refreshRecent",
     "openPitchEditor","pitchSnapshot","semiToRate","renderPitchRoll",

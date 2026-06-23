@@ -1235,6 +1235,12 @@
       <button id="settingsClear" title="Remove all saved keys & settings from this browser">Clear keys</button>
       <span class="readout" id="settingsStatus" style="flex:1"></span>
     </div>
+    <div class="settings-privacy" style="margin-top:14px">
+      <b>🧹 App layout &amp; preferences.</b> Reset the panel order, minimized/expanded (minified) state,
+      track-name column width, and keyboard view back to <b>first-open defaults</b> — handy for seeing the
+      app the way a brand-new user does. This does <b>not</b> touch your saved sessions or your API keys.
+      <div style="margin-top:8px"><button id="settingsResetLayout" title="Reset section order, collapse state &amp; UI prefs to defaults (reloads the page)">↺ Reset app layout to defaults</button></div>
+    </div>
   </div>
 </div>
 
@@ -1475,7 +1481,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.39.0";
+const APP_VERSION="1.40.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -5778,6 +5784,14 @@ settingsModal.addEventListener("click",(e)=>{ if(e.target===settingsModal) close
 aiProvider.addEventListener("change",()=>{ settingsToggleBase(); if(!aiModel.value) aiModel.value=AI_DEFAULT_MODELS[aiProvider.value]||""; });
 document.getElementById("settingsSave").addEventListener("click",()=>{ aiSaveCfg(readSettingsCfg()); refreshAiCfgSummary(); flash(document.getElementById("settingsSave"),"Saved ✓"); });
 document.getElementById("settingsClear").addEventListener("click",()=>{ if(!confirm("Remove all saved API keys & settings from this browser?")) return; try{ localStorage.removeItem("ps_ai_cfg"); }catch(_){} aiProvider.value="openrouter"; aiModel.value=""; aiKey.value=""; aiBaseUrl.value=""; aiAudioUrl.value=""; settingsToggleBase(); refreshAiCfgSummary(); document.getElementById("settingsStatus").textContent="Cleared ✓"; });
+// Reset UI/layout preferences to first-open defaults (NOT sessions — those live in IndexedDB — and NOT API keys).
+function resetAppSettings(){
+  if(!confirm("Reset the app's layout & preferences to first-open defaults?\n\n• section order, minimized/expanded panels\n• track-name column width, keyboard octave/scale-lock\n\nYour saved sessions and API keys are NOT affected. The page will reload.")) return;
+  const keys=[(typeof LAYOUT_KEY!=="undefined"?LAYOUT_KEY:"pitchStudioLayout_v2"),"ps_tlhead_w","ps_kb_octave","ps_kb_scalelock","ps_lyrics_seeded"];
+  try{ keys.forEach(k=>localStorage.removeItem(k)); }catch(_){}
+  location.reload();
+}
+document.getElementById("settingsResetLayout").addEventListener("click",resetAppSettings);
 document.getElementById("settingsTest").addEventListener("click",async()=>{
   const cfg=readSettingsCfg(), st=document.getElementById("settingsStatus"), btn=document.getElementById("settingsTest");
   if(!cfg.key){ st.textContent="Enter your API key first."; return; }
