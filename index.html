@@ -1555,7 +1555,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.45.0";
+const APP_VERSION="1.46.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -3289,11 +3289,15 @@ async function onBlobComplete(blobId){
   rtcStatus("Received an audio take from "+(collab.peerName||"peer")+".");
 }
 function rtcSendTransport(action,pos){ if(rtcConnected() && !_rtcApplying) rtcSend(rtcEncode("transport",{action,pos:pos||0})); }
-function rtcStatus(msg){ const el=document.getElementById("collabStatus"); if(el) el.textContent=msg; }
+function rtcStatus(msg, good){ const el=document.getElementById("collabStatus"); if(el){ el.textContent=msg; el.style.color=good?"#34d399":""; el.style.fontWeight=good?"700":""; } }
+// once a peer is actually connected, the handshake codes are noise — hide them, show the green state
+function rtcShowConnected(){
+  ["collabHost","collabJoinMode","collabOfferRow","collabAnswerInRow","collabJoinRow","collabReplyRow"].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display="none"; });
+}
 function rtcPeersReadout(){ const el=document.getElementById("collabPeers"); if(!el) return; el.textContent=collab.connected?("● "+(collab.peerName||"peer")):""; if(collab.connected) el.style.color=peerColor(collab.peerName); }
 function rtcOnMessage(str){
   const m=rtcDecode(str); if(!m) return;                          // inbound is validated — bad/unknown dropped
-  if(m.type==="hello"){ collab.peerName=(m.data&&m.data.name)||"peer"; collab.peerSession=(m.data&&m.data.sessionId)||null; collab.connected=true; rtcStatus("Connected to "+collab.peerName+(collab.peerSession&&project.sessionId&&collab.peerSession!==project.sessionId&&project.tracks.length?" — different song (merging in)":".")); rtcPeersReadout(); }
+  if(m.type==="hello"){ collab.peerName=(m.data&&m.data.name)||"peer"; collab.peerSession=(m.data&&m.data.sessionId)||null; collab.connected=true; const diff=collab.peerSession&&project.sessionId&&collab.peerSession!==project.sessionId&&project.tracks.length; rtcStatus("✓ Connected to "+collab.peerName+(diff?" — merging your songs…":"."), true); rtcShowConnected(); rtcPeersReadout(); }
   else if(m.type==="bye"){ rtcTeardown("Peer disconnected."); }
   else if(m.type==="state"){ mergeRemoteState(m.data); }
   else if(m.type==="transport"){ const a=m.data&&m.data.action; _rtcApplying=true; try{ if(a==="play"){ if(!transport.playing) transportPlay(); } else if(a==="stop"){ if(transport.playing) transportStop(); } } finally { _rtcApplying=false; } }
@@ -3444,10 +3448,13 @@ async function rtcJoin(input){
   if(!o){ rtcStatus("That invite link/code isn't valid."); return; }
   collab.role="join"; const pc=newPeer(); pc.ondatachannel=(e)=>wireDataChannel(e.channel);
   try{ await pc.setRemoteDescription(o); const ans=await pc.createAnswer(); await pc.setLocalDescription(ans); await iceComplete(pc);
-    showSignalOut("reply", buildSignalUrl(signalBaseUrl(),"reply", await packSignal(pc.localDescription)));
+    const url=buildSignalUrl(signalBaseUrl(),"reply", await packSignal(pc.localDescription));
+    showSignalOut("reply", url);
     document.getElementById("collabReplyRow").style.display="";
-    rtcStatus("Reply link ready — send it back to your peer."); }
-  catch(e){ rtcStatus("Couldn't join: "+e.message); }
+    if(collab.joinedViaLink){ let copied=false; try{ await navigator.clipboard.writeText(url); copied=true; }catch(e){}
+      rtcStatus((copied?"📋 Reply copied! ":"")+"Last step — send this reply link back to your host and have them paste it in. You'll connect right after."); }
+    else rtcStatus("Reply link ready — send it back to your peer."); }
+  catch(e){ rtcStatus("Couldn't join: "+(e.message||e)); }
 }
 // clicked an invite link → auto-open collab in join mode and generate the reply
 function checkInviteUrl(){
@@ -3455,22 +3462,25 @@ function checkInviteUrl(){
   const m=document.getElementById("collabModal"); if(!m) return;
   collab.selfName=(localStorage.getItem("ps_collab_name")||"Guest");
   document.getElementById("collabName").value=collab.selfName;
-  m.style.display="flex"; document.getElementById("collabJoinRow").style.display="";
-  document.getElementById("collabJoinIn").value=location.href;
-  rtcStatus("Invite detected — generating your reply link…");
+  collab.joinedViaLink=true;
+  m.style.display="flex";
+  // we already HAVE the invite — hide the host/join chooser and the manual paste box; just process it
+  ["collabHost","collabJoinMode","collabJoinRow","collabOfferRow","collabAnswerInRow"].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display="none"; });
+  rtcStatus("🔗 Joining your peer's session — preparing your reply…");
   rtcJoin(location.href);
   try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){}   // don't re-trigger on refresh
 }
 function rtcTeardown(msg){
   try{ rtcSend(rtcEncode("bye")); }catch(e){}
   try{ collab.dc&&collab.dc.close(); }catch(e){} try{ collab.pc&&collab.pc.close(); }catch(e){}
-  collab.dc=collab.pc=null; collab.connected=false; collab.peerName="";
+  collab.dc=collab.pc=null; collab.connected=false; collab.peerName=""; collab.joinedViaLink=false;
   rtcStatus(msg||"Not connected."); rtcPeersReadout();
   const d=document.getElementById("collabDisconnect"); if(d) d.style.display="none";
+  ["collabHost","collabJoinMode"].forEach(id=>{ const e=document.getElementById(id); if(e) e.style.display=""; });   // chooser back for a fresh attempt
 }
 (function wireCollab(){
   const $=id=>document.getElementById(id);
-  $("collabBtn").addEventListener("click",()=>{ $("collabName").value=collab.selfName||localStorage.getItem("ps_collab_name")||""; $("collabModal").style.display="flex"; });
+  $("collabBtn").addEventListener("click",()=>{ $("collabName").value=collab.selfName||localStorage.getItem("ps_collab_name")||""; if(!collab.connected){ $("collabHost").style.display=""; $("collabJoinMode").style.display=""; collab.joinedViaLink=false; } $("collabModal").style.display="flex"; });
   $("collabClose").addEventListener("click",()=>{ $("collabModal").style.display="none"; });
   $("collabModal").addEventListener("click",(e)=>{ if(e.target===$("collabModal")) $("collabModal").style.display="none"; });
   $("collabName").addEventListener("input",()=>{ collab.selfName=$("collabName").value.trim(); try{ localStorage.setItem("ps_collab_name",collab.selfName); }catch(e){} });
