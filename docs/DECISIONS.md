@@ -372,10 +372,8 @@ Two browsers edit the same session live, with **no server we host and no account
 
 ## 69. Track automation lanes — volume + pan (Roadmap item 8, v1.36.0)
 Per-track timeline automation, gated behind a head toggle, kept to a few core params.
-- **Scope: volume + pan** (the acceptance params). `track.automation = { volume:[{beat,val}], pan:[...] }`,
-  piecewise-linear. Cutoff is deferred — the per-track chain has no master filter, and adding one to
-  every chain wasn't worth the CPU/risk this pass (the serializer already tolerates a `cutoff` key for
-  when it lands).
+- **Scope: volume, pan, and cutoff.** `track.automation = { volume:[{beat,val}], pan:[...], cutoff:[...] }`,
+  piecewise-linear. (Cutoff was added in v1.38.0 — see the addendum at the end of this entry.)
 - **Engine (DOM-free, tested):** `automationValueAt(points, beat, dflt)` interpolates linearly, holds
   edge values outside the range, tolerates unsorted points, and returns the default for an empty lane
   (so absent automation is a true no-op). `serializeAutomation` prunes empty lanes → `undefined` (clean
@@ -391,6 +389,13 @@ Per-track timeline automation, gated behind a head toggle, kept to a few core pa
   the curve with draggable point handles — click empty to add, drag to shape, right-click to delete.
   Every edit (add/move/delete) routes through `commit()` so it's undoable. Automation persists via
   serialize/load and snapshot. Tests: test/automation.test.mjs (5; 84 total).
+- **Addendum (v1.38.0) — cutoff automation.** `buildTrackChain` gained a lowpass `BiquadFilter`
+  (`type:"lowpass"`, default 20 kHz Q 0.7 → transparent when un-automated) after the FX chain, before the
+  panner. Cutoff points store the frequency in **Hz directly**, so live (`frequency.value`) and offline
+  (`linearRampToValueAtTime`) interpolate identically in Hz — same exactness as volume/pan, no sampled
+  curves. The lane editor maps Hz on a **log scale** (`AUTO_PARAMS.cutoff.log`) so the musical low end
+  isn't crushed into a sliver. The head toggle now cycles off → volume → pan → cutoff. Verified live
+  (18 kHz→9.1 kHz→300 Hz sweep) and offline bounce. This completes Item 8's volume/pan/cutoff scope.
 
 ## 68. Per-track + master level meters (Roadmap item 7, v1.35.0)
 Live feedback, not a console — a slim meter per track head plus a master meter in the transport row.
