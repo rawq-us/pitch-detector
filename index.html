@@ -1475,7 +1475,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.38.0";
+const APP_VERSION="1.39.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -2282,8 +2282,11 @@ function setKbOctave(v){ kbOctave=clamp(Math.round(v),-4,4); try{ localStorage.s
 })();
 
 /* ============================== Project / timing ============================== */
-const FORMAT_VERSION = 3; // v3: sampler layer (pad bank + grid/loop clips); v2: memo layer + clip loopFill
-const project = { bpm:90, timeSig:{num:4,den:4}, lengthSec:32, loop:{start:0,end:32}, loopEnabled:true, countInBars:1, tracks:[], samplerKit:[], keyMap:[], structure:[], meta:{ title:"", artist:"", album:"", genre:"", year:"", key:"", take:1, coverBlob:null } };
+const FORMAT_VERSION = 4; // v4: P2P sync identity (sessionId + per-track uid/ownerId/rev); v3: sampler layer; v2: memo layer + clip loopFill
+const project = { sessionId:null, bpm:90, timeSig:{num:4,den:4}, lengthSec:32, loop:{start:0,end:32}, loopEnabled:true, countInBars:1, tracks:[], samplerKit:[], keyMap:[], structure:[], meta:{ title:"", artist:"", album:"", genre:"", year:"", key:"", take:1, coverBlob:null }, syncBase:null };
+// stable per-install peer id (becomes track.ownerId); session id = the song's identity across machines
+function myPeerId(){ try{ let id=localStorage.getItem("ps_peer_id"); if(!id){ id=uuid(); localStorage.setItem("ps_peer_id", id); } return id; }catch(e){ return "peer-local"; } }
+function ensureSessionId(){ if(!project.sessionId) project.sessionId=uuid(); return project.sessionId; }
 // song structure / arrangement: an ordered set of sections, each placed at a bar with a bar-length.
 // Structure is the same kind of "scaffold" as BPM/time-sig/key — it feeds the lyrics editor & exports.
 const SECTION_TYPES = {
@@ -2790,7 +2793,7 @@ function ensureTrack(type){
 }
 function addTrack(type){
   const n = project.tracks.filter(t=>t.type===type).length + 1;
-  const t = { id:++trackSeq, type, name:({arp:"Arp ",beat:"Beat ",sampler:"Sampler ",voice:"Voice ",memo:"Memo ",midi:"MIDI "}[type]||"Track ")+n, clips:[], fx: fxDefaults(), transpose:0 };
+  const t = { id:++trackSeq, uid:uuid(), ownerId:myPeerId(), rev:0, updatedAt:Date.now(), type, name:({arp:"Arp ",beat:"Beat ",sampler:"Sampler ",voice:"Voice ",memo:"Memo ",midi:"MIDI "}[type]||"Track ")+n, clips:[], fx: fxDefaults(), transpose:0 };
   if (type==="midi") t.synth = cloneVoice(GLOBAL_VOICE);   // MIDI layers are their own instrument (own oscillators/filter/envelope)
   project.tracks.push(t); ensureTrackChain(t); selectedTrackId=t.id; renderTimeline(); return t;
 }
@@ -3071,13 +3074,94 @@ function rtcDecode(str){
   return { type:m.type, data:(m.data==null?null:m.data) };
 }
 function peerColor(seed){ seed=String(seed||""); let h=0; for(let i=0;i<seed.length;i++) h=(h*31+seed.charCodeAt(i))>>>0; return "hsl("+(h%360)+",70%,60%)"; }
+/* ===== P2P sync core (docs/P2P_SYNC_SPEC.md) — DOM-free, testable =====
+   sessionId = song identity across machines; per-track uid+rev+content-hash drive a 3-way merge so
+   reconnects fast-forward silently and only flag a conflict when both sides edited the same layer.
+   Timestamps are a hint, never an authority. */
+function uuid(){ try{ if(typeof crypto!=="undefined"&&crypto.randomUUID) return crypto.randomUUID(); }catch(e){} return "id-"+Date.now().toString(36)+"-"+Math.floor(Math.random()*1e9).toString(36); }
+// FNV-1a over a stable, audio-free projection of a track — deterministic content fingerprint for merge.
+function trackHash(track){
+  const t=track||{};
+  const clips=(t.clips||[]).map(c=>({ start:+(+c.start||0).toFixed(4), lengthBeats:c.lengthBeats||0, loopFill:!!c.loopFill, kind:c.kind||null, rate:c.rate||null, wave:c.wave||null, off:c.off||null, pad:(c.pad==null?null:c.pad), offset:(c.offset==null?null:c.offset), length:(c.length==null?null:c.length), audioDur:(c.audioDur==null?null:c.audioDur), hasAudio:!!(c.blob||c.buffer), notes:c.notes||null, steps:c.steps||null, grid:c.grid||null, pitch:c.pitch||null }));
+  let autom=null; if(t.automation){ const o={}; let any=false; ["volume","pan","cutoff"].forEach(k=>{ if(t.automation[k]&&t.automation[k].length){ o[k]=t.automation[k]; any=true; } }); autom=any?o:null; }   // ignore empty lanes (matches serializeAutomation)
+  const s=JSON.stringify({ type:t.type, name:t.name, transpose:t.transpose||0, muted:!!t.muted, soloed:!!t.soloed, meter:t.meter||null, fx:t.fx||null, automation:autom, clips });
+  let h=0x811c9dc5>>>0;
+  for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,0x01000193)>>>0; }
+  return h>>>0;
+}
+// {sessionId, tracks:{uid:{rev,hash}}} — the last successfully-synced state, the merge base (§1/§5).
+function computeSyncBase(proj){
+  const tracks={}; (proj.tracks||[]).forEach(t=>{ if(t.uid) tracks[t.uid]={ rev:t.rev||0, hash:trackHash(t) }; });
+  return { sessionId:proj.sessionId||null, tracks };
+}
+// metadata each side advertises: one record per track (no audio) for the reconnect exchange.
+function trackSyncMeta(proj){ return (proj.tracks||[]).map(t=>({ uid:t.uid, rev:t.rev||0, hash:trackHash(t), ownerId:t.ownerId||null, updatedAt:t.updatedAt||0 })); }
+// 3-way layer-level merge (§5). local/remote: arrays of {uid,rev,hash,updatedAt}. base: {uid:{rev,hash}}.
+// → { merged:[{uid,take,reason}], conflicts:[{uid,...}] }. take ∈ local|remote|same|delete.
+function reconcile(local, remote, base){
+  base=(base&&base.tracks)?base.tracks:(base||{});
+  const idx=arr=>{ const m=new Map(); (arr||[]).forEach(t=>{ if(t&&t.uid) m.set(t.uid,t); }); return m; };
+  const L=idx(local), R=idx(remote), merged=[], conflicts=[];
+  const uids=new Set([...L.keys(), ...R.keys(), ...Object.keys(base)]);
+  for(const uid of uids){
+    const l=L.get(uid), r=R.get(uid), b=base[uid];
+    const lChanged = l && (!b || l.hash!==b.hash), rChanged = r && (!b || r.hash!==b.hash);
+    if(l && r){
+      if(l.hash===r.hash) merged.push({ uid, take:"same" });
+      else if(lChanged && !rChanged) merged.push({ uid, take:"local", reason:"ff-local" });
+      else if(rChanged && !lChanged) merged.push({ uid, take:"remote", reason:"ff-remote" });
+      else conflicts.push({ uid, localRev:l.rev, remoteRev:r.rev, localUpdatedAt:l.updatedAt||0, remoteUpdatedAt:r.updatedAt||0 });
+    } else if(l && !r){
+      if(!b) merged.push({ uid, take:"local", reason:"added-local" });
+      else if(!lChanged) merged.push({ uid, take:"delete", reason:"deleted-remote" });
+      else conflicts.push({ uid, type:"delete-vs-edit", deletedBy:"remote", localRev:l.rev });
+    } else if(!l && r){
+      if(!b) merged.push({ uid, take:"remote", reason:"added-remote" });
+      else if(!rChanged) merged.push({ uid, take:"delete", reason:"deleted-local" });
+      else conflicts.push({ uid, type:"delete-vs-edit", deletedBy:"local", remoteRev:r.rev });
+    } else {
+      merged.push({ uid, take:"delete", reason:"deleted-both" });   // in base, gone both sides
+    }
+  }
+  return { merged, conflicts };
+}
+// mini-NTP (§2): median of (remoteTime − (localSend + rtt/2)) over ping samples → clock offset in ms.
+function clockMedianOffset(samples){
+  const offs=(samples||[]).map(s=>{ const rtt=(s.localRecv-s.localSend); return s.remoteTime-(s.localSend+rtt/2); }).sort((a,b)=>a-b);
+  if(!offs.length) return 0;
+  const mid=offs.length>>1; return offs.length%2 ? offs[mid] : (offs[mid-1]+offs[mid])/2;
+}
 // strip un-serializable audio (AudioBuffer) and heavy blobs from a snapshot before sending
-function rtcStateForWire(){ const s=snapshotProject(); s.tracks.forEach(t=>t.clips.forEach(c=>{ delete c.buffer; delete c.blob; })); return s; }
-function applyRemoteState(snap){
-  if(!snap||!snap.tracks) return;
-  const bufById=new Map(); project.tracks.forEach(t=>t.clips.forEach(c=>{ if(c.buffer) bufById.set(c.id,c.buffer); }));
-  snap.tracks.forEach(t=>t.clips.forEach(c=>{ const b=bufById.get(c.id); if(b) c.buffer=b; }));
-  _rtcApplying=true; _histMuted=true; try{ restoreProject(snap); } finally { _histMuted=false; _rtcApplying=false; }
+function rtcStateForWire(){ const s=snapshotProject(); s.sessionId=ensureSessionId(); s.tracks.forEach(t=>t.clips.forEach(c=>{ delete c.buffer; delete c.blob; })); return s; }
+// Per-track 3-way merge of an incoming remote snapshot (§5) — replaces whole-project clobber.
+// Each track is taken from local or remote per reconcile(); same-track concurrent edits become
+// conflicts (kept local for now). Local audio buffers ride along on kept tracks; remote-added tracks
+// arrive silent until audio-blob transfer lands. Returns surfaced conflicts.
+function mergeRemoteState(snap){
+  if(!snap||!snap.tracks) return { conflicts:[] };
+  // a brand-new (empty) peer adopts the song's identity and takes everything
+  if(!project.tracks.length && snap.sessionId){ project.sessionId=snap.sessionId; project.syncBase=null; }
+  const localMeta=trackSyncMeta(project);
+  const remoteMeta=snap.tracks.map(t=>({ uid:t.uid, rev:t.rev||0, hash:trackHash(t), updatedAt:t.updatedAt||0 }));
+  const { merged, conflicts }=reconcile(localMeta, remoteMeta, project.syncBase);
+  const localSnaps=new Map(project.tracks.map(t=>[t.uid, snapTrack(t)]));   // snapTrack keeps PCM buffers by ref
+  const remoteByUid=new Map(snap.tracks.map(t=>[t.uid, t]));
+  const decision=new Map(merged.map(m=>[m.uid, m]));
+  const order=[]; project.tracks.forEach(t=>{ if(order.indexOf(t.uid)<0) order.push(t.uid); }); snap.tracks.forEach(t=>{ if(order.indexOf(t.uid)<0) order.push(t.uid); });
+  const tracks=[];
+  for(const uid of order){
+    const m=decision.get(uid);
+    if(!m){ const lt=localSnaps.get(uid); if(lt) tracks.push(lt); continue; }   // conflict → keep mine
+    if(m.take==="delete") continue;
+    if(m.take==="remote") tracks.push(remoteByUid.get(uid));
+    else tracks.push(localSnaps.get(uid)||remoteByUid.get(uid));                  // local | same | added-local
+  }
+  // non-track arrangement fields are last-writer-wins (not track-scoped); selection stays local
+  const mergedSnap={ lengthSec:snap.lengthSec, loop:snap.loop, loopEnabled:snap.loopEnabled, keyMap:snap.keyMap, structure:snap.structure, selectedTrackId:selectedTrackId, tracks };
+  _rtcApplying=true; _histMuted=true; try{ restoreProject(mergedSnap); } finally { _histMuted=false; _rtcApplying=false; }
+  project.syncBase=computeSyncBase(project);
+  if(conflicts.length){ collab.conflicts=conflicts; rtcStatus(conflicts.length+" layer conflict"+(conflicts.length>1?"s":"")+" — kept yours (resolve coming)"); }
+  return { conflicts };
 }
 let _rtcApplying=false;
 const collab={ pc:null, dc:null, role:null, selfName:"", peerName:"", connected:false };
@@ -3089,14 +3173,14 @@ function rtcStatus(msg){ const el=document.getElementById("collabStatus"); if(el
 function rtcPeersReadout(){ const el=document.getElementById("collabPeers"); if(!el) return; el.textContent=collab.connected?("● "+(collab.peerName||"peer")):""; if(collab.connected) el.style.color=peerColor(collab.peerName); }
 function rtcOnMessage(str){
   const m=rtcDecode(str); if(!m) return;                          // inbound is validated — bad/unknown dropped
-  if(m.type==="hello"){ collab.peerName=(m.data&&m.data.name)||"peer"; collab.connected=true; rtcStatus("Connected to "+collab.peerName+"."); rtcPeersReadout(); }
+  if(m.type==="hello"){ collab.peerName=(m.data&&m.data.name)||"peer"; collab.peerSession=(m.data&&m.data.sessionId)||null; collab.connected=true; rtcStatus("Connected to "+collab.peerName+(collab.peerSession&&project.sessionId&&collab.peerSession!==project.sessionId&&project.tracks.length?" — different song (merging in)":".")); rtcPeersReadout(); }
   else if(m.type==="bye"){ rtcTeardown("Peer disconnected."); }
-  else if(m.type==="state"){ applyRemoteState(m.data); }
+  else if(m.type==="state"){ mergeRemoteState(m.data); }
   else if(m.type==="transport"){ const a=m.data&&m.data.action; _rtcApplying=true; try{ if(a==="play"){ if(!transport.playing) transportPlay(); } else if(a==="stop"){ if(transport.playing) transportStop(); } } finally { _rtcApplying=false; } }
 }
 function wireDataChannel(dc){
   collab.dc=dc;
-  dc.onopen=()=>{ collab.connected=true; rtcStatus("Channel open — syncing."); rtcSend(rtcEncode("hello",{name:collab.selfName||"Anon"})); rtcBroadcastState(); document.getElementById("collabDisconnect").style.display=""; };
+  dc.onopen=()=>{ collab.connected=true; rtcStatus("Channel open — syncing."); rtcSend(rtcEncode("hello",{name:collab.selfName||"Anon", sessionId:ensureSessionId()})); rtcBroadcastState(); document.getElementById("collabDisconnect").style.display=""; };
   dc.onclose=()=>rtcTeardown("Channel closed.");
   dc.onmessage=(e)=>rtcOnMessage(e.data);
 }
@@ -5128,7 +5212,7 @@ let autosaveTimer=null, autosaveReady=false;
 function scheduleAutosave(){ if (!autosaveReady) return; if (autosaveTimer) clearTimeout(autosaveTimer); autosaveTimer=setTimeout(()=>{ autosaveTimer=null; saveAutosave(); }, 1500); }
 function serializeProject(){
   return {
-    version: FORMAT_VERSION, bpm: project.bpm, timeSig: {...project.timeSig},
+    version: FORMAT_VERSION, sessionId: ensureSessionId(), syncBase: project.syncBase||undefined, bpm: project.bpm, timeSig: {...project.timeSig},
     lengthSec: project.lengthSec, loop: {...project.loop}, loopEnabled: project.loopEnabled, countInBars: project.countInBars,
     synth: {...GLOBAL_VOICE}, masterEq: {...masterEqParams}, layout: currentLayout(),
     meta: project.meta ? {...project.meta} : undefined,
@@ -5138,7 +5222,7 @@ function serializeProject(){
     lyrics: (typeof lyrSource!=="undefined" && lyrSource) ? { source: lyrSource.value, lineBeats: (lyricsState&&lyricsState.lineBeats)||[] } : undefined,
     tracks: project.tracks.map(function(t){
       return {
-        type: t.type, name: t.name, transpose: t.transpose||0, meter: t.meter||undefined, muted: !!t.muted, soloed: !!t.soloed, fx: JSON.parse(JSON.stringify(t.fx||fxDefaults())), synth: t.synth?cloneVoice(t.synth):undefined, automation: serializeAutomation(t.automation),
+        type: t.type, name: t.name, uid: t.uid||uuid(), ownerId: t.ownerId||myPeerId(), rev: t.rev||0, updatedAt: t.updatedAt||0, transpose: t.transpose||0, meter: t.meter||undefined, muted: !!t.muted, soloed: !!t.soloed, fx: JSON.parse(JSON.stringify(t.fx||fxDefaults())), synth: t.synth?cloneVoice(t.synth):undefined, automation: serializeAutomation(t.automation),
         clips: t.clips.map(function(c){
           if (t.type === "arp") return { start:c.start, lengthBeats:c.lengthBeats, loopFill:!!c.loopFill, rate:c.rate, wave:c.wave, steps:c.steps.map(s=>({...s})) };
           if (t.type === "midi") return { start:c.start, lengthBeats:c.lengthBeats, loopFill:!!c.loopFill, notes:(c.notes||[]).map(n=>({...n})), cc: c.cc?JSON.parse(JSON.stringify(c.cc)):undefined };
@@ -5158,6 +5242,8 @@ function serializeProject(){
 }
 function loadProject(data){
   if(typeof editHistory!=="undefined"){ editHistory.clear(); if(typeof updateUndoUI==="function") updateUndoUI(); }   // undo doesn't cross a session load
+  project.sessionId = data.sessionId || uuid();   // a loaded song keeps its identity across machines (mint if pre-v4)
+  project.syncBase = data.syncBase || null;
   project.bpm = data.bpm||90; bpmInput.value=project.bpm;
   project.timeSig = data.timeSig||{num:4,den:4}; tsSel.value=project.timeSig.num+"/"+project.timeSig.den;
   project.lengthSec = data.lengthSec||32; lenInput.value=String(projectBars());
@@ -5177,7 +5263,7 @@ function loadProject(data){
   project.keyMap=(data.keyMap||[]).map(r=>({ beat:+r.beat||0, root:((+r.root||0)%12+12)%12, mode:r.mode||"ionian" }));
   project.structure=(data.structure||[]).map(s=>({ id:++structSeq, type:s.type, beat:+s.beat||0, bars:Math.max(1,+s.bars||4) }));
   project.samplerKit.forEach(p=>{ if (p&&p.blob) padsToDecode.push(p); });
-  (data.tracks||[]).forEach(t=>{ const tr={id:++trackSeq,type:t.type,name:t.name,clips:[],fx:mergeFx(t.fx),transpose:t.transpose||0,meter:t.meter||undefined,muted:!!t.muted,soloed:!!t.soloed,automation:serializeAutomation(t.automation)}; if(t.type==="midi") tr.synth=t.synth?cloneVoice(t.synth):cloneVoice(GLOBAL_VOICE);
+  (data.tracks||[]).forEach(t=>{ const tr={id:++trackSeq,uid:t.uid||uuid(),ownerId:t.ownerId||myPeerId(),rev:t.rev||0,updatedAt:t.updatedAt||0,type:t.type,name:t.name,clips:[],fx:mergeFx(t.fx),transpose:t.transpose||0,meter:t.meter||undefined,muted:!!t.muted,soloed:!!t.soloed,automation:serializeAutomation(t.automation)}; if(t.type==="midi") tr.synth=t.synth?cloneVoice(t.synth):cloneVoice(GLOBAL_VOICE);
     (t.clips||[]).forEach(c=>{ const clip={id:++clipSeq,start:c.start,lengthBeats:c.lengthBeats,loopFill:!!c.loopFill}; if (t.type==="arp"){ clip.rate=c.rate; clip.wave=c.wave; clip.steps=(c.steps||[]).map(s=>({...s})); } else if (t.type==="midi"){ clip.notes=(c.notes||[]).map(n=>({...n})); clip.cc=c.cc?JSON.parse(JSON.stringify(c.cc)):undefined; } else if (t.type==="sampler"){ clip.kind=c.kind||"grid"; if (clip.kind==="loop"){ clip.pad=c.pad||0; clip.off=c.off||0; } else { clip.grid=(c.grid||[]).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } } else if (t.type==="voice"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if(c.offset) clip.offset=c.offset; if(c.length!=null) clip.length=c.length; if (clip.blob) toDecode.push(clip); } else if (t.type==="memo"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if(c.offset) clip.offset=c.offset; if(c.length!=null) clip.length=c.length; clip.analysis=c.analysis||null; clip.lyricsText=c.lyricsText||""; clip.lyricsWords=c.lyricsWords||null; clip.analysisKey=c.analysisKey||"auto"; clip.lyricsLang=c.lyricsLang||null; if (clip.blob) toDecode.push(clip); } else { clip.grid=(c.grid||DRUMS.map(()=>new Array(16).fill(false))).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } tr.clips.push(clip); }); project.tracks.push(tr); });
   selectedTrackId=project.tracks[0]?.id||null;
   project.tracks.forEach(ensureTrackChain); applyTrackMuteSolo();
@@ -5212,7 +5298,7 @@ function snapClip(type, c){
   return o;
 }
 function snapTrack(t){
-  const o={ id:t.id, type:t.type, name:t.name, transpose:t.transpose||0, meter:t.meter, muted:!!t.muted, soloed:!!t.soloed, fx:JSON.parse(JSON.stringify(t.fx||fxDefaults())), automation:serializeAutomation(t.automation), clips:t.clips.map(c=>snapClip(t.type,c)) };
+  const o={ id:t.id, uid:t.uid, ownerId:t.ownerId, rev:t.rev||0, updatedAt:t.updatedAt||0, type:t.type, name:t.name, transpose:t.transpose||0, meter:t.meter, muted:!!t.muted, soloed:!!t.soloed, fx:JSON.parse(JSON.stringify(t.fx||fxDefaults())), automation:serializeAutomation(t.automation), clips:t.clips.map(c=>snapClip(t.type,c)) };
   if(t.synth) o.synth=cloneVoice(t.synth);
   return o;
 }
@@ -5233,7 +5319,7 @@ function restoreProject(snap){
   project.keyMap=(snap.keyMap||[]).map(r=>({...r}));
   project.structure=(snap.structure||[]).map(s=>({...s}));
   project.tracks=snap.tracks.map(t=>{
-    const tr={ id:t.id, type:t.type, name:t.name, transpose:t.transpose||0, meter:t.meter, muted:!!t.muted, soloed:!!t.soloed, fx:mergeFx(t.fx), automation:serializeAutomation(t.automation), clips:t.clips.map(c=>snapClip(t.type,c)) };
+    const tr={ id:t.id, uid:t.uid, ownerId:t.ownerId, rev:t.rev||0, updatedAt:t.updatedAt||0, type:t.type, name:t.name, transpose:t.transpose||0, meter:t.meter, muted:!!t.muted, soloed:!!t.soloed, fx:mergeFx(t.fx), automation:serializeAutomation(t.automation), clips:t.clips.map(c=>snapClip(t.type,c)) };
     if(t.type==="midi") tr.synth=t.synth?cloneVoice(t.synth):cloneVoice(GLOBAL_VOICE);
     return tr;
   });
@@ -5271,13 +5357,21 @@ function commit(label, doFn){
   if(_histMuted){ if(doFn) doFn(); return; }
   const before=snapshotProject();
   if(doFn) doFn();                              // if the mutation throws, we never record — no bogus entry
+  bumpChangedRevs(before);
   editHistory.push({ label, snap:before });
   updateUndoUI();
   if(typeof rtcBroadcastState==="function") rtcBroadcastState();
 }
+// Per-track rev bump (P2P §1): any track whose content changed since the before-snapshot ++rev + stamps
+// updatedAt. Drives the 3-way merge (a track edited on only one side fast-forwards silently).
+function bumpChangedRevs(beforeSnap){
+  if(typeof trackHash!=="function") return;
+  const pre=new Map(((beforeSnap&&beforeSnap.tracks)||[]).map(t=>[t.uid, trackHash(t)])); const now=Date.now();
+  project.tracks.forEach(t=>{ if(!t.uid) return; if(pre.get(t.uid)!==trackHash(t)){ t.rev=(t.rev||0)+1; t.updatedAt=now; } });
+}
 // Two-phase variant for live drags: grab a before-snapshot at gesture start, record it on release.
 function beginEdit(){ return _histMuted?null:snapshotProject(); }
-function endEdit(label, before){ if(_histMuted||!before) return; editHistory.push({ label, snap:before }); updateUndoUI(); if(typeof rtcBroadcastState==="function") rtcBroadcastState(); }
+function endEdit(label, before){ if(_histMuted||!before) return; bumpChangedRevs(before); editHistory.push({ label, snap:before }); updateUndoUI(); if(typeof rtcBroadcastState==="function") rtcBroadcastState(); }
 function undoEdit(){
   if(!editHistory.canUndo()) return;
   const e=editHistory.undo({ label:editHistory.peekUndo().label, snap:snapshotProject() });

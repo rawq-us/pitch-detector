@@ -110,7 +110,9 @@ test("core functions the tests and features depend on are present", () => {
     // track automation (Roadmap item 8)
     "automationValueAt","serializeAutomation","applyLiveAutomation","buildAutomationOverlay",
     // live collaboration (Roadmap WebRTC)
-    "rtcEncode","rtcDecode","peerColor","rtcStateForWire","applyRemoteState","rtcBroadcastState","rtcSendTransport","rtcOnMessage","rtcHost","rtcJoin","rtcTeardown",
+    "rtcEncode","rtcDecode","peerColor","rtcStateForWire","rtcBroadcastState","rtcSendTransport","rtcOnMessage","rtcHost","rtcJoin","rtcTeardown",
+    // P2P sync spec (docs/P2P_SYNC_SPEC.md)
+    "uuid","myPeerId","ensureSessionId","trackHash","computeSyncBase","trackSyncMeta","reconcile","clockMedianOffset","mergeRemoteState","bumpChangedRevs",
     "midiEditorSetKey","syncSynthKeySel","fillKeySelect",
     "timelineKeys","clipKeySpan","renderKeyChips","nearestInScale","midiSnapPitch",
     "keySegmentsInClip","renderMidiKeyRuler","midiAddKeyChange","midiZoom","cloneVoice",

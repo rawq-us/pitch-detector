@@ -346,6 +346,35 @@ Three complaints from tuning an actual guitar, three fixes:
   the tone, click it again (or change tuning / close the modal) to silence it; the `.playing` card stays lit
   while it sounds.
 
+## 71. P2P sync — identity model + 3-way reconcile (docs/P2P_SYNC_SPEC.md, v1.39.0)
+Implements the testable spine of the sync spec; replaces the old whole-project last-writer-wins clobber
+with a per-track merge. Signaling stays the copy/paste handshake — all sync rides the data channel.
+- **§1 Identity (`FORMAT_VERSION` 3→4).** `project.sessionId` (UUID, the song's identity across machines),
+  per-track `uid`/`ownerId`/`rev`/`updatedAt`, and `project.syncBase` (the last-synced `{sessionId,
+  tracks:{uid:{rev,hash}}}`). `peerId` lives in localStorage and becomes `ownerId`. Minted in `addTrack`,
+  carried through serialize/load and snapshot/restore (so undo preserves identity). **Deviation from the
+  spec:** the spec says `track.id` = UUID, but the app keys runtime state (chains, selection, DOM) on the
+  existing numeric `track.id` everywhere — retrofitting that to a UUID is a large, destabilizing change.
+  So identity lives on a parallel `track.uid` (the stable cross-machine key the sync layer uses), and
+  numeric `id` stays for runtime. Same intent, no refactor blast radius.
+- **rev bumps automatically.** `commit()`/`endEdit()` diff each track's content hash before/after via
+  `bumpChangedRevs`; only genuinely-changed tracks `++rev` + stamp `updatedAt`. Verified: editing one
+  track doesn't touch another's rev.
+- **§5 reconcile (DOM-free, tested).** `trackHash` is an FNV-1a fingerprint over an audio-free, automation-
+  normalized projection of a track. `reconcile(local, remote, base)` → `{merged, conflicts}`: added-one-
+  side → take it; changed-one-side → silent fast-forward; changed-both → conflict; deleted-one-side-
+  untouched-other → take the delete; delete-vs-edit → conflict (never a silent loss). `mergeRemoteState`
+  applies this to an incoming snapshot, taking each track from local or remote by uid, keeping local PCM
+  buffers on kept tracks, and recomputing `syncBase`. An empty peer adopts the remote `sessionId` and
+  takes everything. Conflicts default to keep-mine (non-destructive) with a status line; the layer-diff
+  resolution UI (Keep mine/theirs/both) is deferred. Verified live in-browser: add + fast-forward + conflict.
+- **§2 clock offset (`clockMedianOffset`, tested):** median of `remoteTime − (localSend + rtt/2)` over
+  ping samples — recovers a ~+1000 ms skew. Ready for §3 (clock-synced transport), not yet wired.
+- **Tests:** test/p2psync.test.mjs (8; 97 total). **Remaining (need 2-browser manual testing):** §3 clock-
+  scheduled transport/record-arm, §4 per-track soft-lock live ops + claim, chunked audio-blob transfer so
+  stems are audible peer-to-peer, multi-person host-relay topology, MediaStream voice/video, and the
+  conflict-resolution UI.
+
 ## 70. WebRTC live collaboration — P2P transport + edit sync (Roadmap WebRTC, v1.37.0)
 Two browsers edit the same session live, with **no server we host and no accounts**.
 - **Signaling is copy/paste SDP** (non-trickle): host clicks "Create invite" → `createOffer` →
