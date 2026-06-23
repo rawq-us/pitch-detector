@@ -55,6 +55,7 @@ test("required element ids exist in the markup", () => {
     "collabStepStart","collabStepHost","collabStepJoin","collabStepConnected",
     "collabOffer","collabOfferCopy","collabOfferQR","collabAnswerIn","collabAnswerInBtn",
     "collabReply","collabReplyCopy","collabReplyQR","collabJoinHost","collabRoster","collabInviteMore",
+    "collabHostStep2","collabOfferQRtoggle","collabReplyQRtoggle",
     // settings modal (canonical API-key editor)
     "settingsBtn","settingsModal","settingsSave","settingsTest","settingsClear","settingsStatus","settingsResetLayout",
     // memo editor

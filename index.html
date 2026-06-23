@@ -654,6 +654,14 @@
   .collab-share { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 9px; }
   .collab-share textarea { flex: 1; }
   .collab-bigbtn { width: 100%; padding: 11px; font-size: 13px; font-weight: 650; border-radius: 9px; }
+  .collab-substep { padding: 2px 0; }
+  .collab-divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border), transparent); margin: 26px 0 20px; }
+  .collab-qrtoggle { display: inline-block; margin-top: 10px; background: none; border: 0; color: var(--muted); font-size: 11.5px; cursor: pointer; padding: 2px; }
+  .collab-qrtoggle:hover { color: var(--text); }
+  .collab-qrbox { margin-top: 10px; }
+  .collab-bigpaste { min-height: 84px; font-size: 12.5px !important; line-height: 1.5; border: 1.5px dashed color-mix(in srgb, #6ea8fe 55%, var(--border)) !important; border-radius: 11px; padding: 13px !important; background: rgba(110,168,254,0.04); transition: border-color .15s, background .15s; }
+  .collab-bigpaste::placeholder { color: color-mix(in srgb, #6ea8fe 75%, var(--muted)); font-weight: 600; }
+  .collab-bigpaste:focus { border-color: #6ea8fe !important; border-style: solid !important; background: rgba(110,168,254,0.07); outline: none; }
   .collab-connected { font-size: 18px; font-weight: 750; color: #34d399; margin: 4px 0 9px; }
   .collab-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #34d399; vertical-align: middle; animation: collabPulse 1.7s ease-in-out infinite; }
   @keyframes collabPulse { 0%,100% { box-shadow: 0 0 5px #34d399, 0 0 0 0 rgba(52,211,153,0.5); } 50% { box-shadow: 0 0 11px #34d399, 0 0 0 4px rgba(52,211,153,0); } }
@@ -1260,22 +1268,31 @@
 
     <!-- STEP: host — share invite (1), then paste their reply (2). Like sending then entering an MFA code. -->
     <div id="collabStepHost" class="collab-step" style="display:none">
-      <div class="collab-stepnum">Step 1 · Send this invite</div>
-      <p class="collab-explain">Share this link, or have them scan the QR. They open it and send you a reply link back.</p>
-      <div class="collab-share"><textarea id="collabOffer" rows="2" readonly placeholder="generating…"></textarea><div class="collab-qr" id="collabOfferQR"></div></div>
-      <button id="collabOfferCopy" class="collab-bigbtn">📋 Copy invite link</button>
-      <div class="collab-stepnum" style="margin-top:18px">Step 2 · Paste their reply</div>
-      <p class="collab-explain">When your collaborator sends back their reply link, paste it here to connect.</p>
-      <textarea id="collabAnswerIn" rows="2" placeholder="paste the reply link your collaborator sends back…"></textarea>
-      <button id="collabAnswerInBtn" class="primary collab-bigbtn" style="margin-top:8px">🔗 Connect</button>
+      <div class="collab-substep">
+        <div class="collab-stepnum">Step 1 · Send the invite</div>
+        <p class="collab-explain">Copy this link and send it to whoever you want to jam with — text, email, chat, anywhere.</p>
+        <textarea id="collabOffer" rows="2" readonly placeholder="generating your invite link…"></textarea>
+        <button id="collabOfferCopy" class="primary collab-bigbtn" style="margin-top:9px">📋 Copy invite link</button>
+        <button type="button" id="collabOfferQRtoggle" class="collab-qrtoggle">⊞ Show QR code</button>
+        <div class="collab-qr collab-qrbox" id="collabOfferQR" style="display:none"></div>
+      </div>
+      <div class="collab-substep" id="collabHostStep2" style="display:none">
+        <div class="collab-divider"></div>
+        <div class="collab-stepnum">Step 2 · Paste their reply</div>
+        <p class="collab-explain">They'll open your link and get a <b>reply link</b> of their own. Paste it below and you're connected.</p>
+        <textarea id="collabAnswerIn" class="collab-bigpaste" rows="4" placeholder="⬇  Paste the reply link your collaborator sends back  ⬇"></textarea>
+        <button id="collabAnswerInBtn" class="primary collab-bigbtn" style="display:none;margin-top:9px">🔗 Connect</button>
+      </div>
     </div>
 
     <!-- STEP: join — arrived via a link; just send the reply back. No paste box, no chooser. -->
     <div id="collabStepJoin" class="collab-step" style="display:none">
       <div class="collab-stepnum">Last step · Send this back</div>
-      <p class="collab-explain">You're joining <b id="collabJoinHost">your host</b>'s session. Send this reply link (or QR) back to them — you'll connect the moment they paste it in.</p>
-      <div class="collab-share"><textarea id="collabReply" rows="2" readonly placeholder="preparing your reply…"></textarea><div class="collab-qr" id="collabReplyQR"></div></div>
-      <button id="collabReplyCopy" class="primary collab-bigbtn">📋 Copy reply link</button>
+      <p class="collab-explain">You're joining <b id="collabJoinHost">your host</b>'s session. Copy this reply link and send it back to them — you'll connect the moment they paste it in.</p>
+      <textarea id="collabReply" rows="2" readonly placeholder="preparing your reply link…"></textarea>
+      <button id="collabReplyCopy" class="primary collab-bigbtn" style="margin-top:9px">📋 Copy reply link</button>
+      <button type="button" id="collabReplyQRtoggle" class="collab-qrtoggle">⊞ Show QR code</button>
+      <div class="collab-qr collab-qrbox" id="collabReplyQR" style="display:none"></div>
     </div>
 
     <!-- STEP: connected -->
@@ -1628,7 +1645,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.50.0";
+const APP_VERSION="1.51.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -3541,8 +3558,15 @@ function showSignalOut(kind, url){
   const ta=document.getElementById(kind==="invite"?"collabOffer":"collabReply"); if(ta) ta.value=url;
   if(typeof renderCollabQR==="function") renderCollabQR(kind, url);
 }
+function resetHostStep(){   // each new invite restarts at step 1, with step 2 hidden until they copy
+  const s2=document.getElementById("collabHostStep2"); if(s2) s2.style.display="none";
+  const ai=document.getElementById("collabAnswerIn"); if(ai) ai.value="";
+  const ab=document.getElementById("collabAnswerInBtn"); if(ab) ab.style.display="none";
+  ["collabOfferQR","collabReplyQR"].forEach(id=>{ const q=document.getElementById(id); if(q) q.style.display="none"; });
+  ["collabOfferQRtoggle","collabReplyQRtoggle"].forEach(id=>{ const t=document.getElementById(id); if(t) t.textContent="⊞ Show QR code"; });
+}
 async function rtcHost(){   // mint one invite for one new person; can be called again to add more
-  collab.isHost=true;
+  collab.isHost=true; resetHostStep();
   const peer={ id:"pending-"+uuid().slice(0,8), name:"", pc:newPeer(), dc:null };
   collab.peers.push(peer); collab._awaiting=peer;
   peer.dc=peer.pc.createDataChannel("ps"); wirePeerChannel(peer);
@@ -3597,9 +3621,15 @@ function rtcTeardown(msg){
   $("collabInviteMore").addEventListener("click",()=>{ rtcStatus("Creating another invite link…"); rtcHost(); });   // add another person to the live session
   $("collabAnswerInBtn").addEventListener("click",()=>rtcHostAccept($("collabAnswerIn").value.trim()));
   $("collabDisconnect").addEventListener("click",()=>rtcTeardown("You left the session."));
-  const copyLink=(taId,btn)=>{ const ta=$(taId); if(!ta||!ta.value) return; try{ navigator.clipboard.writeText(ta.value); }catch(e){ ta.select(); document.execCommand&&document.execCommand("copy"); } const o=btn.textContent; btn.textContent="✓ Copied"; setTimeout(()=>btn.textContent=o,1200); };
-  $("collabOfferCopy").addEventListener("click",()=>copyLink("collabOffer",$("collabOfferCopy")));
+  const copyLink=(taId,btn)=>{ const ta=$(taId); if(!ta||!ta.value) return; try{ navigator.clipboard.writeText(ta.value); }catch(e){ ta.select(); document.execCommand&&document.execCommand("copy"); } const o=btn.textContent; btn.textContent="✓ Copied!"; setTimeout(()=>btn.textContent=o,1400); };
+  // host: copying the invite advances to step 2 (paste their reply) — progressive disclosure
+  $("collabOfferCopy").addEventListener("click",()=>{ copyLink("collabOffer",$("collabOfferCopy")); $("collabHostStep2").style.display=""; $("collabAnswerIn").focus(); });
   $("collabReplyCopy").addEventListener("click",()=>copyLink("collabReply",$("collabReplyCopy")));
+  // the Connect button only appears once something's been pasted
+  $("collabAnswerIn").addEventListener("input",()=>{ $("collabAnswerInBtn").style.display = $("collabAnswerIn").value.trim() ? "" : "none"; });
+  // QR is optional, tucked behind a toggle (no in-app scanner, so it's not the main path)
+  const wireQR=(toggleId, boxId)=>{ const t=$(toggleId), b=$(boxId); if(!t||!b) return; t.addEventListener("click",()=>{ const show=b.style.display==="none"; b.style.display=show?"":"none"; t.textContent=(show?"⊟ Hide QR code":"⊞ Show QR code"); }); };
+  wireQR("collabOfferQRtoggle","collabOfferQR"); wireQR("collabReplyQRtoggle","collabReplyQR");
   setTimeout(checkInviteUrl, 300);   // auto-join if the page was opened from an invite link
 })();
 // First-run welcome / pitch modal (shown once; cleared by the Settings "reset app layout" button)
