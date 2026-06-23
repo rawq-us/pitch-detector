@@ -1500,7 +1500,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.43.0";
+const APP_VERSION="1.44.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -3091,7 +3091,7 @@ function buildAutomationOverlay(lane, track, param){
    No server we host: a copy/paste SDP handshake opens an RTCDataChannel; STUN (public) helps NAT.
    Messages are validated JSON. Edits sync as scoped arrangement snapshots (audio stripped — peers keep
    their own decoded audio by clip id); transport (play/stop) and presence sync too. Last-writer-wins. */
-const RTC_PROTO=1, RTC_MSG_TYPES=["hello","bye","transport","state","cursor"];
+const RTC_PROTO=1, RTC_MSG_TYPES=["hello","bye","transport","state","cursor","blobreq","blobmeta","blob"];
 function rtcEncode(type, data){ return JSON.stringify({ v:RTC_PROTO, type, data:(data===undefined?null:data) }); }
 function rtcDecode(str){
   let m; try{ m=JSON.parse(str); }catch(e){ return null; }
@@ -3185,6 +3185,7 @@ function mergeRemoteState(snap){
   const mergedSnap={ lengthSec:snap.lengthSec, loop:snap.loop, loopEnabled:snap.loopEnabled, keyMap:snap.keyMap, structure:snap.structure, selectedTrackId:selectedTrackId, tracks };
   _rtcApplying=true; _histMuted=true; try{ restoreProject(mergedSnap); } finally { _histMuted=false; _rtcApplying=false; }
   project.syncBase=computeSyncBase(project);
+  collabRegisterLocalBlobs(); requestMissingBlobs();   // pull any takes referenced but not yet held
   if(conflicts.length){ collab.conflicts=conflicts; rtcStatus(conflicts.length+" layer conflict"+(conflicts.length>1?"s":"")+" — kept yours (resolve coming)"); }
   return { conflicts };
 }
@@ -3192,7 +3193,46 @@ let _rtcApplying=false;
 const collab={ pc:null, dc:null, role:null, selfName:"", peerName:"", connected:false };
 function rtcConnected(){ return !!(collab.dc && collab.dc.readyState==="open"); }
 function rtcSend(str){ if(rtcConnected()){ try{ collab.dc.send(str); }catch(e){} } }
-function rtcBroadcastState(){ if(rtcConnected() && !_rtcApplying) rtcSend(rtcEncode("state", rtcStateForWire())); }
+function rtcBroadcastState(){ if(rtcConnected() && !_rtcApplying){ collabRegisterLocalBlobs(); rtcSend(rtcEncode("state", rtcStateForWire())); } }
+/* ===== Collab audio-blob transfer — recorded stems become audible on every peer =====
+   State sync carries clip structure + a stable blobId (no audio bytes). A peer that has a clip with a
+   blobId it lacks requests it; the owner streams the blob in base64 chunks over the data channel; the
+   receiver reassembles, decodes, and attaches the AudioBuffer to every clip sharing that blobId. */
+const collabBlobs=new Map();        // blobId → Blob we can serve to peers
+const _blobRx=new Map();            // blobId → { mime, total, chunks[], got }
+const _blobReq=new Set();           // blobIds already requested (dedupe)
+const BLOB_CHUNK=12*1024;           // raw bytes/chunk (~16KB base64 message)
+function concatChunks(chunks){ let n=0; for(const c of chunks) if(c) n+=c.length; const out=new Uint8Array(n); let o=0; for(const c of chunks) if(c){ out.set(c,o); o+=c.length; } return out; }
+function blobChunkCount(len, size){ return Math.max(0, Math.ceil(len/(size||BLOB_CHUNK))); }
+// assign a stable id to every local audio blob and register it so we can answer requests
+function collabRegisterLocalBlobs(){
+  project.tracks.forEach(t=>{ if(t.type!=="voice"&&t.type!=="memo") return; t.clips.forEach(c=>{ if(c.blob){ if(!c.blobId) c.blobId=uuid(); collabBlobs.set(c.blobId, c.blob); } }); });
+}
+async function sendBlob(blobId){
+  const blob=collabBlobs.get(blobId); if(!blob||!rtcConnected()) return;
+  const bytes=new Uint8Array(await blob.arrayBuffer()), total=blobChunkCount(bytes.length, BLOB_CHUNK);
+  rtcSend(rtcEncode("blobmeta",{ blobId, total, mime:blob.type||"audio/wav", size:bytes.length }));
+  for(let i=0;i<total;i++){
+    while(collab.dc && collab.dc.bufferedAmount>1000000) await new Promise(r=>setTimeout(r,30));   // backpressure
+    if(!rtcConnected()) return;
+    rtcSend(rtcEncode("blob",{ blobId, seq:i, b64:bytesToB64url(bytes.subarray(i*BLOB_CHUNK,(i+1)*BLOB_CHUNK)) }));
+  }
+}
+// after a merge, pull any audio the arrangement references but this peer doesn't have yet
+function requestMissingBlobs(){
+  if(!rtcConnected()) return;
+  project.tracks.forEach(t=>{ if(t.type!=="voice"&&t.type!=="memo") return; t.clips.forEach(c=>{ if(c.blobId && !c.blob && !c.buffer && !collabBlobs.has(c.blobId) && !_blobReq.has(c.blobId)){ _blobReq.add(c.blobId); rtcSend(rtcEncode("blobreq",{ blobId:c.blobId })); } }); });
+  if(_blobReq.size) rtcStatus("Pulling "+_blobReq.size+" audio take"+(_blobReq.size>1?"s":"")+" from "+(collab.peerName||"peer")+"…");
+}
+async function onBlobComplete(blobId){
+  const rx=_blobRx.get(blobId); if(!rx) return;
+  const blob=new Blob([concatChunks(rx.chunks)],{ type:rx.mime }); collabBlobs.set(blobId, blob);
+  _blobRx.delete(blobId); _blobReq.delete(blobId);
+  let buffer=null; try{ buffer=await decodeBlob(blob, getCtx()); }catch(e){}
+  project.tracks.forEach(t=>t.clips.forEach(c=>{ if(c.blobId===blobId){ c.blob=blob; if(buffer){ c.buffer=buffer; c.audioDur=buffer.duration; } } }));
+  renderTimeline();
+  rtcStatus("Received an audio take from "+(collab.peerName||"peer")+".");
+}
 function rtcSendTransport(action,pos){ if(rtcConnected() && !_rtcApplying) rtcSend(rtcEncode("transport",{action,pos:pos||0})); }
 function rtcStatus(msg){ const el=document.getElementById("collabStatus"); if(el) el.textContent=msg; }
 function rtcPeersReadout(){ const el=document.getElementById("collabPeers"); if(!el) return; el.textContent=collab.connected?("● "+(collab.peerName||"peer")):""; if(collab.connected) el.style.color=peerColor(collab.peerName); }
@@ -3202,6 +3242,9 @@ function rtcOnMessage(str){
   else if(m.type==="bye"){ rtcTeardown("Peer disconnected."); }
   else if(m.type==="state"){ mergeRemoteState(m.data); }
   else if(m.type==="transport"){ const a=m.data&&m.data.action; _rtcApplying=true; try{ if(a==="play"){ if(!transport.playing) transportPlay(); } else if(a==="stop"){ if(transport.playing) transportStop(); } } finally { _rtcApplying=false; } }
+  else if(m.type==="blobreq"){ if(m.data&&m.data.blobId) sendBlob(m.data.blobId); }
+  else if(m.type==="blobmeta"){ const d=m.data||{}; if(d.blobId) _blobRx.set(d.blobId,{ mime:d.mime||"audio/wav", total:d.total||0, chunks:new Array(d.total||0).fill(null), got:0 }); }
+  else if(m.type==="blob"){ const d=m.data||{}, rx=_blobRx.get(d.blobId); if(rx && d.b64!=null && d.seq>=0 && d.seq<rx.chunks.length && !rx.chunks[d.seq]){ rx.chunks[d.seq]=b64urlToBytes(d.b64); rx.got++; if(rx.got>=rx.total) onBlobComplete(d.blobId); } }
 }
 function wireDataChannel(dc){
   collab.dc=dc;
@@ -5421,8 +5464,8 @@ function serializeProject(){
           if (t.type === "sampler"){ return c.kind==="loop"
             ? { start:c.start, lengthBeats:c.lengthBeats, loopFill:!!c.loopFill, kind:"loop", pad:c.pad, off:c.off||0 }
             : { start:c.start, lengthBeats:c.lengthBeats, loopFill:!!c.loopFill, kind:"grid", grid:(c.grid||[]).map(r=>r.slice()), pitch:c.pitch?{...c.pitch}:undefined }; }
-          if (t.type === "voice") return { start:c.start, audioDur:c.audioDur, blob:c.blob, offset:c.offset||undefined, length:c.length!=null?c.length:undefined };
-          if (t.type === "memo") return { start:c.start, audioDur:c.audioDur, blob:c.blob, offset:c.offset||undefined, length:c.length!=null?c.length:undefined,
+          if (t.type === "voice") return { start:c.start, audioDur:c.audioDur, blob:c.blob, blobId:c.blobId||undefined, offset:c.offset||undefined, length:c.length!=null?c.length:undefined };
+          if (t.type === "memo") return { start:c.start, audioDur:c.audioDur, blob:c.blob, blobId:c.blobId||undefined, offset:c.offset||undefined, length:c.length!=null?c.length:undefined,
             analysis: c.analysis?JSON.parse(JSON.stringify(c.analysis)):null,
             lyricsText: c.lyricsText||"", lyricsWords: c.lyricsWords?JSON.parse(JSON.stringify(c.lyricsWords)):null,
             analysisKey: c.analysisKey||"auto", lyricsLang: c.lyricsLang||null };
@@ -5456,7 +5499,7 @@ function loadProject(data){
   project.structure=(data.structure||[]).map(s=>({ id:++structSeq, type:s.type, beat:+s.beat||0, bars:Math.max(1,+s.bars||4) }));
   project.samplerKit.forEach(p=>{ if (p&&p.blob) padsToDecode.push(p); });
   (data.tracks||[]).forEach(t=>{ const tr={id:++trackSeq,uid:t.uid||uuid(),ownerId:t.ownerId||myPeerId(),rev:t.rev||0,updatedAt:t.updatedAt||0,type:t.type,name:t.name,clips:[],fx:mergeFx(t.fx),transpose:t.transpose||0,meter:t.meter||undefined,muted:!!t.muted,soloed:!!t.soloed,automation:serializeAutomation(t.automation)}; if(t.type==="midi") tr.synth=t.synth?cloneVoice(t.synth):cloneVoice(GLOBAL_VOICE);
-    (t.clips||[]).forEach(c=>{ const clip={id:++clipSeq,start:c.start,lengthBeats:c.lengthBeats,loopFill:!!c.loopFill}; if (t.type==="arp"){ clip.rate=c.rate; clip.wave=c.wave; clip.steps=(c.steps||[]).map(s=>({...s})); } else if (t.type==="midi"){ clip.notes=(c.notes||[]).map(n=>({...n})); clip.cc=c.cc?JSON.parse(JSON.stringify(c.cc)):undefined; } else if (t.type==="sampler"){ clip.kind=c.kind||"grid"; if (clip.kind==="loop"){ clip.pad=c.pad||0; clip.off=c.off||0; } else { clip.grid=(c.grid||[]).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } } else if (t.type==="voice"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if(c.offset) clip.offset=c.offset; if(c.length!=null) clip.length=c.length; if (clip.blob) toDecode.push(clip); } else if (t.type==="memo"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if(c.offset) clip.offset=c.offset; if(c.length!=null) clip.length=c.length; clip.analysis=c.analysis||null; clip.lyricsText=c.lyricsText||""; clip.lyricsWords=c.lyricsWords||null; clip.analysisKey=c.analysisKey||"auto"; clip.lyricsLang=c.lyricsLang||null; if (clip.blob) toDecode.push(clip); } else { clip.grid=(c.grid||DRUMS.map(()=>new Array(16).fill(false))).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } tr.clips.push(clip); }); project.tracks.push(tr); });
+    (t.clips||[]).forEach(c=>{ const clip={id:++clipSeq,start:c.start,lengthBeats:c.lengthBeats,loopFill:!!c.loopFill}; if (t.type==="arp"){ clip.rate=c.rate; clip.wave=c.wave; clip.steps=(c.steps||[]).map(s=>({...s})); } else if (t.type==="midi"){ clip.notes=(c.notes||[]).map(n=>({...n})); clip.cc=c.cc?JSON.parse(JSON.stringify(c.cc)):undefined; } else if (t.type==="sampler"){ clip.kind=c.kind||"grid"; if (clip.kind==="loop"){ clip.pad=c.pad||0; clip.off=c.off||0; } else { clip.grid=(c.grid||[]).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } } else if (t.type==="voice"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if(c.blobId) clip.blobId=c.blobId; if(c.offset) clip.offset=c.offset; if(c.length!=null) clip.length=c.length; if (clip.blob) toDecode.push(clip); } else if (t.type==="memo"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if(c.blobId) clip.blobId=c.blobId; if(c.offset) clip.offset=c.offset; if(c.length!=null) clip.length=c.length; clip.analysis=c.analysis||null; clip.lyricsText=c.lyricsText||""; clip.lyricsWords=c.lyricsWords||null; clip.analysisKey=c.analysisKey||"auto"; clip.lyricsLang=c.lyricsLang||null; if (clip.blob) toDecode.push(clip); } else { clip.grid=(c.grid||DRUMS.map(()=>new Array(16).fill(false))).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } tr.clips.push(clip); }); project.tracks.push(tr); });
   selectedTrackId=project.tracks[0]?.id||null;
   project.tracks.forEach(ensureTrackChain); applyTrackMuteSolo();
   if (data.layout && typeof applySectionLayout==="function"){ applySectionLayout(data.layout); saveLayout(); }
@@ -5484,8 +5527,8 @@ function snapClip(type, c){
   if(type==="arp"){ o.rate=c.rate; o.wave=c.wave; o.steps=(c.steps||[]).map(s=>({...s})); }
   else if(type==="midi"){ o.notes=(c.notes||[]).map(n=>({...n})); o.cc=c.cc?JSON.parse(JSON.stringify(c.cc)):undefined; }
   else if(type==="sampler"){ o.kind=c.kind||"grid"; if(o.kind==="loop"){ o.pad=c.pad; o.off=c.off||0; } else { o.grid=(c.grid||[]).map(r=>r.slice()); o.pitch=c.pitch?{...c.pitch}:undefined; } }
-  else if(type==="voice"){ o.audioDur=c.audioDur; if(c.offset) o.offset=c.offset; if(c.length!=null) o.length=c.length; }
-  else if(type==="memo"){ o.audioDur=c.audioDur; if(c.offset) o.offset=c.offset; if(c.length!=null) o.length=c.length; o.analysis=c.analysis?JSON.parse(JSON.stringify(c.analysis)):null; o.lyricsText=c.lyricsText||""; o.lyricsWords=c.lyricsWords?JSON.parse(JSON.stringify(c.lyricsWords)):null; o.analysisKey=c.analysisKey||"auto"; o.lyricsLang=c.lyricsLang||null; }
+  else if(type==="voice"){ o.audioDur=c.audioDur; if(c.offset) o.offset=c.offset; if(c.length!=null) o.length=c.length; if(c.blobId) o.blobId=c.blobId; }
+  else if(type==="memo"){ o.audioDur=c.audioDur; if(c.offset) o.offset=c.offset; if(c.length!=null) o.length=c.length; if(c.blobId) o.blobId=c.blobId; o.analysis=c.analysis?JSON.parse(JSON.stringify(c.analysis)):null; o.lyricsText=c.lyricsText||""; o.lyricsWords=c.lyricsWords?JSON.parse(JSON.stringify(c.lyricsWords)):null; o.analysisKey=c.analysisKey||"auto"; o.lyricsLang=c.lyricsLang||null; }
   else { o.grid=(c.grid||[]).map(r=>r.slice()); o.pitch=c.pitch?{...c.pitch}:undefined; }
   return o;
 }
