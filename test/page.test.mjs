@@ -16,7 +16,7 @@ test("required element ids exist in the markup", () => {
   const ids = [
     // transport & layers
     "bpmInput","tsSel","lenInput","playBtn","tlZoomIn","tlZoomOut","tlZoomReset",
-    "addArpTrackBtn","addBeatTrackBtn","addSamplerTrackBtn","addVoiceTrackBtn","addMemoTrackBtn","addMidiTrackBtn",
+    "addLayerBtn","addLayerModal","addLayerClose","layerGrid","loopMenuBtn","loopWholeBtn","undoBtn","redoBtn",
     // MIDI piano-roll editor
     "midiModal","midiRoll","midiRollWrap","midiCtrlLane","midiCtrlTabs","midiCtrlBox","midiKbHost","midiKeyTag","midiSnap","midiBars","midiPlay","midiRecBtn","midiQuant",
     // instrument sections (visualizer + full-screen editor)
@@ -81,7 +81,7 @@ test("core functions the tests and features depend on are present", () => {
     "samplerClipEvents","spawnOscs","buildId3","memoSrt","songMetadataJson","wavBytes16",
     "encodeSongAudio","exportSongPackage","applyProjectSpec","aiParseSpec",
     "aiProjectSummary","applyProjectOps","applySectionLayout","popOutSection","saveAutosave","bindKnob",
-    "openSettings","aiCfgSummary","aiLoadCfg","aiSaveCfg","aiChat","aiComplete","resetAppSettings",
+    "openSettings","aiCfgSummary","aiLoadCfg","aiSaveCfg","aiChat","aiComplete","resetAppSettings","addLayer",
     "buildLyricsWizPrompt","buildMulliganPrompt","parseAiVariations",
     "newSession","saveCurrent","openSession","saveSession","setCurrentLabel","refreshRecent",
     "openPitchEditor","pitchSnapshot","semiToRate","renderPitchRoll",

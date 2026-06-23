@@ -634,6 +634,13 @@
   .tl-meter > i { position: absolute; left: 0; right: 0; bottom: 0; height: 0%; background: linear-gradient(to top, #2be36b 0%, #2be36b 60%, #ffcc1a 80%, #ff4d4d 100%); transition: height 0.04s linear; }
   .tl-meter.h { position: relative; right: auto; top: auto; bottom: auto; width: 84px; height: 9px; display: inline-block; }
   .tl-meter.h > i { left: 0; bottom: 0; top: 0; height: auto; width: 0%; background: linear-gradient(to right, #2be36b 0%, #2be36b 60%, #ffcc1a 80%, #ff4d4d 100%); transition: width 0.04s linear; }
+  .layer-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 8px; }
+  .layer-card { display: flex; gap: 12px; align-items: flex-start; text-align: left; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 12px 13px; cursor: pointer; transition: border-color 0.12s, background 0.12s; }
+  .layer-card:hover { border-color: var(--accent, #6ea8fe); background: rgba(110,168,254,0.08); }
+  .layer-card .lc-ico { font-size: 22px; line-height: 1; flex: none; }
+  .layer-card .lc-body { display: flex; flex-direction: column; }
+  .layer-card .lc-name { display: block; font-weight: 600; font-size: 13px; margin-bottom: 3px; }
+  .layer-card .lc-desc { display: block; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
   .tl-clip .cloop { position: absolute; bottom: 3px; right: 4px; font-size: 10px; background: rgba(0,0,0,0.4); border-radius: 5px; padding: 1px 5px; cursor: pointer; }
   .tl-clip .cloop:hover { background: rgba(0,0,0,0.7); }
   .tl-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.7); z-index: 5; pointer-events: none; display: none; }
@@ -693,7 +700,9 @@
         <div id="recentList" class="mb-recent"><div class="empty">No saved sessions yet</div></div>
       </div>
     </div>
+    <div class="mb-spacer"></div>
     <button class="mb-current song-meta-btn" id="songMetaBtn" title="Set the song title, genre &amp; take — captured as metadata and written into the export (ID3 tags)"><b id="songMetaDisplay">Untitled song</b></button>
+    <button class="mb-btn" id="collabBtn" title="Live collaborate — connect a second browser peer-to-peer; edits &amp; transport sync live (no server)">👥 Collab</button>
     <b id="sessionLabel" style="display:none">Untitled session</b>
     <div class="mb-spacer"></div>
     <button class="mb-btn" id="settingsBtn" title="Settings — API keys &amp; privacy">⚙ Settings</button>
@@ -722,9 +731,9 @@
         <div class="group"><label for="lenInput">Length (bars)</label><input id="lenInput" class="tl-in" type="text" inputmode="numeric" value="8" /></div>
       </div>
       <div class="tl-center tr-row tl-transport">
+        <div class="group"><label>&nbsp;</label><div class="tr-row" style="gap:3px"><button id="undoBtn" class="mini" title="Nothing to undo" disabled>↩</button><button id="redoBtn" class="mini" title="Nothing to redo" disabled>↪</button></div></div>
         <div class="group"><label>&nbsp;</label><button id="playBtn" class="primary">▶ Play</button></div>
-        <div class="group"><label>&nbsp;</label><button id="loopBtn" class="on">↺ Loop: on</button></div>
-        <div class="group"><label>&nbsp;</label><button id="loopResetBtn">Loop: whole piece</button></div>
+        <div class="group"><label>&nbsp;</label><div class="tr-row" style="gap:0"><button id="loopBtn" class="on">🔁 Loop: on</button><button id="loopMenuBtn" class="mini" title="Loop options" style="padding:6px 7px">▾</button></div></div>
         <div class="group"><label for="countInSel">Count-in</label>
           <select id="countInSel" class="tl-in">
             <option value="0">Off</option>
@@ -739,16 +748,9 @@
       </div>
     </div>
     <div class="row tl-controls" style="margin-bottom:12px">
-      <div class="group"><label>&nbsp;</label><div class="tr-row"><button id="undoBtn" class="mini" title="Nothing to undo" disabled>↶</button><button id="redoBtn" class="mini" title="Nothing to redo" disabled>↷</button></div></div>
-      <div class="group"><label>&nbsp;</label><button id="addArpTrackBtn" class="iconbtn" title="Add arp layer">＋🎹</button></div>
-      <div class="group"><label>&nbsp;</label><button id="addMidiTrackBtn" class="iconbtn" title="Add a MIDI layer — piano-roll editor (program, record &amp; edit notes)">＋🎼</button></div>
-      <div class="group"><label>&nbsp;</label><button id="addBeatTrackBtn" class="iconbtn" title="Add beat layer">＋🥁</button></div>
-      <div class="group"><label>&nbsp;</label><button id="addSamplerTrackBtn" class="iconbtn" title="Add sampler layer (sampled beats &amp; loops)">＋🎛</button></div>
-      <div class="group"><label>&nbsp;</label><button id="addVoiceTrackBtn" class="iconbtn" title="Add voice layer">＋🎤</button></div>
-      <div class="group"><label>&nbsp;</label><button id="addMemoTrackBtn" class="iconbtn" title="Add annotated memo layer (chords · notes · tempo · lyrics)">＋📝</button></div>
+      <div class="group"><label>&nbsp;</label><button id="addLayerBtn" class="iconbtn primary" title="Add a layer — choose a type">＋ Add layer</button></div>
       <div class="group"><label>&nbsp;</label><button id="backingBtn" class="iconbtn" title="Generate backing — turn a chord progression into in-key pad / bass / arp / drum layers, each its own editable, transposable stem">🎸 Backing</button></div>
       <div class="group"><label>&nbsp;</label><button id="aiComposeBtn" class="iconbtn" title="AI Composer — generate arrangement &amp; lyrics into isolated stems">🤖 AI</button></div>
-      <div class="group"><label>&nbsp;</label><button id="collabBtn" class="iconbtn" title="Live collaborate — connect a second browser peer-to-peer; edits &amp; transport sync live (no server)">👥 Collab</button></div>
       <div class="group"><label>&nbsp;</label><span class="dim" style="font-size:11px">Save / Open / Export &amp; New are in the <b>File</b> menu ↑</span></div>
       <div class="spacer"></div>
       <div class="group"><label>Master</label><div id="masterMeter" class="tl-meter h" title="Master output level"><i id="masterMeterFill"></i></div></div>
@@ -1122,6 +1124,19 @@
 </div>
 
 <!-- AI Composer modal -->
+<div id="loopMenu" class="popup" style="display:none">
+  <button id="loopWholeBtn" class="mini">⤢ Loop the whole piece</button>
+  <div id="loopRegionReadout" class="dim" style="font-size:11px"></div>
+</div>
+
+<div id="addLayerModal" class="modal" style="display:none">
+  <div class="modal-box" style="max-width:640px">
+    <div class="modal-head"><b>＋ Add a layer</b><button id="addLayerClose">✕</button></div>
+    <div class="hint" style="margin-top:0">Pick a layer type — each lands as its own editable, transposable track on the timeline.</div>
+    <div class="layer-grid" id="layerGrid"></div>
+  </div>
+</div>
+
 <div id="collabModal" class="modal" style="display:none">
   <div class="modal-box" style="max-width:640px">
     <div class="modal-head"><b>👥 Live collaborate (peer-to-peer)</b><button id="collabClose">✕</button></div>
@@ -1481,7 +1496,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.40.0";
+const APP_VERSION="1.41.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -3394,9 +3409,8 @@ function applyLiveAutomation(posSec){
 
 /* ============================== Timeline controls ============================== */
 const bpmInput=document.getElementById("bpmInput"), tsSel=document.getElementById("tsSel"), lenInput=document.getElementById("lenInput"),
-      playBtn=document.getElementById("playBtn"), loopBtn=document.getElementById("loopBtn"), loopResetBtn=document.getElementById("loopResetBtn"),
-      addArpTrackBtn=document.getElementById("addArpTrackBtn"), addBeatTrackBtn=document.getElementById("addBeatTrackBtn");
-function updateLoopButtons(){ loopBtn.classList.toggle("on",project.loopEnabled); loopBtn.textContent="↺ Loop: "+(project.loopEnabled?"on":"off"); }
+      playBtn=document.getElementById("playBtn"), loopBtn=document.getElementById("loopBtn");
+function updateLoopButtons(){ loopBtn.classList.toggle("on",project.loopEnabled); loopBtn.textContent="🔁 Loop: "+(project.loopEnabled?"on":"off"); }
 // changing tempo / meter keeps the song the same number of BARS (seconds are derived) — the
 // bar-centric model: you compose in bars, not seconds
 bpmInput.addEventListener("input",()=>{ const bars=projectBars(); project.bpm=clamp(parseFloat(bpmInput.value)||90,20,400); updateMsReadout(); updateBeatLen(); applyDelaySync(); setLength(bars*barSec()); if (transport.playing){ transportStop(); transportPlay(); } });
@@ -3405,12 +3419,46 @@ lenInput.addEventListener("input",()=>{ lenInput.value = lenInput.value.replace(
 lenInput.addEventListener("change",()=>{ setLengthBars(parseInt(lenInput.value||"0",10)||8); });
 playBtn.addEventListener("click",()=>{ transport.playing?transportStop():transportPlay(); });
 loopBtn.addEventListener("click",()=>{ project.loopEnabled=!project.loopEnabled; updateLoopButtons(); renderTimeline(); if (transport.playing){ transportStop(); transportPlay(); } });
-loopResetBtn.addEventListener("click",()=>{ project.loop.start=0; project.loop.end=project.lengthSec; project.loopEnabled=true; updateLoopButtons(); renderTimeline(); if (transport.playing){ transportStop(); transportPlay(); } });
+// Loop options popup (the "whole piece" reset lives here now — declutters the transport row)
+const loopMenu=document.getElementById("loopMenu"), loopMenuBtn=document.getElementById("loopMenuBtn");
+function closeLoopMenu(){ loopMenu.style.display="none"; }
+loopMenuBtn.addEventListener("click",(e)=>{
+  e.stopPropagation();
+  if(loopMenu.style.display==="flex"){ closeLoopMenu(); return; }
+  const r=loopMenuBtn.getBoundingClientRect();
+  loopMenu.style.left=(window.scrollX+Math.min(r.left, window.innerWidth-200))+"px";
+  loopMenu.style.top=(window.scrollY+r.bottom+6)+"px";
+  document.getElementById("loopRegionReadout").textContent="Region: "+fmtBars(project.loop.start)+" – "+fmtBars(project.loop.end);
+  loopMenu.style.display="flex";
+});
+document.getElementById("loopWholeBtn").addEventListener("click",()=>{ project.loop.start=0; project.loop.end=project.lengthSec; project.loopEnabled=true; updateLoopButtons(); renderTimeline(); closeLoopMenu(); if (transport.playing){ transportStop(); transportPlay(); } });
+document.addEventListener("click",(e)=>{ if(loopMenu.style.display==="flex" && !loopMenu.contains(e.target) && e.target!==loopMenuBtn) closeLoopMenu(); });
 document.getElementById("countInSel").addEventListener("change",(e)=>{ project.countInBars=parseInt(e.target.value,10)||0; renderTimeline(); });
-addArpTrackBtn.addEventListener("click",()=>commit("add arp layer",()=>addTrack("arp")));
-addBeatTrackBtn.addEventListener("click",()=>commit("add beat layer",()=>addTrack("beat")));
-document.getElementById("addMidiTrackBtn").addEventListener("click",()=>commit("add MIDI layer",()=>{ const t=addTrack("midi"); const clip={ id:++clipSeq, start:0, lengthBeats:beatsPerBar()*2, notes:[], loopFill:false }; addClip(t,clip); openMidiEditor(t,clip); }));
-document.getElementById("addSamplerTrackBtn").addEventListener("click",()=>{ commit("add sampler layer",()=>addTrack("sampler")); const s=document.querySelector('.csec[data-key="sampler"]'); if(s){ setCollapsed(s,false); saveLayout(); s.scrollIntoView({behavior:"smooth",block:"start"}); } });
+// ---- Add layer: one button → a modal of descriptive type cards ----
+const LAYER_TYPES=[
+  { type:"midi",    icon:"🎼", name:"MIDI instrument", desc:"Program melodies, basslines & chords on a piano roll — record live or draw notes. Its own synth voice." },
+  { type:"arp",     icon:"🎹", name:"Arpeggiator",     desc:"A synth that plays a repeating pattern through your chord. Instant hooks, movement & texture." },
+  { type:"beat",    icon:"🥁", name:"Beat",            desc:"A step-sequenced drum machine — tap kicks, snares & hats onto a grid that loops." },
+  { type:"sampler", icon:"🎛", name:"Sampler",         desc:"Load your own sounds or loops onto pads and sequence them into a beat." },
+  { type:"voice",   icon:"🎤", name:"Voice",           desc:"Record audio straight from your mic as a clip on the timeline." },
+  { type:"memo",    icon:"📝", name:"Memo",            desc:"Capture a take and auto-map it — chords, notes vs. your key, tempo & lyrics. The idea catcher." },
+];
+function addLayer(type){
+  if(type==="midi") commit("add MIDI layer",()=>{ const t=addTrack("midi"); const clip={ id:++clipSeq, start:0, lengthBeats:beatsPerBar()*2, notes:[], loopFill:false }; addClip(t,clip); openMidiEditor(t,clip); });
+  else if(type==="sampler"){ commit("add sampler layer",()=>addTrack("sampler")); const s=document.querySelector('.csec[data-key="sampler"]'); if(s){ setCollapsed(s,false); saveLayout(); s.scrollIntoView({behavior:"smooth",block:"start"}); } }
+  else commit("add "+type+" layer",()=>addTrack(type));
+}
+(function wireAddLayer(){
+  const modal=document.getElementById("addLayerModal"), grid=document.getElementById("layerGrid");
+  LAYER_TYPES.forEach(L=>{ const card=document.createElement("button"); card.className="layer-card"; card.dataset.type=L.type;
+    card.innerHTML='<span class="lc-ico">'+L.icon+'</span><span class="lc-body"><span class="lc-name">'+L.name+'</span><span class="lc-desc">'+L.desc+'</span></span>';
+    card.addEventListener("click",()=>{ modal.style.display="none"; addLayer(L.type); });
+    grid.appendChild(card);
+  });
+  document.getElementById("addLayerBtn").addEventListener("click",()=>{ modal.style.display="flex"; });
+  document.getElementById("addLayerClose").addEventListener("click",()=>{ modal.style.display="none"; });
+  modal.addEventListener("click",(e)=>{ if(e.target===modal) modal.style.display="none"; });
+})();
 
 /* ---- timeline zoom (buttons · ctrl/cmd+scroll · touch pinch) ---- */
 // Zoom updates PX_PER_SEC immediately but coalesces the (expensive) re-render to one per
@@ -3467,9 +3515,7 @@ function attachPinch(el, getZ, setZ, onTwo){
 attachPinch(tlScroll, ()=>PX_PER_SEC, (z,cx)=>setTimelineZoom(z,cx), ()=>{ drag=null; loopDrag=null; });
 
 /* ---------- Voice recording (MediaRecorder -> Blob) ---------- */
-const addVoiceTrackBtn=document.getElementById("addVoiceTrackBtn");
 let mediaRec=null, recChunks=[], recording=false, recStream=null, recTrack=null;
-addVoiceTrackBtn.addEventListener("click",()=>commit("add voice layer",()=>addTrack("voice")));
 function toggleVoiceRec(track){ recording ? stopVoiceRec() : startVoiceRec(track); }
 async function startVoiceRec(track){
   if (recording) return;
@@ -3502,7 +3548,6 @@ async function addVoiceClipFromBlob(blob){
    diatonic-first), the sung/played melody with cents-deviation coloring — plus
    optional in-browser Whisper lyric transcription. Everything exports as a portable
    bundle (24-bit WAV + SMF-1 MIDI with tempo map/markers/lyrics + LRC + Audacity labels). */
-document.getElementById("addMemoTrackBtn").addEventListener("click",()=>commit("add memo layer",()=>addTrack("memo")));
 const MEMO_QUALS=[ {q:"",iv:[0,4,7]}, {q:"m",iv:[0,3,7]}, {q:"dim",iv:[0,3,6]}, {q:"7",iv:[0,4,7,10]}, {q:"maj7",iv:[0,4,7,11]}, {q:"m7",iv:[0,3,7,10]} ];
 function memoChordLabel(s){ return NOTE_NAMES[s.root]+s.quality+(s.diatonic?"":"?"); }
 function memoTuneColor(c){ const a=Math.abs(c); return a<=10?"#2dd4bf":(a<=35?"#fbbf24":"#f87171"); }
