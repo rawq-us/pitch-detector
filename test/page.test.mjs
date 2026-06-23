@@ -54,7 +54,7 @@ test("required element ids exist in the markup", () => {
     "collabBtn","collabModal","collabClose","collabName","collabHost","collabDisconnect","collabStatus","collabPeers",
     "collabStepStart","collabStepHost","collabStepJoin","collabStepConnected",
     "collabOffer","collabOfferCopy","collabOfferQR","collabAnswerIn","collabAnswerInBtn",
-    "collabReply","collabReplyCopy","collabReplyQR","collabPeerName","collabJoinHost",
+    "collabReply","collabReplyCopy","collabReplyQR","collabJoinHost","collabRoster","collabInviteMore",
     // settings modal (canonical API-key editor)
     "settingsBtn","settingsModal","settingsSave","settingsTest","settingsClear","settingsStatus","settingsResetLayout",
     // memo editor
@@ -115,6 +115,7 @@ test("core functions the tests and features depend on are present", () => {
     "automationValueAt","serializeAutomation","applyLiveAutomation","buildAutomationOverlay",
     // live collaboration (Roadmap WebRTC)
     "rtcEncode","rtcDecode","peerColor","rtcStateForWire","rtcBroadcastState","rtcSendTransport","rtcOnMessage","rtcHost","rtcJoin","rtcTeardown","collabStep",
+    "rtcOpenPeers","rtcInSession","rtcSendAll","rtcSendTo","updateCollabUI","rebuildRoster","onPeerConnected","dropPeer","wirePeerChannel",
     "bytesToB64url","b64urlToBytes","buildSignalUrl","parseSignalHash","packSignal","unpackSignal","checkInviteUrl","showSignalOut",
     "qrGfMul","qrRsGen","qrChooseVersion","qrMakeMatrix","renderCollabQR",
     "concatChunks","blobChunkCount","collabRegisterLocalBlobs","sendBlob","requestMissingBlobs","onBlobComplete",

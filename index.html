@@ -655,6 +655,11 @@
   .collab-share textarea { flex: 1; }
   .collab-bigbtn { width: 100%; padding: 11px; font-size: 13px; font-weight: 650; border-radius: 9px; }
   .collab-connected { font-size: 18px; font-weight: 750; color: #34d399; margin: 4px 0 9px; }
+  .collab-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #34d399; vertical-align: middle; animation: collabPulse 1.7s ease-in-out infinite; }
+  @keyframes collabPulse { 0%,100% { box-shadow: 0 0 5px #34d399, 0 0 0 0 rgba(52,211,153,0.5); } 50% { box-shadow: 0 0 11px #34d399, 0 0 0 4px rgba(52,211,153,0); } }
+  .collab-roster { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 14px; }
+  .collab-peer { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 650; padding: 6px 12px; border-radius: 999px; color: var(--text); background: rgba(52,211,153,0.10); border: 1px solid rgba(52,211,153,0.32); }
+  #collabBtn.connected { color: #34d399; border-color: color-mix(in srgb, #34d399 45%, transparent); background: rgba(52,211,153,0.10); font-weight: 700; }
   /* ---- welcome / pitch modal — premium first-run ---- */
   #welcomeModal { background: rgba(7,11,20,0.66); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
   .welcome-box { position: relative; max-width: 920px; width: 100%; height: auto; max-height: 92vh; overflow: hidden; padding: 0; display: flex; flex-direction: column; border-radius: 24px;
@@ -1275,9 +1280,11 @@
 
     <!-- STEP: connected -->
     <div id="collabStepConnected" class="collab-step" style="display:none">
-      <div class="collab-connected">✓ Connected to <b id="collabPeerName">your peer</b></div>
-      <p class="collab-explain">Edits and transport sync live, and recorded takes stream over automatically. Close this window and keep working together.</p>
-      <button id="collabDisconnect" class="danger collab-bigbtn">Disconnect</button>
+      <div class="collab-connected">✓ You're in a live session</div>
+      <div class="collab-roster" id="collabRoster"></div>
+      <p class="collab-explain">Edits, transport and recorded takes sync live with everyone here. Invite more people, or just close this and keep working — you'll stay connected.</p>
+      <button id="collabInviteMore" class="primary collab-bigbtn">➕ Invite another person</button>
+      <button id="collabDisconnect" class="danger collab-bigbtn" style="margin-top:8px">Leave session</button>
     </div>
   </div>
 </div>
@@ -1621,7 +1628,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.49.0";
+const APP_VERSION="1.50.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -3212,7 +3219,7 @@ function buildAutomationOverlay(lane, track, param){
    No server we host: a copy/paste SDP handshake opens an RTCDataChannel; STUN (public) helps NAT.
    Messages are validated JSON. Edits sync as scoped arrangement snapshots (audio stripped — peers keep
    their own decoded audio by clip id); transport (play/stop) and presence sync too. Last-writer-wins. */
-const RTC_PROTO=1, RTC_MSG_TYPES=["hello","bye","transport","state","cursor","blobreq","blobmeta","blob"];
+const RTC_PROTO=1, RTC_MSG_TYPES=["hello","bye","transport","state","cursor","blobreq","blobmeta","blob","roster"];
 function rtcEncode(type, data){ return JSON.stringify({ v:RTC_PROTO, type, data:(data===undefined?null:data) }); }
 function rtcDecode(str){
   let m; try{ m=JSON.parse(str); }catch(e){ return null; }
@@ -3311,10 +3318,15 @@ function mergeRemoteState(snap){
   return { conflicts };
 }
 let _rtcApplying=false;
-const collab={ pc:null, dc:null, role:null, selfName:"", peerName:"", connected:false, stage:"start" };
-function rtcConnected(){ return !!(collab.dc && collab.dc.readyState==="open"); }
-function rtcSend(str){ if(rtcConnected()){ try{ collab.dc.send(str); }catch(e){} } }
-function rtcBroadcastState(){ if(rtcConnected() && !_rtcApplying){ collabRegisterLocalBlobs(); rtcSend(rtcEncode("state", rtcStateForWire())); } }
+// Multi-person session (star / host-relay): collab.peers holds one RTCDataChannel per connected person.
+// The host has many peers and relays sync traffic between them; a joiner has just the host.
+const collab={ selfId:uuid(), selfName:"", isHost:false, peers:[], roster:[], stage:"start", joinedViaLink:false, _awaiting:null };
+function rtcOpenPeers(){ return collab.peers.filter(p=>p.dc && p.dc.readyState==="open"); }
+function rtcInSession(){ return rtcOpenPeers().length>0; }
+function rtcConnected(){ return rtcInSession(); }
+function rtcSendTo(peer, str){ if(peer && peer.dc && peer.dc.readyState==="open"){ try{ peer.dc.send(str); }catch(e){} } }
+function rtcSendAll(str, exceptId){ rtcOpenPeers().forEach(p=>{ if(p.id!==exceptId) rtcSendTo(p, str); }); }
+function rtcBroadcastState(){ if(rtcInSession() && !_rtcApplying){ collabRegisterLocalBlobs(); rtcSendAll(rtcEncode("state", rtcStateForWire())); } }
 /* ===== Collab audio-blob transfer — recorded stems become audible on every peer =====
    State sync carries clip structure + a stable blobId (no audio bytes). A peer that has a clip with a
    blobId it lacks requests it; the owner streams the blob in base64 chunks over the data channel; the
@@ -3329,21 +3341,21 @@ function blobChunkCount(len, size){ return Math.max(0, Math.ceil(len/(size||BLOB
 function collabRegisterLocalBlobs(){
   project.tracks.forEach(t=>{ if(t.type!=="voice"&&t.type!=="memo") return; t.clips.forEach(c=>{ if(c.blob){ if(!c.blobId) c.blobId=uuid(); collabBlobs.set(c.blobId, c.blob); } }); });
 }
-async function sendBlob(blobId){
-  const blob=collabBlobs.get(blobId); if(!blob||!rtcConnected()) return;
+async function sendBlob(blobId, peer){   // stream a take to the peer that asked for it
+  const blob=collabBlobs.get(blobId); if(!blob||!peer) return;
   const bytes=new Uint8Array(await blob.arrayBuffer()), total=blobChunkCount(bytes.length, BLOB_CHUNK);
-  rtcSend(rtcEncode("blobmeta",{ blobId, total, mime:blob.type||"audio/wav", size:bytes.length }));
+  rtcSendTo(peer, rtcEncode("blobmeta",{ blobId, total, mime:blob.type||"audio/wav", size:bytes.length }));
   for(let i=0;i<total;i++){
-    while(collab.dc && collab.dc.bufferedAmount>1000000) await new Promise(r=>setTimeout(r,30));   // backpressure
-    if(!rtcConnected()) return;
-    rtcSend(rtcEncode("blob",{ blobId, seq:i, b64:bytesToB64url(bytes.subarray(i*BLOB_CHUNK,(i+1)*BLOB_CHUNK)) }));
+    while(peer.dc && peer.dc.bufferedAmount>1000000) await new Promise(r=>setTimeout(r,30));   // backpressure
+    if(!peer.dc || peer.dc.readyState!=="open") return;
+    rtcSendTo(peer, rtcEncode("blob",{ blobId, seq:i, b64:bytesToB64url(bytes.subarray(i*BLOB_CHUNK,(i+1)*BLOB_CHUNK)) }));
   }
 }
-// after a merge, pull any audio the arrangement references but this peer doesn't have yet
+// after a merge, ask the session for any audio the arrangement references but this peer doesn't have
 function requestMissingBlobs(){
-  if(!rtcConnected()) return;
-  project.tracks.forEach(t=>{ if(t.type!=="voice"&&t.type!=="memo") return; t.clips.forEach(c=>{ if(c.blobId && !c.blob && !c.buffer && !collabBlobs.has(c.blobId) && !_blobReq.has(c.blobId)){ _blobReq.add(c.blobId); rtcSend(rtcEncode("blobreq",{ blobId:c.blobId })); } }); });
-  if(_blobReq.size) rtcStatus("Pulling "+_blobReq.size+" audio take"+(_blobReq.size>1?"s":"")+" from "+(collab.peerName||"peer")+"…");
+  if(!rtcInSession()) return; let n=0;
+  project.tracks.forEach(t=>{ if(t.type!=="voice"&&t.type!=="memo") return; t.clips.forEach(c=>{ if(c.blobId && !c.blob && !c.buffer && !collabBlobs.has(c.blobId) && !_blobReq.has(c.blobId)){ _blobReq.add(c.blobId); rtcSendAll(rtcEncode("blobreq",{ blobId:c.blobId })); n++; } }); });
+  if(n) rtcStatus("Pulling "+n+" audio take"+(n>1?"s":"")+"…", true);
 }
 async function onBlobComplete(blobId){
   const rx=_blobRx.get(blobId); if(!rx) return;
@@ -3352,32 +3364,62 @@ async function onBlobComplete(blobId){
   let buffer=null; try{ buffer=await decodeBlob(blob, getCtx()); }catch(e){}
   project.tracks.forEach(t=>t.clips.forEach(c=>{ if(c.blobId===blobId){ c.blob=blob; if(buffer){ c.buffer=buffer; c.audioDur=buffer.duration; } } }));
   renderTimeline();
-  rtcStatus("Received an audio take from "+(collab.peerName||"peer")+".");
 }
-function rtcSendTransport(action,pos){ if(rtcConnected() && !_rtcApplying) rtcSend(rtcEncode("transport",{action,pos:pos||0})); }
+function rtcSendTransport(action,pos){ if(rtcInSession() && !_rtcApplying) rtcSendAll(rtcEncode("transport",{action,pos:pos||0})); }
 function rtcStatus(msg, good){ const el=document.getElementById("collabStatus"); if(el){ el.textContent=msg; el.style.color=good?"#34d399":""; el.style.fontWeight=good?"700":""; } }
-// once a peer is actually connected, the handshake codes are noise — hide them, show the green state
 // The connection wizard shows exactly one step: start | host | join | connected.
 function collabStep(name){
   collab.stage=name;
   ["Start","Host","Join","Connected"].forEach(s=>{ const e=document.getElementById("collabStep"+s); if(e) e.style.display=(s.toLowerCase()===name)?"":"none"; });
 }
-function rtcPeersReadout(){ const el=document.getElementById("collabPeers"); if(!el) return; el.textContent=collab.connected?("● "+(collab.peerName||"peer")):""; if(collab.connected) el.style.color=peerColor(collab.peerName); }
-function rtcOnMessage(str){
+// header button + connected-step roster reflect who's live, with a green pulsing presence dot
+function updateCollabUI(){
+  const open=rtcOpenPeers().length, live=open>0;
+  const people=collab.roster.length ? collab.roster.slice() : [{id:collab.selfId,name:collab.selfName||"You",self:true}].concat(rtcOpenPeers().map(p=>({id:p.id,name:p.name||"peer"})));
+  const btn=document.getElementById("collabBtn");
+  if(btn){ btn.classList.toggle("connected", live); btn.innerHTML = live ? ('<span class="collab-dot"></span> Live · '+people.length) : "👥 Collab"; btn.title = live ? "Live session ("+people.length+") — click to manage or invite more" : "Live collaborate — connect peers, no server"; }
+  const list=document.getElementById("collabRoster");
+  if(list) list.innerHTML = people.map(p=>'<span class="collab-peer"><span class="collab-dot"></span>'+escapeHtml(p.name||"peer")+(p.self?" (you)":"")+'</span>').join("");
+}
+// host is authoritative for presence: rebuild the roster (me + named peers) and push it to everyone
+function rebuildRoster(){
+  if(!collab.isHost) return;
+  collab.roster=[{id:collab.selfId,name:collab.selfName||"You",self:true}].concat(rtcOpenPeers().filter(p=>p.name).map(p=>({id:p.id,name:p.name})));
+  rtcSendAll(rtcEncode("roster",{peers:collab.roster}));
+  updateCollabUI();
+}
+function onPeerConnected(peer){
+  collab.stage="connected";
+  if(collab.isHost) rebuildRoster();
+  else collab.roster=[{id:collab.selfId,name:collab.selfName||"You",self:true},{id:peer&&peer.id,name:(peer&&peer.name)||"host"}];
+  rtcStatus("You're collaborating live.", true); collabStep("connected"); updateCollabUI();
+  setTimeout(()=>{ const m=document.getElementById("collabModal"); if(m && rtcInSession()) m.style.display="none"; }, 1300);   // auto-close so they can start editing
+}
+function dropPeer(peer){
+  try{ peer.dc&&peer.dc.close(); }catch(e){} try{ peer.pc&&peer.pc.close(); }catch(e){}
+  collab.peers=collab.peers.filter(p=>p!==peer);
+  if(collab.isHost) rebuildRoster();
+  if(!rtcInSession()){ collab.stage="start"; collab.roster=[]; collabStep("start"); rtcStatus("The session ended."); }
+  updateCollabUI();
+}
+function rtcOnMessage(str, fromPeer){
   const m=rtcDecode(str); if(!m) return;                          // inbound is validated — bad/unknown dropped
-  if(m.type==="hello"){ collab.peerName=(m.data&&m.data.name)||"peer"; collab.peerSession=(m.data&&m.data.sessionId)||null; collab.connected=true; const diff=collab.peerSession&&project.sessionId&&collab.peerSession!==project.sessionId&&project.tracks.length; const pn=document.getElementById("collabPeerName"); if(pn) pn.textContent=collab.peerName; rtcStatus(diff?"Merging your songs…":"You're collaborating live.", true); collabStep("connected"); rtcPeersReadout(); }
-  else if(m.type==="bye"){ rtcTeardown("Peer disconnected."); }
+  // host-relay: pass sync/transport/blob traffic to the OTHER peers (a joiner has only the host, so this no-ops)
+  if(collab.isHost && collab.peers.length>1 && ["state","transport","blobreq","blobmeta","blob"].indexOf(m.type)>=0) rtcSendAll(str, fromPeer&&fromPeer.id);
+  if(m.type==="hello"){ if(fromPeer){ if(m.data&&m.data.id) fromPeer.id=m.data.id; fromPeer.name=(m.data&&m.data.name)||"peer"; fromPeer.session=(m.data&&m.data.sessionId)||null; } onPeerConnected(fromPeer); }
+  else if(m.type==="roster"){ collab.roster=(m.data&&m.data.peers)||[]; updateCollabUI(); }
+  else if(m.type==="bye"){ if(fromPeer) dropPeer(fromPeer); }
   else if(m.type==="state"){ mergeRemoteState(m.data); }
   else if(m.type==="transport"){ const a=m.data&&m.data.action; _rtcApplying=true; try{ if(a==="play"){ if(!transport.playing) transportPlay(); } else if(a==="stop"){ if(transport.playing) transportStop(); } } finally { _rtcApplying=false; } }
-  else if(m.type==="blobreq"){ if(m.data&&m.data.blobId) sendBlob(m.data.blobId); }
+  else if(m.type==="blobreq"){ if(m.data&&m.data.blobId) sendBlob(m.data.blobId, fromPeer); }
   else if(m.type==="blobmeta"){ const d=m.data||{}; if(d.blobId) _blobRx.set(d.blobId,{ mime:d.mime||"audio/wav", total:d.total||0, chunks:new Array(d.total||0).fill(null), got:0 }); }
   else if(m.type==="blob"){ const d=m.data||{}, rx=_blobRx.get(d.blobId); if(rx && d.b64!=null && d.seq>=0 && d.seq<rx.chunks.length && !rx.chunks[d.seq]){ rx.chunks[d.seq]=b64urlToBytes(d.b64); rx.got++; if(rx.got>=rx.total) onBlobComplete(d.blobId); } }
 }
-function wireDataChannel(dc){
-  collab.dc=dc;
-  dc.onopen=()=>{ collab.connected=true; rtcStatus("Channel open — syncing."); rtcSend(rtcEncode("hello",{name:collab.selfName||"Anon", sessionId:ensureSessionId()})); rtcBroadcastState(); document.getElementById("collabDisconnect").style.display=""; };
-  dc.onclose=()=>rtcTeardown("Channel closed.");
-  dc.onmessage=(e)=>rtcOnMessage(e.data);
+function wirePeerChannel(peer){
+  const dc=peer.dc;
+  dc.onopen=()=>{ rtcSendTo(peer, rtcEncode("hello",{ id:collab.selfId, name:collab.selfName||"Anon", sessionId:ensureSessionId() })); collabRegisterLocalBlobs(); rtcSendTo(peer, rtcEncode("state", rtcStateForWire())); requestMissingBlobs(); updateCollabUI(); };
+  dc.onclose=()=>dropPeer(peer);
+  dc.onmessage=(e)=>rtcOnMessage(e.data, peer);
 }
 /* ===== Signaling payload codec — compress an SDP to a short, link-safe string (no backend) =====
    WebRTC needs a two-way exchange (offer ↔ answer), so we can't do it in one link — but each leg can
@@ -3492,33 +3534,38 @@ function renderCollabQR(kind, text){
   host.innerHTML='<svg width="'+wh+'" height="'+wh+'" viewBox="0 0 '+wh+' '+wh+'" xmlns="http://www.w3.org/2000/svg"><rect width="'+wh+'" height="'+wh+'" fill="#fff"/><g fill="#000">'+rects+'</g></svg>';
   host.title="Scan to open the "+(kind==="invite"?"invite":"reply")+" link (QR v"+q.version+")";
 }
-function newPeer(){ const pc=new RTCPeerConnection({ iceServers:[{urls:"stun:stun.l.google.com:19302"}] }); collab.pc=pc; return pc; }
+function newPeer(){ return new RTCPeerConnection({ iceServers:[{urls:"stun:stun.l.google.com:19302"}] }); }
 function iceComplete(pc){ return new Promise(res=>{ if(pc.iceGatheringState==="complete") return res(); const chk=()=>{ if(pc.iceGatheringState==="complete"){ pc.removeEventListener("icegatheringstatechange",chk); res(); } }; pc.addEventListener("icegatheringstatechange",chk); setTimeout(res,2500); }); }
 // fill the output textarea with the link and (if available) render a QR for it
 function showSignalOut(kind, url){
   const ta=document.getElementById(kind==="invite"?"collabOffer":"collabReply"); if(ta) ta.value=url;
   if(typeof renderCollabQR==="function") renderCollabQR(kind, url);
 }
-async function rtcHost(){
-  collab.role="host"; const pc=newPeer(); wireDataChannel(pc.createDataChannel("ps"));
-  const offer=await pc.createOffer(); await pc.setLocalDescription(offer); await iceComplete(pc);
-  showSignalOut("invite", buildSignalUrl(signalBaseUrl(),"invite", await packSignal(pc.localDescription)));
-  collabStep("host");
-  rtcStatus("Waiting for your collaborator's reply…");
+async function rtcHost(){   // mint one invite for one new person; can be called again to add more
+  collab.isHost=true;
+  const peer={ id:"pending-"+uuid().slice(0,8), name:"", pc:newPeer(), dc:null };
+  collab.peers.push(peer); collab._awaiting=peer;
+  peer.dc=peer.pc.createDataChannel("ps"); wirePeerChannel(peer);
+  const offer=await peer.pc.createOffer(); await peer.pc.setLocalDescription(offer); await iceComplete(peer.pc);
+  showSignalOut("invite", buildSignalUrl(signalBaseUrl(),"invite", await packSignal(peer.pc.localDescription)));
+  collabStep("host"); rtcStatus("Waiting for your collaborator's reply…");
 }
 async function rtcHostAccept(input){
   const sig=parseSignalHash(input); const a=await unpackSignal(sig?sig.payload:input);
   if(!a){ rtcStatus("That reply link/code isn't valid."); return; }
-  try{ await collab.pc.setRemoteDescription(a); rtcStatus("Connecting…"); }catch(e){ rtcStatus("Couldn't connect: "+e.message); }
+  const peer=collab._awaiting; if(!peer){ rtcStatus("Create an invite first."); return; }
+  try{ await peer.pc.setRemoteDescription(a); rtcStatus("Connecting…"); }catch(e){ rtcStatus("Couldn't connect: "+(e.message||e)); }
 }
 async function rtcJoin(input){
   const sig=parseSignalHash(input); const o=await unpackSignal(sig?sig.payload:input);
   if(!o){ rtcStatus("That invite link/code isn't valid."); return; }
-  collab.role="join"; const pc=newPeer(); pc.ondatachannel=(e)=>wireDataChannel(e.channel);
-  try{ await pc.setRemoteDescription(o); const ans=await pc.createAnswer(); await pc.setLocalDescription(ans); await iceComplete(pc);
-    const url=buildSignalUrl(signalBaseUrl(),"reply", await packSignal(pc.localDescription));
-    showSignalOut("reply", url);
-    collabStep("join");
+  collab.isHost=false;
+  const peer={ id:"host-"+uuid().slice(0,8), name:"host", pc:newPeer(), dc:null };
+  collab.peers.push(peer);
+  peer.pc.ondatachannel=(e)=>{ peer.dc=e.channel; wirePeerChannel(peer); };
+  try{ await peer.pc.setRemoteDescription(o); const ans=await peer.pc.createAnswer(); await peer.pc.setLocalDescription(ans); await iceComplete(peer.pc);
+    const url=buildSignalUrl(signalBaseUrl(),"reply", await packSignal(peer.pc.localDescription));
+    showSignalOut("reply", url); collabStep("join");
     let copied=false; try{ await navigator.clipboard.writeText(url); copied=true; }catch(e){}
     rtcStatus(copied?"📋 Reply copied — send it to your host.":"Send your reply link back to your host."); }
   catch(e){ rtcStatus("Couldn't join: "+(e.message||e)); }
@@ -3536,21 +3583,20 @@ function checkInviteUrl(){
   try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){}   // don't re-trigger on refresh
 }
 function rtcTeardown(msg){
-  try{ rtcSend(rtcEncode("bye")); }catch(e){}
-  try{ collab.dc&&collab.dc.close(); }catch(e){} try{ collab.pc&&collab.pc.close(); }catch(e){}
-  collab.dc=collab.pc=null; collab.connected=false; collab.peerName=""; collab.joinedViaLink=false;
-  rtcStatus(msg||"Not connected."); rtcPeersReadout();
-  collabStep("start");   // back to the beginning for a fresh attempt
+  collab.peers.forEach(p=>{ try{ rtcSendTo(p, rtcEncode("bye")); }catch(e){} try{ p.dc&&p.dc.close(); }catch(e){} try{ p.pc&&p.pc.close(); }catch(e){} });
+  collab.peers=[]; collab.roster=[]; collab._awaiting=null; collab.joinedViaLink=false; collab.isHost=false;
+  rtcStatus(msg||"Not connected."); collabStep("start"); updateCollabUI();
 }
 (function wireCollab(){
   const $=id=>document.getElementById(id);
-  $("collabBtn").addEventListener("click",()=>{ $("collabName").value=collab.selfName||localStorage.getItem("ps_collab_name")||""; collabStep(collab.stage||"start"); $("collabModal").style.display="flex"; });
+  $("collabBtn").addEventListener("click",()=>{ $("collabName").value=collab.selfName||localStorage.getItem("ps_collab_name")||""; collabStep(rtcInSession()?"connected":(collab.stage||"start")); updateCollabUI(); $("collabModal").style.display="flex"; });
   $("collabClose").addEventListener("click",()=>{ $("collabModal").style.display="none"; });
   $("collabModal").addEventListener("click",(e)=>{ if(e.target===$("collabModal")) $("collabModal").style.display="none"; });
   $("collabName").addEventListener("input",()=>{ collab.selfName=$("collabName").value.trim(); try{ localStorage.setItem("ps_collab_name",collab.selfName); }catch(e){} });
   $("collabHost").addEventListener("click",()=>{ collab.selfName=$("collabName").value.trim()||"Host"; rtcStatus("Creating your invite link…"); rtcHost(); });
+  $("collabInviteMore").addEventListener("click",()=>{ rtcStatus("Creating another invite link…"); rtcHost(); });   // add another person to the live session
   $("collabAnswerInBtn").addEventListener("click",()=>rtcHostAccept($("collabAnswerIn").value.trim()));
-  $("collabDisconnect").addEventListener("click",()=>rtcTeardown("Disconnected."));
+  $("collabDisconnect").addEventListener("click",()=>rtcTeardown("You left the session."));
   const copyLink=(taId,btn)=>{ const ta=$(taId); if(!ta||!ta.value) return; try{ navigator.clipboard.writeText(ta.value); }catch(e){ ta.select(); document.execCommand&&document.execCommand("copy"); } const o=btn.textContent; btn.textContent="✓ Copied"; setTimeout(()=>btn.textContent=o,1200); };
   $("collabOfferCopy").addEventListener("click",()=>copyLink("collabOffer",$("collabOfferCopy")));
   $("collabReplyCopy").addEventListener("click",()=>copyLink("collabReply",$("collabReplyCopy")));
