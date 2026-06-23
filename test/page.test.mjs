@@ -16,7 +16,7 @@ test("required element ids exist in the markup", () => {
   const ids = [
     // transport & layers
     "bpmInput","tsSel","lenInput","playBtn","tlZoomIn","tlZoomOut","tlZoomReset",
-    "addArpTrackBtn","addBeatTrackBtn","addSamplerTrackBtn","addVoiceTrackBtn","addMemoTrackBtn","addMidiTrackBtn",
+    "addLayerBtn","addLayerModal","addLayerClose","layerGrid","loopMenuBtn","loopWholeBtn","undoBtn","redoBtn",
     // MIDI piano-roll editor
     "midiModal","midiRoll","midiRollWrap","midiCtrlLane","midiCtrlTabs","midiCtrlBox","midiKbHost","midiKeyTag","midiSnap","midiBars","midiPlay","midiRecBtn","midiQuant",
     // instrument sections (visualizer + full-screen editor)
@@ -43,8 +43,21 @@ test("required element ids exist in the markup", () => {
     // song package + AI composer
     "songModal","songTitle","songGenre","songCover","songLyrics","songExportBtn",
     "aiComposeBtn","aiModal","aiProvider","aiModel","aiKey","aiIdea","aiComposeRun","aiOpenSettings",
+    // generate-backing modal (Roadmap item 4)
+    "backingBtn","backingModal","backingClose","backProg","backMemoSel","backAiRoot","backAiMode",
+    "backAiBars","backAiStyle","backPad","backBass","backArp","backDrums","backFeel","backBars","backingRun","backingStatus",
+    // undo/redo toolbar (Roadmap item 1)
+    "undoBtn","redoBtn",
+    // master level meter (Roadmap item 7)
+    "masterMeter","masterMeterFill",
+    // live collaboration (Roadmap WebRTC)
+    "collabBtn","collabModal","collabClose","collabName","collabHost","collabDisconnect","collabStatus","collabPeers",
+    "collabStepStart","collabStepHost","collabStepJoin","collabStepConnected",
+    "collabOffer","collabOfferCopy","collabOfferQR","collabAnswerIn","collabAnswerInBtn",
+    "collabReply","collabReplyCopy","collabReplyQR","collabJoinHost","collabRoster","collabInviteMore",
+    "collabHostStep2","collabOfferQRtoggle","collabReplyQRtoggle",
     // settings modal (canonical API-key editor)
-    "settingsBtn","settingsModal","settingsSave","settingsTest","settingsClear","settingsStatus",
+    "settingsBtn","settingsModal","settingsSave","settingsTest","settingsClear","settingsStatus","settingsResetLayout",
     // memo editor
     "tunerBtn","tunerModal","tunerInst","tunerTuning","tunerStrings","tunerMicBtn","tunerMeter","tmNote","tmNeedle","tmCents","tmTarget",
     "memoModal","memoCanvas","memoChips","memoSummary","memoKeySel","memoReanalyze",
@@ -57,6 +70,8 @@ test("required element ids exist in the markup", () => {
     "structSummary","structPopup","structType","structBars","structSave","structDel","structAddMenu","structAddBtns",
     // song metadata header (genre · title · take)
     "songMetaBtn","songMetaDisplay","songMetaPopup","smTitle","smGenre","smTake",
+    // first-run welcome / pitch modal
+    "welcomeModal","welcomeClose","welcomeStart",
   ];
   for (const id of ids) assert.ok(html.includes('id="' + id + '"'), "missing #" + id);
 });
@@ -71,7 +86,7 @@ test("core functions the tests and features depend on are present", () => {
     "samplerClipEvents","spawnOscs","buildId3","memoSrt","songMetadataJson","wavBytes16",
     "encodeSongAudio","exportSongPackage","applyProjectSpec","aiParseSpec",
     "aiProjectSummary","applyProjectOps","applySectionLayout","popOutSection","saveAutosave","bindKnob",
-    "openSettings","aiCfgSummary","aiLoadCfg","aiSaveCfg","aiChat","aiComplete",
+    "openSettings","aiCfgSummary","aiLoadCfg","aiSaveCfg","aiChat","aiComplete","resetAppSettings","addLayer",
     "buildLyricsWizPrompt","buildMulliganPrompt","parseAiVariations",
     "newSession","saveCurrent","openSession","saveSession","setCurrentLabel","refreshRecent",
     "openPitchEditor","pitchSnapshot","semiToRate","renderPitchRoll",
@@ -87,6 +102,26 @@ test("core functions the tests and features depend on are present", () => {
     "openSynthModal","closeSynthModal","renderInstViz","renderInstVizAll","openArpClip","setArpEditTarget",
     "renderPattern","midiLibAdd","midiLibPreview",
     "parseProgression","chordQualityFromSuffix","voiceProgression",
+    "chordsToProgression","backingDrumPattern","buildBacking","buildBackingPrompt",
+    "backingSrc","backingMemos","materializeBacking","runBacking","openBackingModal",
+    // undo/redo (Roadmap item 1)
+    "makeHistory","commit","beginEdit","endEdit","undoEdit","redoEdit","snapshotProject","restoreProject","snapClip","snapTrack","updateUndoUI",
+    // clip editing (Roadmap item 2)
+    "cloneClipData","splitMidiNotes","splitClipData","duplicateClip","copyClip","pasteClipAt","splitClipAt","openClipMenu","attachClipResize","playheadSec","selectClip",
+    // harmony assistant (Roadmap item 5)
+    "diatonicChords","triadQuality","romanFor","suggestChords","suggestProgression","voiceLead","progressionToText","chordSuffix",
+    // level meters (Roadmap item 7)
+    "analyserRms","analyserPeak","linToDb","dbToFrac","meterFrac","readLevel","drawMeters",
+    // track automation (Roadmap item 8)
+    "automationValueAt","serializeAutomation","applyLiveAutomation","buildAutomationOverlay",
+    // live collaboration (Roadmap WebRTC)
+    "rtcEncode","rtcDecode","peerColor","rtcStateForWire","rtcBroadcastState","rtcSendTransport","rtcOnMessage","rtcHost","rtcJoin","rtcTeardown","collabStep",
+    "rtcOpenPeers","rtcInSession","rtcSendAll","rtcSendTo","updateCollabUI","rebuildRoster","onPeerConnected","dropPeer","wirePeerChannel",
+    "bytesToB64url","b64urlToBytes","buildSignalUrl","parseSignalHash","packSignal","unpackSignal","checkInviteUrl","showSignalOut",
+    "qrGfMul","qrRsGen","qrChooseVersion","qrMakeMatrix","renderCollabQR",
+    "concatChunks","blobChunkCount","collabRegisterLocalBlobs","sendBlob","requestMissingBlobs","onBlobComplete",
+    // P2P sync spec (docs/P2P_SYNC_SPEC.md)
+    "uuid","myPeerId","ensureSessionId","trackHash","computeSyncBase","trackSyncMeta","reconcile","clockMedianOffset","mergeRemoteState","bumpChangedRevs",
     "midiEditorSetKey","syncSynthKeySel","fillKeySelect",
     "timelineKeys","clipKeySpan","renderKeyChips","nearestInScale","midiSnapPitch",
     "keySegmentsInClip","renderMidiKeyRuler","midiAddKeyChange","midiZoom","cloneVoice",

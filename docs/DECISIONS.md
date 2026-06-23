@@ -346,6 +346,216 @@ Three complaints from tuning an actual guitar, three fixes:
   the tone, click it again (or change tuning / close the modal) to silence it; the `.playing` card stays lit
   while it sounds.
 
+## 72. Collab signaling — invite links, compression, QR (v1.42.0 / v1.43.0)
+The copy/paste SDP handshake became clickable links. **Why not one link:** WebRTC needs a two-way
+exchange (offer ↔ answer), so each leg is its own link — a single self-contained link is impossible
+without a rendezvous server (the backend we refuse). Each leg's payload rides in the URL `#hash`,
+which is never sent to any server.
+- **Codec (DOM-free, tested):** `packSignal` = JSON → `deflate-raw` (CompressionStream) → base64url,
+  tagged `c`/`u` with a graceful fallback; `unpackSignal` reverses and also tolerates a raw-JSON paste.
+  A real offer shrinks ~60% (~700-char link). `buildSignalUrl`/`parseSignalHash` put/extract the
+  payload under `#invite=`/`#reply=`. base64url uses `btoa`/`atob` (present in Node) so it unit-tests.
+- **Auto-join:** `checkInviteUrl` fires on load — opening an invite link auto-opens collab in join mode,
+  generates the reply link, and `history.replaceState`s the hash away so refresh won't re-trigger.
+- **QR (v1.43.0):** an inline, dependency-free QR encoder (byte mode, EC level L, auto version to v40)
+  renders a scannable QR beside each link. GF(256) over the QR polynomial **0x11D** (not AES's 0x11B —
+  a trap I tested against), Reed-Solomon EC, 8-mask penalty selection, format + version info.
+  **The RS generator coefficient order is the load-bearing detail** — my first pass had it reversed,
+  which produces structurally-valid but unscannable QRs; the unit test pins it to the canonical
+  exponents `[87,229,146,149,238,102,21]`. test/qr.test.mjs + test/signal.test.mjs (9 tests; 106 total).
+  Final scan fidelity is a real-phone check, like the 2-browser collab test.
+
+## 71. P2P sync — identity model + 3-way reconcile (docs/P2P_SYNC_SPEC.md, v1.39.0)
+Implements the testable spine of the sync spec; replaces the old whole-project last-writer-wins clobber
+with a per-track merge. Signaling stays the copy/paste handshake — all sync rides the data channel.
+- **§1 Identity (`FORMAT_VERSION` 3→4).** `project.sessionId` (UUID, the song's identity across machines),
+  per-track `uid`/`ownerId`/`rev`/`updatedAt`, and `project.syncBase` (the last-synced `{sessionId,
+  tracks:{uid:{rev,hash}}}`). `peerId` lives in localStorage and becomes `ownerId`. Minted in `addTrack`,
+  carried through serialize/load and snapshot/restore (so undo preserves identity). **Deviation from the
+  spec:** the spec says `track.id` = UUID, but the app keys runtime state (chains, selection, DOM) on the
+  existing numeric `track.id` everywhere — retrofitting that to a UUID is a large, destabilizing change.
+  So identity lives on a parallel `track.uid` (the stable cross-machine key the sync layer uses), and
+  numeric `id` stays for runtime. Same intent, no refactor blast radius.
+- **rev bumps automatically.** `commit()`/`endEdit()` diff each track's content hash before/after via
+  `bumpChangedRevs`; only genuinely-changed tracks `++rev` + stamp `updatedAt`. Verified: editing one
+  track doesn't touch another's rev.
+- **§5 reconcile (DOM-free, tested).** `trackHash` is an FNV-1a fingerprint over an audio-free, automation-
+  normalized projection of a track. `reconcile(local, remote, base)` → `{merged, conflicts}`: added-one-
+  side → take it; changed-one-side → silent fast-forward; changed-both → conflict; deleted-one-side-
+  untouched-other → take the delete; delete-vs-edit → conflict (never a silent loss). `mergeRemoteState`
+  applies this to an incoming snapshot, taking each track from local or remote by uid, keeping local PCM
+  buffers on kept tracks, and recomputing `syncBase`. An empty peer adopts the remote `sessionId` and
+  takes everything. Conflicts default to keep-mine (non-destructive) with a status line; the layer-diff
+  resolution UI (Keep mine/theirs/both) is deferred. Verified live in-browser: add + fast-forward + conflict.
+- **§2 clock offset (`clockMedianOffset`, tested):** median of `remoteTime − (localSend + rtt/2)` over
+  ping samples — recovers a ~+1000 ms skew. Ready for §3 (clock-synced transport), not yet wired.
+- **Tests:** test/p2psync.test.mjs (8; 97 total). **Remaining (need 2-browser manual testing):** §3 clock-
+  scheduled transport/record-arm, §4 per-track soft-lock live ops + claim, chunked audio-blob transfer so
+  stems are audible peer-to-peer, multi-person host-relay topology, MediaStream voice/video, and the
+  conflict-resolution UI.
+
+## 70. WebRTC live collaboration — P2P transport + edit sync (Roadmap WebRTC, v1.37.0)
+Two browsers edit the same session live, with **no server we host and no accounts**.
+- **Signaling is copy/paste SDP** (non-trickle): host clicks "Create invite" → `createOffer` →
+  `iceComplete` waits for gathering (2.5 s cap) → the full `localDescription` JSON is shown to copy.
+  The joiner pastes it, `createAnswer`s, and pastes the reply back. A public Google STUN server helps
+  NAT traversal (not ours; BYO/relay is the documented upgrade path). One `RTCDataChannel` carries everything.
+- **Wire protocol (DOM-free, tested):** `rtcEncode(type,data)` / `rtcDecode(str)` frame versioned JSON
+  and **validate every inbound message** — bad JSON, wrong version, missing or unknown type are dropped
+  (acceptance: "inbound ops are validated"). Types: `hello`/`bye` (presence), `transport`, `state`,
+  `cursor`. `peerColor` derives a stable hue from a name.
+- **Edit sync reuses the snapshot layer, not a separate op format.** Rather than build an operation
+  protocol, every local `commit`/`endEdit`/`undo`/`redo` broadcasts the scoped arrangement snapshot with
+  audio stripped (`rtcStateForWire` deletes `buffer`/`blob` — AudioBuffers aren't serializable and blobs
+  are heavy). The peer applies it via `applyRemoteState`, which re-attaches its OWN decoded audio by
+  clip id, then runs `restoreProject` under `_histMuted` + `_rtcApplying` (so remote edits don't enter
+  local undo and don't echo back). Last-writer-wins. Trade-off: audio bytes don't cross the wire — peers
+  share the saved session for actual audio; structure/MIDI/automation/keymap all sync live.
+- **Transport sync:** `transportPlay`/`transportStop` broadcast `{action,pos}`; the receiver starts/stops
+  under `_rtcApplying` so it doesn't bounce back.
+- **What's verified vs. manual:** the protocol is unit-tested (test/collab.test.mjs); offer generation
+  produces a valid data-channel SDP in-browser (checked in preview). A true two-peer connection needs two
+  real browsers + network and is the documented manual smoke test — the headless single-page loopback
+  can't reliably complete ICE.
+
+## 69. Track automation lanes — volume + pan (Roadmap item 8, v1.36.0)
+Per-track timeline automation, gated behind a head toggle, kept to a few core params.
+- **Scope: volume, pan, and cutoff.** `track.automation = { volume:[{beat,val}], pan:[...], cutoff:[...] }`,
+  piecewise-linear. (Cutoff was added in v1.38.0 — see the addendum at the end of this entry.)
+- **Engine (DOM-free, tested):** `automationValueAt(points, beat, dflt)` interpolates linearly, holds
+  edge values outside the range, tolerates unsorted points, and returns the default for an empty lane
+  (so absent automation is a true no-op). `serializeAutomation` prunes empty lanes → `undefined` (clean
+  sessions, no FORMAT bump).
+- **Two apply paths.** Live: `applyLiveAutomation(posSec)` runs each transport tick, setting
+  `chain.level.gain.value = fx.level × vol(beat)` and `chain.pan.pan.value = pan(beat)` — follows the
+  playhead and loops naturally; `transportStop` releases the override back to the static fader/centre.
+  Offline: `renderMix` schedules the points as `linearRampToValueAtTime` curves on each chain's
+  `level`/`pan` params, so the bounce matches playback. `buildTrackChain` gained a `StereoPanner`
+  (transparent at 0) for the pan tap. Verified: a 1→0 volume ramp reads ×0.5 at its midpoint live, and
+  the offline bounce renders cleanly.
+- **UI:** a head "Auto" button cycles off → volume → pan; when on, an SVG overlay on the clip lane shows
+  the curve with draggable point handles — click empty to add, drag to shape, right-click to delete.
+  Every edit (add/move/delete) routes through `commit()` so it's undoable. Automation persists via
+  serialize/load and snapshot. Tests: test/automation.test.mjs (5; 84 total).
+- **Addendum (v1.38.0) — cutoff automation.** `buildTrackChain` gained a lowpass `BiquadFilter`
+  (`type:"lowpass"`, default 20 kHz Q 0.7 → transparent when un-automated) after the FX chain, before the
+  panner. Cutoff points store the frequency in **Hz directly**, so live (`frequency.value`) and offline
+  (`linearRampToValueAtTime`) interpolate identically in Hz — same exactness as volume/pan, no sampled
+  curves. The lane editor maps Hz on a **log scale** (`AUTO_PARAMS.cutoff.log`) so the musical low end
+  isn't crushed into a sliver. The head toggle now cycles off → volume → pan → cutoff. Verified live
+  (18 kHz→9.1 kHz→300 Hz sweep) and offline bounce. This completes Item 8's volume/pan/cutoff scope.
+
+## 68. Per-track + master level meters (Roadmap item 7, v1.35.0)
+Live feedback, not a console — a slim meter per track head plus a master meter in the transport row.
+- **Tap, don't rewire.** `buildTrackChain` gained an `AnalyserNode` (`fftSize 256`) fed from the chain's
+  final output — which sits *after* the mute gain, so a muted or un-soloed track's tap is silent and the
+  meter reads 0 with zero extra logic (mute/solo-aware for free). The master meter reuses the existing
+  `masterAnalyser`. Offline `renderMix` builds its own chains and never reads these, so the bounce is
+  unaffected.
+- **DOM-free signal math (tested):** `analyserRms`/`analyserPeak` over a time-domain frame, `linToDb`
+  (0 dB at full scale), `dbToFrac` (0..1 over a −60 dB floor, clamped), `meterFrac`. Verified a
+  −13 dBFS tone reads ~0.76.
+- **One shared rAF.** `drawMeters` is called from the existing `startViz` loop (no new animation frame);
+  `readLevel` caches a Float32 buffer on each analyser node. Fast attack, eased release (−5%/frame). Track
+  fills are stored on `track._meterFill` and refreshed on each `renderTimeline` head rebuild.
+
+## 67. Harmony assistant — mode-aware suggestions + voice leading (Roadmap item 5, v1.34.0)
+A pure-theory engine (DOM-free, tested) that feeds the backing generator and explains itself.
+- **`diatonicChords(root, mode)`** builds the seven triads of any mode from `SCALES`, deriving each
+  quality from its third/fifth intervals (`triadQuality`) and a Roman numeral (`romanFor`: case by
+  quality, `°`/`+` for dim/aug). C major → I ii iii IV V vi vii°; A Dorian keeps its signature major IV.
+- **`suggestChords(root, mode, prev, opts)`** ranks the next chord from a functional-tendency table
+  keyed by the last chord's scale degree (V→I strongest, ii→V, vi→IV…), each with a one-line rationale.
+  `opts.borrow` adds parallel-mode chords (C major → Fm/A♭/B♭, flagged `borrowed`); `opts.secondaryDominants`
+  adds `V7/x` a fifth above each diatonic target. De-duped by root+quality, best-first.
+- **`suggestProgression(root, mode, bars, opts)`** chains the suggester, starting on the tonic and
+  avoiding the last two chords each step so the default is musical, not I–V–I–V — A major yields the
+  "A E F#m D" axis, C major over 6 bars resolves home ("C G Am F G C").
+- **`voiceLead(fromMidi, toPCs)`** places each target pitch-class in the octave nearest the previous
+  voicing's centre, so chords move with minimal total semitone travel (no octave leaps).
+- **UI:** a "✨ Suggest" button in the backing modal fills the progression box from the session key
+  (`keyAtBeat(0)`) for the chosen chord count, then runs through Item 4. Deeper hooks (next-chord chips
+  in the chord/key popups, AI-augmented "make it more neo-soul") are deferred — the deterministic engine
+  is the foundation. Tests: test/harmony.test.mjs (7; 74 total). SCALES/HARMONY_TENDENCY were collapsed
+  to one line each so `extractConstLine` can lift them for the harness.
+
+## 66. Clip editing — split · duplicate · copy/paste · edge-resize (Roadmap item 2, v1.33.0)
+Operates on the in-memory clip model; every op routes through item-1 `commit()` so it's undoable.
+- **DOM-free core (tested):** `splitMidiNotes(notes, atBeat)` partitions notes around a cut, splitting
+  any straddling note into a clamped head + a rebased tail; `splitClipData` wraps it into two MIDI
+  clip payloads; `cloneClipData` deep-copies a clip's editable payload (sharing `buffer`/`blob` by
+  reference, dropping id/start) — built on the undo `snapClip` cloner.
+- **Audio clips gain `offset`/`length` (seconds into the buffer).** This is the buffer-offset render
+  path the roadmap called for: `clipDuration` honors `length`; `forEachClipEvent` emits `aoff`/`alen`
+  on voice events; both the live scheduler (`transportScheduler`) and the **offline bounce**
+  (`renderMix`) call `bufferSource.start(when, offset, duration)`. An untrimmed clip passes
+  `offset 0, duration audioDur` → identical to before. Splitting an audio clip is pure offset/length
+  arithmetic (no PCM copied); verified a 6 s clip splits into 0–2.5 s / 2.5–6 s halves sharing one buffer.
+- **UX:** click selects a clip (outline); right-click opens a context menu (Split here · Duplicate ·
+  Copy · Paste here · Delete) acting at the click point; ⌘D/⌘C/⌘V act on the selection (gated off
+  while the MIDI editor owns the keyboard); a right-edge `.cresize` handle drags to change `lengthBeats`
+  (event clips, snaps to beat, clears loop-fill) or `length` (audio trim). Paste lands on the
+  selected same-type track at the playhead (`playheadSec()` = live head while playing, else cycle start).
+- **Split keeps an open MIDI editor valid** by repointing `midiEd.clip` to the head half (the left
+  reuses the original clip id). Offset/length persist via serialize/load and snapshot (undo).
+- Split is offered for MIDI + audio only — arp/beat/sampler clips loop a pattern, so a positional cut
+  isn't meaningful (they're resized/duplicated instead). Tests: test/clipedit.test.mjs (5; 67 total).
+
+## 65. Undo / redo — scoped snapshot command stack (Roadmap item 1, v1.32.0)
+A single `commit(label, doFn)` envelope snapshots before a mutation, runs it, and records the
+before-state; `undoEdit`/`redoEdit` swap snapshots. ⌘Z / ⇧⌘Z + a toolbar ↶/↷ (disabled-state +
+label tooltips via `updateUndoUI`).
+- **Snapshot is in-memory and SCOPED, not a serialize/loadProject round-trip.** `snapshotProject`
+  deep-copies only the *arrangement* — `tracks · clips · keyMap · structure · lengthSec · loop ·
+  selectedTrackId`. Decoded PCM (`clip.buffer`) and source blobs are carried **by reference, never
+  copied**, so audio survives undo without re-decoding (the acceptance criterion). `restoreProject`
+  rebuilds tracks from the snapshot, disconnects the old chains, and re-`ensureTrackChain`s — buffers
+  intact. Verified in-browser: `clip.buffer===` the same object after undo.
+- **Why scoped, not whole-project:** snapshot-based undo incorrectly reverts any state a restore
+  touches but no `commit()` recorded. So the snapshot deliberately EXCLUDES synth/GLOBAL_VOICE,
+  master-EQ, song metadata, sampler-kit, lyrics, bpm/timeSig/countIn — none of the wired mutators
+  change them, so restoring never clobbers them. Those domains are simply not undoable yet (documented
+  gap, not a bug). If they're later wired through `commit()`, add them to the snapshot together.
+- **Wired mutators:** add/delete track, add/move/delete clip, loop-fill toggle, mute/solo, key-map
+  add/edit/delete, structure add/edit/delete, backing generation (one atomic entry for all N tracks),
+  and all MIDI-editor note ops (add/move/resize via a gesture-scoped `beginEdit`/`endEdit`, plus
+  delete/clear/quantize/nudge/pattern-insert via `commit`). NOT yet wired: live MIDI recording,
+  key-edge & structure-block drag-resize, synth/fx knob tweaks.
+- **The MIDI editor holds object refs into the project**, which a restore replaces. `restoreProject`
+  re-points `midiEd.track`/`midiEd.clip` by id (clearing the note selection), or closes the editor if
+  its clip was undone away. Ids are preserved through snapshot/restore precisely so this matching works.
+- **Robustness:** `undoEdit`/`redoEdit` restore inside try/finally so a render error can't leave the
+  history muted; `commit` records only after `doFn` returns, so a throwing mutation leaves no bogus
+  entry. History is depth-capped at 100 and cleared on session load (`loadProject`). The `makeHistory`
+  stack is DOM-free and unit-tested (test/history.test.mjs); the snapshot/restore pair is preview-verified.
+
+## 64. Chord-driven backing generation — UI on the inert engine (Roadmap item 4, v1.31.0)
+The voicing engine (`parseProgression`, `chordQualityFromSuffix`, `voiceProgression`) shipped tested
+but inert in v1.30.1. v1.31.0 adds the orchestration core + UI.
+- **Every role becomes its own track**, not one multi-part clip. `buildBacking(prog, opts)` (DOM-free,
+  tested) maps a source-agnostic progression `[{root,quality}]` to one layer spec per role: pad/bass/arp
+  are **MIDI** stems (`voiceProgression` notes → a notes clip), drums is a **beat** track. This is the
+  whole point of item 4 — generated parts are *born* as isolated, transposable, individually-exportable
+  stems (`track.transpose` per track), editable in the existing MIDI/beat editors. No new clip machinery:
+  `materializeBacking` just calls `addTrack`+`addClip` per spec.
+- **Three chord sources, in priority order.** (1) **Typed** progression box (`parseProgression` — letters
+  only: `A C#m F#m D`). (2) **Detected memo chords** — `chordsToProgression` maps a memo's
+  `analysis.chords` spans to the engine shape; the span suffixes (`""`,`m`,`7`,`maj7`,`m7`,`dim`) already
+  round-trip through `chordQualityFromSuffix`, so detect→voice is lossless. (3) **AI** via `aiComplete`
+  with a strict-JSON system prompt (`BACKING_SYS`) + `buildBackingPrompt` (BYO key, defaults to
+  `keyAtBeat(0)`); reply parsed with the existing `aiParseSpec`, qualities normalized through
+  `chordQualityFromSuffix`. No audio model, no CORS — a chat completion only.
+- **Drums are a static, genre-neutral pattern** (`backingDrumPattern`): kick on beats 1 & 3, snare on the
+  backbeats, closed hat on eighths (straight) or quarters (laid-back). Returned as per-voice step indices
+  so the UI maps kick/snare/hat onto rows 0/1/2 of the full `DRUMS` grid; `loopFill:true` repeats it under
+  the harmonic layers. Kept dumb on purpose — a real beat generator is out of scope for this item.
+- **Why MIDI for the arp role** (not an arp track): `voiceProgression`'s arp is an explicit eighth-note run
+  through the chord tones — a melody, not an auto-arpeggiator pattern. A MIDI clip keeps it editable
+  note-by-note and exportable as a clean stem, consistent with pad/bass.
+- Explicit chords (typed/memo/AI) are absolute and do **not** auto-follow later key-map transpositions —
+  that's musically correct (the user named the chords). The key-map awareness here is the AI path seeding
+  its key from `keyAtBeat(0)`; the Roman-template-from-key-map source is item 5's job and is deferred.
+
 ## 62. Per-layer mute / solo on the timeline (v1.30.0)
 - Each track head now carries **M** and **S** chips (between FX and the type-specific buttons), toggling
   `track.muted` / `track.soloed`. Audibility rule, in one helper trio: `soloActive()` (any track soloed),
