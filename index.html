@@ -657,7 +657,7 @@
   .collab-connected { font-size: 18px; font-weight: 750; color: #34d399; margin: 4px 0 9px; }
   /* ---- welcome / pitch modal — premium first-run ---- */
   #welcomeModal { background: rgba(7,11,20,0.66); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-  .welcome-box { position: relative; max-width: 920px; width: 100%; max-height: 92vh; overflow: hidden auto; padding: 48px 52px 42px; border-radius: 24px;
+  .welcome-box { position: relative; max-width: 920px; width: 100%; height: auto; max-height: 92vh; overflow: hidden; padding: 0; display: flex; flex-direction: column; border-radius: 24px;
     background: radial-gradient(95% 60% at 12% -12%, rgba(56,189,248,0.20), transparent 60%), radial-gradient(90% 60% at 102% -6%, rgba(168,85,247,0.22), transparent 55%), radial-gradient(80% 80% at 50% 130%, rgba(251,191,36,0.10), transparent 60%), rgba(13,18,30,0.90);
     border: 1px solid rgba(255,255,255,0.09); box-shadow: 0 36px 100px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.07);
     animation: welcomeIn 0.65s cubic-bezier(0.16,1,0.3,1) both; }
@@ -667,6 +667,7 @@
     animation: aurora 20s ease-in-out infinite alternate; }
   @keyframes aurora { from { transform: translate(0,0) rotate(0deg) scale(1); } to { transform: translate(-5%,4%) rotate(10deg) scale(1.12); } }
   .welcome-box > * { position: relative; z-index: 1; }
+  .welcome-scroll { position: relative; z-index: 1; min-height: 0; overflow-y: auto; padding: 38px 48px 34px; }
   .welcome-close { position: absolute; top: 16px; right: 18px; z-index: 3; width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); color: var(--muted); cursor: pointer; font-size: 14px; transition: all .15s; }
   .welcome-close:hover { background: rgba(255,255,255,0.15); color: #fff; transform: rotate(90deg); }
   .welcome-eyebrow { text-align: center; font-size: 11px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; color: #7dd3fc; margin-bottom: 14px; }
@@ -674,7 +675,7 @@
     background: linear-gradient(100deg, #38bdf8, #818cf8 28%, #c084fc 52%, #f472b6 76%, #fbbf24); background-size: 220% auto; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: heroShine 7s linear infinite; }
   @keyframes heroShine { to { background-position: 220% center; } }
   .welcome-tag { text-align: center; font-size: clamp(16px, 2vw, 19px); color: #f1f5f9; font-weight: 650; line-height: 1.4; max-width: 660px; margin: 0 auto 16px; }
-  .welcome-mission { text-align: center; font-size: 13.5px; color: var(--muted); line-height: 1.75; max-width: 600px; margin: 0 auto 34px; }
+  .welcome-mission { text-align: center; font-size: 13.5px; color: var(--muted); line-height: 1.7; max-width: 600px; margin: 0 auto 24px; }
   .welcome-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
   .wp { position: relative; border-radius: 18px; padding: 20px 21px 18px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07); overflow: hidden;
     transition: transform .28s cubic-bezier(.16,1,.3,1), border-color .28s, box-shadow .28s; animation: cardIn .65s cubic-bezier(.16,1,.3,1) both; }
@@ -694,7 +695,7 @@
   .wp-pills { display: flex; flex-wrap: wrap; gap: 6px; }
   .wp-pill { font-size: 11px; font-weight: 650; padding: 4px 10px; border-radius: 999px; color: var(--wp-c); background: color-mix(in srgb, var(--wp-c) 13%, transparent); border: 1px solid color-mix(in srgb, var(--wp-c) 28%, transparent); transition: transform .15s, background .15s; }
   .wp-pill:hover { transform: translateY(-1px); background: color-mix(in srgb, var(--wp-c) 24%, transparent); }
-  .welcome-foot { display: flex; flex-direction: column; align-items: center; gap: 13px; margin-top: 34px; animation: cardIn .65s cubic-bezier(.16,1,.3,1) .46s both; }
+  .welcome-foot { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-top: 26px; animation: cardIn .65s cubic-bezier(.16,1,.3,1) .46s both; }
   .welcome-cta { position: relative; font-size: 16px; font-weight: 750; padding: 16px 48px; border: 0; border-radius: 15px; cursor: pointer; color: #07111f; letter-spacing: .2px; overflow: hidden;
     background: linear-gradient(100deg, #38bdf8, #a855f7 55%, #f472b6); background-size: 190% auto; animation: ctaGlow 3.6s ease-in-out infinite; transition: transform .2s, background-position .4s; }
   .welcome-cta:hover { transform: translateY(-2px) scale(1.025); background-position: 100% center; }
@@ -1189,8 +1190,9 @@
 
 <!-- AI Composer modal -->
 <div id="welcomeModal" class="modal" style="display:none">
-  <div class="modal-box welcome-box">
+  <div class="welcome-box">
     <button id="welcomeClose" class="welcome-close" title="Close">✕</button>
+    <div class="welcome-scroll">
     <div class="welcome-eyebrow">Free · Open source · 100% in your browser</div>
     <div class="welcome-hero">Pitch Studio</div>
     <div class="welcome-tag">A real music studio that lives in your browser — and works for you, not the other way around.</div>
@@ -1220,6 +1222,7 @@
     <div class="welcome-foot">
       <button id="welcomeStart" class="welcome-cta">✨ Start creating — it's free</button>
       <span class="welcome-os">No account · No install · Free forever · <a href="https://github.com/rawq-us/pitch-detector" target="_blank" rel="noopener">Open source on GitHub</a></span>
+    </div>
     </div>
   </div>
 </div>
@@ -1618,7 +1621,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.48.0";
+const APP_VERSION="1.49.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
