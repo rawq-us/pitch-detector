@@ -68,6 +68,8 @@ test("required element ids exist in the markup", () => {
     "structSummary","structPopup","structType","structBars","structSave","structDel","structAddMenu","structAddBtns",
     // song metadata header (genre · title · take)
     "songMetaBtn","songMetaDisplay","songMetaPopup","smTitle","smGenre","smTake",
+    // first-run welcome / pitch modal
+    "welcomeModal","welcomeClose","welcomeStart",
   ];
   for (const id of ids) assert.ok(html.includes('id="' + id + '"'), "missing #" + id);
 });

@@ -643,6 +643,26 @@
   .layer-card .lc-desc { display: block; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
   .collab-qr { line-height: 0; border-radius: 6px; overflow: hidden; }
   .collab-qr svg { display: block; }
+  /* ---- welcome / pitch modal ---- */
+  .welcome-box { max-width: 760px; max-height: 92vh; overflow-y: auto; background: radial-gradient(120% 120% at 0% 0%, rgba(56,189,248,0.10), transparent 45%), radial-gradient(120% 120% at 100% 0%, rgba(168,85,247,0.12), transparent 45%), var(--panel); }
+  .welcome-hero { font-size: 30px; font-weight: 800; letter-spacing: -0.5px; margin: 2px 0 4px; background: linear-gradient(90deg, #38bdf8, #a855f7 40%, #f472b6 70%, #fbbf24); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+  .welcome-tag { font-size: 14px; color: var(--text); font-weight: 600; margin-bottom: 8px; }
+  .welcome-mission { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 16px; max-width: 620px; }
+  .welcome-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .wp { position: relative; border: 1px solid var(--border); border-radius: 12px; padding: 13px 14px 14px; background: rgba(255,255,255,0.025); overflow: hidden; }
+  .wp::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--wp-c, #38bdf8); }
+  .wp-head { display: flex; align-items: center; gap: 9px; margin-bottom: 7px; }
+  .wp-ico { font-size: 20px; line-height: 1; }
+  .wp-title { font-weight: 700; font-size: 13.5px; color: var(--wp-c, #38bdf8); }
+  .wp-desc { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 9px; }
+  .wp-pills { display: flex; flex-wrap: wrap; gap: 5px; }
+  .wp-pill { font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 999px; color: var(--wp-c, #38bdf8); background: color-mix(in srgb, var(--wp-c, #38bdf8) 14%, transparent); border: 1px solid color-mix(in srgb, var(--wp-c, #38bdf8) 32%, transparent); }
+  .welcome-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 16px; flex-wrap: wrap; }
+  .welcome-cta { font-size: 14px; font-weight: 700; padding: 11px 22px; border: 0; border-radius: 10px; cursor: pointer; color: #07111f; background: linear-gradient(90deg, #38bdf8, #a855f7); box-shadow: 0 6px 20px rgba(120,90,250,0.35); }
+  .welcome-cta:hover { filter: brightness(1.08); }
+  .welcome-os { font-size: 11.5px; color: var(--muted); }
+  .welcome-os a { color: #7dd3fc; }
+  @media (max-width: 620px){ .welcome-grid { grid-template-columns: 1fr; } }
   .tl-clip .cloop { position: absolute; bottom: 3px; right: 4px; font-size: 10px; background: rgba(0,0,0,0.4); border-radius: 5px; padding: 1px 5px; cursor: pointer; }
   .tl-clip .cloop:hover { background: rgba(0,0,0,0.7); }
   .tl-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.7); z-index: 5; pointer-events: none; display: none; }
@@ -1126,6 +1146,41 @@
 </div>
 
 <!-- AI Composer modal -->
+<div id="welcomeModal" class="modal" style="display:none">
+  <div class="modal-box welcome-box">
+    <div class="modal-head" style="border:0;margin-bottom:2px"><span></span><button id="welcomeClose" title="Close">✕</button></div>
+    <div class="welcome-hero">Pitch Studio</div>
+    <div class="welcome-tag">A real music studio that lives in your browser — and works for you, not the other way around.</div>
+    <div class="welcome-mission">Catch a song the moment it strikes — hum it, play it, type it — then shape it with real music theory and hand it off clean. No account. No subscription. No one watching. Just you and the idea. We built this because making music shouldn't cost your privacy, your wallet, or your data.</div>
+    <div class="welcome-grid">
+      <div class="wp" style="--wp-c:#34d399">
+        <div class="wp-head"><span class="wp-ico">🆓</span><span class="wp-title">Free &amp; yours, forever</span></div>
+        <div class="wp-desc">Completely free with nothing held back. Open source, so it's yours to keep — and your sessions never leave your device.</div>
+        <div class="wp-pills"><span class="wp-pill">Free</span><span class="wp-pill">No ads</span><span class="wp-pill">No tracking</span><span class="wp-pill">No sign-up</span><span class="wp-pill">No paywalls</span><span class="wp-pill">Open source</span></div>
+      </div>
+      <div class="wp" style="--wp-c:#38bdf8">
+        <div class="wp-head"><span class="wp-ico">🎚️</span><span class="wp-title">A studio, fully in the browser</span></div>
+        <div class="wp-desc">A serverless DAW that runs entirely on your machine. Plug in a MIDI instrument, tune up with the built-in tuner, and pop panels out to their own windows.</div>
+        <div class="wp-pills"><span class="wp-pill">In-browser DAW</span><span class="wp-pill">MIDI instrument input</span><span class="wp-pill">Instrument tuner</span><span class="wp-pill">Multi-window</span></div>
+      </div>
+      <div class="wp" style="--wp-c:#a855f7">
+        <div class="wp-head"><span class="wp-ico">🎤</span><span class="wp-title">From a hum to a song</span></div>
+        <div class="wp-desc">Pitch detection turns a hummed melody into notes. A smart lyrics editor and AI that transcribes your audio into timed lyrics get the words down fast.</div>
+        <div class="wp-pills"><span class="wp-pill">Pitch detection</span><span class="wp-pill">Smart lyrics editor</span><span class="wp-pill">AI audio → lyrics</span></div>
+      </div>
+      <div class="wp" style="--wp-c:#fbbf24">
+        <div class="wp-head"><span class="wp-ico">🤝</span><span class="wp-title">Made together — and portable</span></div>
+        <div class="wp-desc">Collaborate live, peer-to-peer over WebRTC — no server, no middleman. Bring your own AI via OpenRouter. Everything exports to formats you can take anywhere.</div>
+        <div class="wp-pills"><span class="wp-pill">Live WebRTC collab</span><span class="wp-pill">BYO AI · OpenRouter</span><span class="wp-pill">Export MIDI</span><span class="wp-pill">Audio stems</span><span class="wp-pill">Portable lyrics</span></div>
+      </div>
+    </div>
+    <div class="welcome-foot">
+      <button id="welcomeStart" class="welcome-cta">✨ Start creating</button>
+      <span class="welcome-os">Open source &amp; built in the open · <a href="https://github.com/rawq-us/pitch-detector" target="_blank" rel="noopener">GitHub</a></span>
+    </div>
+  </div>
+</div>
+
 <div id="loopMenu" class="popup" style="display:none">
   <button id="loopWholeBtn" class="mini">⤢ Loop the whole piece</button>
   <div id="loopRegionReadout" class="dim" style="font-size:11px"></div>
@@ -1500,7 +1555,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.44.0";
+const APP_VERSION="1.45.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -3428,6 +3483,17 @@ function rtcTeardown(msg){
   $("collabOfferCopy").addEventListener("click",()=>copyLink("collabOffer",$("collabOfferCopy")));
   $("collabReplyCopy").addEventListener("click",()=>copyLink("collabReply",$("collabReplyCopy")));
   setTimeout(checkInviteUrl, 300);   // auto-join if the page was opened from an invite link
+})();
+// First-run welcome / pitch modal (shown once; cleared by the Settings "reset app layout" button)
+(function wireWelcome(){
+  const m=document.getElementById("welcomeModal"); if(!m) return;
+  const close=()=>{ m.style.display="none"; try{ localStorage.setItem("ps_welcome_seen","1"); }catch(e){} };
+  document.getElementById("welcomeClose").addEventListener("click",close);
+  document.getElementById("welcomeStart").addEventListener("click",close);
+  m.addEventListener("click",(e)=>{ if(e.target===m) close(); });
+  let seen=false; try{ seen=localStorage.getItem("ps_welcome_seen")==="1"; }catch(e){}
+  const fromInvite=!!parseSignalHash(location.hash);   // someone arriving via an invite link joins, not browses
+  if(!seen && !fromInvite) setTimeout(()=>{ m.style.display="flex"; }, 350);
 })();
 
 /* cycle region select on the ruler */
@@ -6016,7 +6082,7 @@ document.getElementById("settingsClear").addEventListener("click",()=>{ if(!conf
 // Reset UI/layout preferences to first-open defaults (NOT sessions — those live in IndexedDB — and NOT API keys).
 function resetAppSettings(){
   if(!confirm("Reset the app's layout & preferences to first-open defaults?\n\n• section order, minimized/expanded panels\n• track-name column width, keyboard octave/scale-lock\n\nYour saved sessions and API keys are NOT affected. The page will reload.")) return;
-  const keys=[(typeof LAYOUT_KEY!=="undefined"?LAYOUT_KEY:"pitchStudioLayout_v2"),"ps_tlhead_w","ps_kb_octave","ps_kb_scalelock","ps_lyrics_seeded"];
+  const keys=[(typeof LAYOUT_KEY!=="undefined"?LAYOUT_KEY:"pitchStudioLayout_v2"),"ps_tlhead_w","ps_kb_octave","ps_kb_scalelock","ps_lyrics_seeded","ps_welcome_seen"];
   try{ keys.forEach(k=>localStorage.removeItem(k)); }catch(_){}
   location.reload();
 }
