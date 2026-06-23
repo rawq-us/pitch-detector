@@ -346,6 +346,25 @@ Three complaints from tuning an actual guitar, three fixes:
   the tone, click it again (or change tuning / close the modal) to silence it; the `.playing` card stays lit
   while it sounds.
 
+## 72. Collab signaling — invite links, compression, QR (v1.42.0 / v1.43.0)
+The copy/paste SDP handshake became clickable links. **Why not one link:** WebRTC needs a two-way
+exchange (offer ↔ answer), so each leg is its own link — a single self-contained link is impossible
+without a rendezvous server (the backend we refuse). Each leg's payload rides in the URL `#hash`,
+which is never sent to any server.
+- **Codec (DOM-free, tested):** `packSignal` = JSON → `deflate-raw` (CompressionStream) → base64url,
+  tagged `c`/`u` with a graceful fallback; `unpackSignal` reverses and also tolerates a raw-JSON paste.
+  A real offer shrinks ~60% (~700-char link). `buildSignalUrl`/`parseSignalHash` put/extract the
+  payload under `#invite=`/`#reply=`. base64url uses `btoa`/`atob` (present in Node) so it unit-tests.
+- **Auto-join:** `checkInviteUrl` fires on load — opening an invite link auto-opens collab in join mode,
+  generates the reply link, and `history.replaceState`s the hash away so refresh won't re-trigger.
+- **QR (v1.43.0):** an inline, dependency-free QR encoder (byte mode, EC level L, auto version to v40)
+  renders a scannable QR beside each link. GF(256) over the QR polynomial **0x11D** (not AES's 0x11B —
+  a trap I tested against), Reed-Solomon EC, 8-mask penalty selection, format + version info.
+  **The RS generator coefficient order is the load-bearing detail** — my first pass had it reversed,
+  which produces structurally-valid but unscannable QRs; the unit test pins it to the canonical
+  exponents `[87,229,146,149,238,102,21]`. test/qr.test.mjs + test/signal.test.mjs (9 tests; 106 total).
+  Final scan fidelity is a real-phone check, like the 2-browser collab test.
+
 ## 71. P2P sync — identity model + 3-way reconcile (docs/P2P_SYNC_SPEC.md, v1.39.0)
 Implements the testable spine of the sync spec; replaces the old whole-project last-writer-wins clobber
 with a per-track merge. Signaling stays the copy/paste handshake — all sync rides the data channel.
