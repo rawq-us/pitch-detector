@@ -641,6 +641,8 @@
   .layer-card .lc-body { display: flex; flex-direction: column; }
   .layer-card .lc-name { display: block; font-weight: 600; font-size: 13px; margin-bottom: 3px; }
   .layer-card .lc-desc { display: block; font-size: 11.5px; color: var(--muted); line-height: 1.45; }
+  .collab-qr { line-height: 0; border-radius: 6px; overflow: hidden; }
+  .collab-qr svg { display: block; }
   .tl-clip .cloop { position: absolute; bottom: 3px; right: 4px; font-size: 10px; background: rgba(0,0,0,0.4); border-radius: 5px; padding: 1px 5px; cursor: pointer; }
   .tl-clip .cloop:hover { background: rgba(0,0,0,0.7); }
   .tl-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.7); z-index: 5; pointer-events: none; display: none; }
@@ -1140,7 +1142,7 @@
 <div id="collabModal" class="modal" style="display:none">
   <div class="modal-box" style="max-width:640px">
     <div class="modal-head"><b>👥 Live collaborate (peer-to-peer)</b><button id="collabClose">✕</button></div>
-    <div class="hint" style="margin-top:0">Connect two browsers directly — <b>no server, no account</b>. Edits and transport sync live over a WebRTC data channel. Audio clips sync their structure (positions, notes); share the saved session for the actual audio. Exchange the codes below over any channel (chat, email).</div>
+    <div class="hint" style="margin-top:0">Connect two browsers directly — <b>no server, no account</b>. Edits and transport sync live over a WebRTC data channel. Audio clips sync their structure (positions, notes); share the saved session for the actual audio. Send the <b>invite link</b> (or scan its QR) over any channel — your peer just opens it and sends a reply link back.</div>
     <div class="ai-cfg-line"><span id="collabStatus" class="dim">Not connected.</span><span id="collabPeers" class="dim" style="margin-left:auto"></span></div>
     <div class="row knobrow" style="gap:12px">
       <div class="group" style="flex:1"><label for="collabName">Your name</label><input id="collabName" type="text" placeholder="e.g. Alex" style="width:100%"></div>
@@ -1498,7 +1500,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.42.0";
+const APP_VERSION="1.43.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -3232,6 +3234,93 @@ async function unpackSignal(str){
     if(tag==="u") return JSON.parse(new TextDecoder().decode(bytes));
   }catch(e){}
   try{ return JSON.parse(str); }catch(e){ return null; }   // tolerate a pasted raw-JSON code
+}
+/* ===== Minimal QR encoder — byte mode, EC level L, auto version (inline, no deps) =====
+   Enough to encode the invite/reply links (~700 bytes → ~version 20). GF(256) uses the QR primitive
+   polynomial 0x11D; tables/masking/penalty follow ISO/IEC 18004. matrix is mod[row][col]. */
+const QR_ECC_L=[-1,7,10,15,20,26,18,20,24,30,18,20,24,26,30,22,24,28,30,28,28,28,28,30,30,26,28,30,30,30,30,30,30,30,30,30,30,30,30,30,30];
+const QR_BLK_L=[-1,1,1,1,1,1,2,2,2,2,4,4,4,4,4,6,6,6,6,7,8,8,9,9,10,12,12,12,13,14,15,16,17,18,19,19,20,21,22,24,25];
+let _qrExp=null,_qrLog=null;
+function qrGfInit(){ if(_qrExp) return; _qrExp=new Uint8Array(512); _qrLog=new Uint8Array(256); let x=1; for(let i=0;i<255;i++){ _qrExp[i]=x; _qrLog[x]=i; x<<=1; if(x&0x100) x^=0x11D; } for(let i=255;i<512;i++) _qrExp[i]=_qrExp[i-255]; }
+function qrGfMul(a,b){ qrGfInit(); if(a===0||b===0) return 0; return _qrExp[_qrLog[a]+_qrLog[b]]; }
+// generator polynomial as `deg` coefficients (excluding the implicit leading 1), high-degree → constant
+function qrRsGen(deg){ qrGfInit(); const res=new Array(deg).fill(0); res[deg-1]=1; let root=1; for(let i=0;i<deg;i++){ for(let j=0;j<deg;j++){ res[j]=qrGfMul(res[j],root); if(j+1<deg) res[j]^=res[j+1]; } root=qrGfMul(root,2); } return res; }
+function qrRsEc(data, deg){ const gen=qrRsGen(deg), res=new Array(deg).fill(0); for(let i=0;i<data.length;i++){ const f=data[i]^res[0]; res.shift(); res.push(0); if(f!==0) for(let j=0;j<deg;j++) res[j]^=qrGfMul(gen[j],f); } return res; }
+function qrRawDataModules(v){ let r=(16*v+128)*v+64; if(v>=2){ const n=Math.floor(v/7)+2; r-=(25*n-10)*n-55; if(v>=7) r-=36; } return r; }
+function qrDataCodewords(v){ return Math.floor(qrRawDataModules(v)/8) - QR_ECC_L[v]*QR_BLK_L[v]; }
+function qrChooseVersion(len){ for(let v=1;v<=40;v++){ const cc=(v<=9)?8:16; if(qrDataCodewords(v)*8 >= 4+cc+8*len) return v; } return -1; }
+function qrAlignPositions(v){ if(v===1) return []; const n=Math.floor(v/7)+2, size=17+4*v, step=(v===32)?26:Math.ceil((v*4+4)/(n*2-2))*2; const pos=[6]; for(let p=size-7; pos.length<n; p-=step) pos.splice(1,0,p); return pos; }
+function qrBch(data, gen, deg){ let rem=data; for(let i=0; i<deg; i++) rem=(rem<<1) ^ (((rem>>(deg-1))&1)*gen); return rem & ((1<<deg)-1); }
+// text → { matrix:boolean[row][col], size, version, mask } or null if too long for a v40 QR.
+function qrMakeMatrix(text){
+  const data=new TextEncoder().encode(text), v=qrChooseVersion(data.length); if(v<0) return null;
+  const cc=(v<=9)?8:16, ndc=qrDataCodewords(v);
+  const bits=[]; const put=(val,n)=>{ for(let i=n-1;i>=0;i--) bits.push((val>>i)&1); };
+  put(0b0100,4); put(data.length,cc); for(const b of data) put(b,8);
+  for(let i=0;i<4 && bits.length<ndc*8;i++) bits.push(0);
+  while(bits.length%8) bits.push(0);
+  const cws=[]; for(let i=0;i<bits.length;i+=8){ let b=0; for(let j=0;j<8;j++) b=(b<<1)|bits[i+j]; cws.push(b); }
+  for(let pad=0xEC; cws.length<ndc; pad^=0xEC^0x11) cws.push(pad);
+  const nb=QR_BLK_L[v], ecLen=QR_ECC_L[v], shortLen=Math.floor(ndc/nb), numShort=nb-(ndc%nb);
+  const dBlocks=[], eBlocks=[]; let off=0;
+  for(let i=0;i<nb;i++){ const dl=shortLen+(i<numShort?0:1), blk=cws.slice(off,off+dl); off+=dl; dBlocks.push(blk); eBlocks.push(qrRsEc(blk,ecLen)); }
+  const finalCw=[], maxD=shortLen+1;
+  for(let i=0;i<maxD;i++) for(let b=0;b<nb;b++) if(i<dBlocks[b].length) finalCw.push(dBlocks[b][i]);
+  for(let i=0;i<ecLen;i++) for(let b=0;b<nb;b++) finalCw.push(eBlocks[b][i]);
+  const size=17+4*v, mod=Array.from({length:size},()=>new Array(size).fill(false)), fn=Array.from({length:size},()=>new Array(size).fill(false));
+  const setF=(x,y,d)=>{ if(x<0||x>=size||y<0||y>=size) return; mod[y][x]=d; fn[y][x]=true; };
+  const finder=(ox,oy)=>{ for(let dy=-1;dy<=7;dy++) for(let dx=-1;dx<=7;dx++){ const r=Math.max(Math.abs(dx-3),Math.abs(dy-3)); setF(ox+dx,oy+dy, r!==2 && r<=3); } };
+  finder(3,3); finder(size-4,3); finder(3,size-4);
+  for(let i=8;i<size-8;i++){ setF(i,6,i%2===0); setF(6,i,i%2===0); }
+  const ap=qrAlignPositions(v); for(const ay of ap) for(const ax of ap){ if((ax<=7&&ay<=7)||(ax<=7&&ay>=size-8)||(ax>=size-8&&ay<=7)) continue; for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++) setF(ax+dx,ay+dy, Math.max(Math.abs(dx),Math.abs(dy))!==1); }
+  // reserve format (row 8 / col 8) and version (v>=7) areas so data placement skips them
+  for(let i=0;i<9;i++){ fn[i][8]=true; fn[8][i]=true; }
+  for(let i=0;i<8;i++){ fn[8][size-1-i]=true; fn[size-1-i][8]=true; }
+  if(v>=7) for(let i=0;i<18;i++){ const a=Math.floor(i/3), b=i%3; fn[size-11+b][a]=true; fn[a][size-11+b]=true; }
+  // place data (zigzag up/down columns, right→left, skipping the vertical timing column)
+  let bi=0; const nextBit=()=> (bi<finalCw.length*8) ? ((finalCw[bi>>3]>>(7-(bi&7)))&1) : 0;
+  for(let col=size-1; col>=1; col-=2){ if(col===6) col=5; for(let r=0;r<size;r++){ const up=((col+1)&2)===0, y=up?size-1-r:r; for(let c=0;c<2;c++){ const x=col-c; if(fn[y][x]) continue; mod[y][x]=nextBit()===1; bi++; } } }
+  const maskFns=[(x,y)=>(x+y)%2===0,(x,y)=>y%2===0,(x,y)=>x%3===0,(x,y)=>(x+y)%3===0,(x,y)=>(Math.floor(y/2)+Math.floor(x/3))%2===0,(x,y)=>((x*y)%2)+((x*y)%3)===0,(x,y)=>(((x*y)%2)+((x*y)%3))%2===0,(x,y)=>(((x+y)%2)+((x*y)%3))%2===0];
+  let best=null,bestPen=1e18;
+  for(let m=0;m<8;m++){
+    const t=mod.map(r=>r.slice());
+    for(let y=0;y<size;y++) for(let x=0;x<size;x++) if(!fn[y][x] && maskFns[m](x,y)) t[y][x]=!t[y][x];
+    qrDrawFormat(t,size,m); if(v>=7) qrDrawVersion(t,size,v);
+    const pen=qrPenalty(t,size); if(pen<bestPen){ bestPen=pen; best={t,m}; }
+  }
+  return { matrix:best.t, size, version:v, mask:best.m };
+}
+function qrDrawFormat(mod,size,mask){
+  const dataBits=(1<<3)|mask;                              // EC level L = 0b01 → (01<<3)|mask
+  const bits=((dataBits<<10) | qrBch(dataBits<<10,0x537,10)) ^ 0x5412;
+  const g=i=>((bits>>i)&1)===1;
+  for(let i=0;i<=5;i++) mod[i][8]=g(i); mod[7][8]=g(6); mod[8][8]=g(7); mod[8][7]=g(8);
+  for(let i=9;i<15;i++) mod[8][14-i]=g(i);
+  for(let i=0;i<8;i++) mod[8][size-1-i]=g(i);
+  for(let i=8;i<15;i++) mod[size-15+i][8]=g(i);
+  mod[size-8][8]=true;                                     // always-dark module
+}
+function qrDrawVersion(mod,size,v){
+  const bits=(v<<12) | qrBch(v<<12,0x1F25,12);
+  for(let i=0;i<18;i++){ const a=Math.floor(i/3), b=i%3, d=((bits>>i)&1)===1; mod[size-11+b][a]=d; mod[a][size-11+b]=d; }
+}
+function qrPenalty(m,size){
+  let p=0;
+  for(let y=0;y<size;y++){ let run=1; for(let x=1;x<size;x++){ if(m[y][x]===m[y][x-1]){ run++; if(run===5)p+=3; else if(run>5)p++; } else run=1; } }
+  for(let x=0;x<size;x++){ let run=1; for(let y=1;y<size;y++){ if(m[y][x]===m[y-1][x]){ run++; if(run===5)p+=3; else if(run>5)p++; } else run=1; } }
+  for(let y=0;y<size-1;y++) for(let x=0;x<size-1;x++) if(m[y][x]===m[y][x+1]&&m[y][x]===m[y+1][x]&&m[y][x]===m[y+1][x+1]) p+=3;
+  let dark=0; for(let y=0;y<size;y++) for(let x=0;x<size;x++) if(m[y][x]) dark++;
+  p+=Math.floor(Math.abs(dark*100/(size*size)-50)/5)*10;
+  return p;
+}
+// render a QR for a string into an element as a crisp SVG (with a quiet zone)
+function renderCollabQR(kind, text){
+  const host=document.getElementById(kind==="invite"?"collabOfferQR":"collabReplyQR"); if(!host) return;
+  const q=qrMakeMatrix(text); if(!q){ host.innerHTML=""; return; }
+  const n=q.size, quiet=4, dim=n+quiet*2, px=Math.max(2, Math.floor(180/dim)), wh=dim*px;
+  let rects=""; for(let y=0;y<n;y++) for(let x=0;x<n;x++) if(q.matrix[y][x]) rects+='<rect x="'+((x+quiet)*px)+'" y="'+((y+quiet)*px)+'" width="'+px+'" height="'+px+'"/>';
+  host.innerHTML='<svg width="'+wh+'" height="'+wh+'" viewBox="0 0 '+wh+' '+wh+'" xmlns="http://www.w3.org/2000/svg"><rect width="'+wh+'" height="'+wh+'" fill="#fff"/><g fill="#000">'+rects+'</g></svg>';
+  host.title="Scan to open the "+(kind==="invite"?"invite":"reply")+" link (QR v"+q.version+")";
 }
 function newPeer(){ const pc=new RTCPeerConnection({ iceServers:[{urls:"stun:stun.l.google.com:19302"}] }); collab.pc=pc; return pc; }
 function iceComplete(pc){ return new Promise(res=>{ if(pc.iceGatheringState==="complete") return res(); const chk=()=>{ if(pc.iceGatheringState==="complete"){ pc.removeEventListener("icegatheringstatechange",chk); res(); } }; pc.addEventListener("icegatheringstatechange",chk); setTimeout(res,2500); }); }

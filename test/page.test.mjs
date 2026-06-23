@@ -113,6 +113,7 @@ test("core functions the tests and features depend on are present", () => {
     // live collaboration (Roadmap WebRTC)
     "rtcEncode","rtcDecode","peerColor","rtcStateForWire","rtcBroadcastState","rtcSendTransport","rtcOnMessage","rtcHost","rtcJoin","rtcTeardown",
     "bytesToB64url","b64urlToBytes","buildSignalUrl","parseSignalHash","packSignal","unpackSignal","checkInviteUrl","showSignalOut",
+    "qrGfMul","qrRsGen","qrChooseVersion","qrMakeMatrix","renderCollabQR",
     // P2P sync spec (docs/P2P_SYNC_SPEC.md)
     "uuid","myPeerId","ensureSessionId","trackHash","computeSyncBase","trackSyncMeta","reconcile","clockMedianOffset","mergeRemoteState","bumpChangedRevs",
     "midiEditorSetKey","syncSynthKeySel","fillKeySelect",
