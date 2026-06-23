@@ -51,9 +51,10 @@ test("required element ids exist in the markup", () => {
     // master level meter (Roadmap item 7)
     "masterMeter","masterMeterFill",
     // live collaboration (Roadmap WebRTC)
-    "collabBtn","collabModal","collabClose","collabName","collabHost","collabJoinMode","collabDisconnect",
-    "collabOffer","collabAnswerIn","collabAnswerInBtn","collabJoinIn","collabJoinBtn","collabReply","collabStatus",
-    "collabOfferCopy","collabReplyCopy","collabOfferQR","collabReplyQR",
+    "collabBtn","collabModal","collabClose","collabName","collabHost","collabDisconnect","collabStatus","collabPeers",
+    "collabStepStart","collabStepHost","collabStepJoin","collabStepConnected",
+    "collabOffer","collabOfferCopy","collabOfferQR","collabAnswerIn","collabAnswerInBtn",
+    "collabReply","collabReplyCopy","collabReplyQR","collabPeerName","collabJoinHost",
     // settings modal (canonical API-key editor)
     "settingsBtn","settingsModal","settingsSave","settingsTest","settingsClear","settingsStatus","settingsResetLayout",
     // memo editor
@@ -113,7 +114,7 @@ test("core functions the tests and features depend on are present", () => {
     // track automation (Roadmap item 8)
     "automationValueAt","serializeAutomation","applyLiveAutomation","buildAutomationOverlay",
     // live collaboration (Roadmap WebRTC)
-    "rtcEncode","rtcDecode","peerColor","rtcStateForWire","rtcBroadcastState","rtcSendTransport","rtcOnMessage","rtcHost","rtcJoin","rtcTeardown",
+    "rtcEncode","rtcDecode","peerColor","rtcStateForWire","rtcBroadcastState","rtcSendTransport","rtcOnMessage","rtcHost","rtcJoin","rtcTeardown","collabStep",
     "bytesToB64url","b64urlToBytes","buildSignalUrl","parseSignalHash","packSignal","unpackSignal","checkInviteUrl","showSignalOut",
     "qrGfMul","qrRsGen","qrChooseVersion","qrMakeMatrix","renderCollabQR",
     "concatChunks","blobChunkCount","collabRegisterLocalBlobs","sendBlob","requestMissingBlobs","onBlobComplete",
