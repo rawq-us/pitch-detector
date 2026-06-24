@@ -1724,6 +1724,12 @@
       <div class="group"><label>&nbsp;</label><button id="memoUseKey" title="Set the project key & mode to this memo's key">Use key in project</button></div>
       <div class="group"><label>&nbsp;</label><button id="memoUseBpm" title="Set the project BPM to this memo's tracked tempo">Use BPM in project</button></div>
     </div>
+    <div class="row" id="memoFlexRow" style="margin-bottom:12px; align-items:flex-end">
+      <div class="group"><label>Flex time <span class="dim">— warp the take onto the grid</span></label><button id="memoFlexBtn" title="Time-stretch this take so its tracked beats land on the project's tempo grid (pitch preserved)">🔀 Flex to grid</button></div>
+      <div class="group"><label for="memoFlexStrength">Strength <span class="readout" id="memoFlexStrengthOut">100%</span></label><input id="memoFlexStrength" type="range" min="0" max="1" step="0.05" value="1" title="100% snaps beats exactly to the grid · lower values keep some of the original feel"></div>
+      <div class="group"><label>&nbsp;</label><button id="memoFlexReset" class="mini" title="Remove flex — restore the original timing">↻ Unflex</button></div>
+      <div class="group"><label>&nbsp;</label><span class="readout" id="memoFlexInfo" style="line-height:36px"></span></div>
+    </div>
     <div class="memo-canvas-wrap"><canvas id="memoCanvas" height="260"></canvas></div>
     <div class="memo-legend">
       <span><i style="background:#2dd4bf"></i>in tune (±10¢)</span>
@@ -1822,7 +1828,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="1.52.0";
+const APP_VERSION="2.0.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -2649,7 +2655,7 @@ function setKbOctave(v){ kbOctave=clamp(Math.round(v),-4,4); try{ localStorage.s
 })();
 
 /* ============================== Project / timing ============================== */
-const FORMAT_VERSION = 4; // v4: P2P sync identity (sessionId + per-track uid/ownerId/rev); v3: sampler layer; v2: memo layer + clip loopFill
+const FORMAT_VERSION = 5; // v5: clip flex-time warp map; v4: P2P sync identity (sessionId + per-track uid/ownerId/rev); v3: sampler layer; v2: memo layer + clip loopFill
 const project = { sessionId:null, bpm:90, timeSig:{num:4,den:4}, lengthSec:32, loop:{start:0,end:32}, loopEnabled:true, countInBars:1, tracks:[], samplerKit:[], keyMap:[], structure:[], meta:{ title:"", artist:"", album:"", genre:"", year:"", key:"", take:1, coverBlob:null }, syncBase:null };
 // stable per-install peer id (becomes track.ownerId); session id = the song's identity across machines
 function myPeerId(){ try{ let id=localStorage.getItem("ps_peer_id"); if(!id){ id=uuid(); localStorage.setItem("ps_peer_id", id); } return id; }catch(e){ return "peer-local"; } }
@@ -3393,7 +3399,7 @@ function patternSec(track, clip){
 }
 function naturalBeats(track, clip){ return Math.max(1, Math.round(patternSec(track,clip)/beatUnitSec())); }
 function clipDuration(track, clip){
-  if (track.type==="voice"||track.type==="memo") return clip.length!=null ? clip.length : (clip.audioDur||1);
+  if (track.type==="voice"||track.type==="memo") return clip.warpedBuffer ? clip.warpDur : (clip.length!=null ? clip.length : (clip.audioDur||1));
   if (clip.loopFill) return Math.max(patternSec(track,clip), project.lengthSec - clip.start); // ∞: repeat to the end of the session
   return (clip.lengthBeats||naturalBeats(track,clip)) * beatUnitSec();
 }
@@ -3775,7 +3781,7 @@ function clockMedianOffset(samples){
   const mid=offs.length>>1; return offs.length%2 ? offs[mid] : (offs[mid-1]+offs[mid])/2;
 }
 // strip un-serializable audio (AudioBuffer) and heavy blobs from a snapshot before sending
-function rtcStateForWire(){ const s=snapshotProject(); s.sessionId=ensureSessionId(); s.tracks.forEach(t=>t.clips.forEach(c=>{ delete c.buffer; delete c.blob; })); return s; }
+function rtcStateForWire(){ const s=snapshotProject(); s.sessionId=ensureSessionId(); s.tracks.forEach(t=>t.clips.forEach(c=>{ delete c.buffer; delete c.blob; delete c.warpedBuffer; })); return s; }
 // Per-track 3-way merge of an incoming remote snapshot (§5) — replaces whole-project clobber.
 // Each track is taken from local or remote per reconcile(); same-track concurrent edits become
 // conflicts (kept local for now). Local audio buffers ride along on kept tracks; remote-added tracks
@@ -4172,7 +4178,7 @@ function forEachClipEvent(cb){
   const spq=quarterSec();
   for (const tr of project.tracks){
     for (const clip of tr.clips){
-      if (tr.type==="voice"||tr.type==="memo"){ if (clip.buffer || clip.blob) cb({ kind:"voice", time:clip.start, clip, track:tr, aoff:clip.offset||0, alen:clipDuration(tr,clip) }); continue; }
+      if (tr.type==="voice"||tr.type==="memo"){ if (clip.buffer || clip.blob) cb({ kind:"voice", time:clip.start, clip, track:tr, aoff:clip.warpedBuffer?0:(clip.offset||0), alen:clipDuration(tr,clip) }); continue; }
       if (tr.type==="sampler"){
         const clipDur=clipDuration(tr,clip);
         samplerClipEvents(clip, { stepSec:spq/4, clipDur, patSec:patternSec(tr,clip), clipStart:clip.start })
@@ -4201,7 +4207,7 @@ function forEachClipEvent(cb){
 }
 function buildEvents(){
   const start=project.loop.start, end=project.loop.end, evs=[];
-  forEachClipEvent(ev=>{ if (ev.time>=start && ev.time<end){ if (ev.kind==="voice") evs.push({ t:ev.time-start, kind:"voice", buffer:ev.clip.buffer, aoff:ev.aoff, alen:ev.alen, gain:ev.clip.gain, track:ev.track }); else evs.push({ t:ev.time-start, kind:ev.kind, midi:ev.midi, dur:ev.dur, wave:ev.wave, drum:ev.drum, pad:ev.pad, loop:ev.loop, off:ev.off, track:ev.track }); } });
+  forEachClipEvent(ev=>{ if (ev.time>=start && ev.time<end){ if (ev.kind==="voice") evs.push({ t:ev.time-start, kind:"voice", buffer:ev.clip.warpedBuffer||ev.clip.buffer, aoff:ev.aoff, alen:ev.alen, gain:ev.clip.gain, track:ev.track }); else evs.push({ t:ev.time-start, kind:ev.kind, midi:ev.midi, dur:ev.dur, wave:ev.wave, drum:ev.drum, pad:ev.pad, loop:ev.loop, off:ev.off, track:ev.track }); } });
   evs.sort((a,b)=>a.t-b.t);
   transport.events=evs; transport.loopStart=start; transport.loopLen=Math.max(0.1, end-start);
 }
@@ -4728,7 +4734,7 @@ function renderMemoChips(){
     memoChipsEl.appendChild(d);
   });
 }
-function syncMemoModal(){ if (!memoModalClip) return; renderMemoSummary(); renderMemoChips(); drawMemoModalCanvas(); }
+function syncMemoModal(){ if (!memoModalClip) return; renderMemoSummary(); renderMemoChips(); syncMemoFlex(); drawMemoModalCanvas(); }
 let memoZoom=1;
 function setMemoZoom(z, anchorPx){
   const wrap=memoCanvas.parentElement, baseW=Math.max(100, wrap.clientWidth||800);
@@ -4829,8 +4835,9 @@ function memoStopPlay(){
 function memoTogglePlay(){
   const clip=memoModalClip; if (!clip||!clip.buffer) return;
   if (memoPlaySrc){ memoStopPlay(); return; }
-  const ctx=getCtx(), s=ctx.createBufferSource(); s.buffer=clip.buffer; s.connect(masterGain||ctx.destination);
-  memoPlayOff=clamp(memoSeekT||0,0,Math.max(0,clip.audioDur-0.05));
+  const ctx=getCtx(), s=ctx.createBufferSource(); s.buffer=clip.warpedBuffer||clip.buffer; s.connect(masterGain||ctx.destination);
+  const playDur=clip.warpedBuffer?clip.warpDur:clip.audioDur;   // flexed preview matches timeline playback
+  memoPlayOff=clamp(memoSeekT||0,0,Math.max(0,playDur-0.05));
   s.start(0, memoPlayOff); memoPlaySrc=s; memoPlayT0=ctx.currentTime;
   s.onended=()=>{ if (memoPlaySrc===s) memoStopPlay(); };
   const b=document.getElementById("memoPlayBtn"); b.textContent="■ Stop"; b.classList.add("danger");
@@ -4868,6 +4875,53 @@ document.getElementById("memoUseBpm").addEventListener("click",()=>{
   project.bpm=clamp(Math.round(a.bpm),20,400); bpmInput.value=project.bpm;
   updateMsReadout(); updateBeatLen(); renderTimeline();
   flash(document.getElementById("memoUseBpm"),"✓ "+project.bpm+" BPM");
+});
+// ---- Flex time: warp the take onto the project grid using the tracked beats ----
+function memoBuildWarp(clip, strength){
+  const a=clip.analysis;
+  const anchors=flexAnchorsToGrid((a.beats||[]).map(Number), { bpm:project.bpm, dur:clip.buffer.duration, strength });
+  clip.warp={ anchors, strength, bpm:project.bpm };
+  bakeWarp(clip);
+}
+function memoFlexable(clip){ const a=clip&&clip.analysis; return !!(clip&&clip.buffer&&a&&a.beats&&a.beats.length>=2); }
+function syncMemoFlex(){
+  const clip=memoModalClip; if (!clip) return;
+  const btn=document.getElementById("memoFlexBtn"), reset=document.getElementById("memoFlexReset"),
+        slider=document.getElementById("memoFlexStrength"), out=document.getElementById("memoFlexStrengthOut"),
+        info=document.getElementById("memoFlexInfo");
+  if (!btn) return;
+  const flexed=!!clip.warp;
+  btn.disabled=!memoFlexable(clip);
+  btn.textContent=flexed?"🔀 Re-flex to grid":"🔀 Flex to grid";
+  reset.style.display=flexed?"":"none";
+  if (flexed && clip.warp.strength!=null) slider.value=String(clip.warp.strength);
+  out.textContent=Math.round(+slider.value*100)+"%";
+  if (flexed && clip.warpDur) info.textContent=fmtTime(clip.audioDur)+" → "+fmtTime(clip.warpDur)+" @ "+(clip.warp.bpm||project.bpm)+" BPM";
+  else if (!memoFlexable(clip)) info.textContent=clip.buffer?"re-analyze for a beat grid first":"";
+  else info.textContent="";
+}
+document.getElementById("memoFlexBtn").addEventListener("click",()=>{
+  const clip=memoModalClip, btn=document.getElementById("memoFlexBtn"); if (!clip) return;
+  if (!memoFlexable(clip)){ flash(btn, clip.buffer?"No beats tracked":"Audio not loaded"); return; }
+  memoStopPlay();
+  commit("flex memo to grid",()=>memoBuildWarp(clip, +document.getElementById("memoFlexStrength").value));
+  renderTimeline(); scheduleAutosave(); syncMemoFlex(); drawMemoModalCanvas();
+  flash(btn,"✓ flexed to "+project.bpm+" BPM");
+});
+document.getElementById("memoFlexReset").addEventListener("click",()=>{
+  const clip=memoModalClip; if (!clip||!clip.warp) return;
+  memoStopPlay();
+  commit("unflex memo",()=>{ clip.warp=null; clip.warpedBuffer=null; clip.warpDur=null; });
+  renderTimeline(); scheduleAutosave(); syncMemoFlex(); drawMemoModalCanvas();
+});
+document.getElementById("memoFlexStrength").addEventListener("input",()=>{
+  document.getElementById("memoFlexStrengthOut").textContent=Math.round(+document.getElementById("memoFlexStrength").value*100)+"%";
+});
+document.getElementById("memoFlexStrength").addEventListener("change",()=>{   // re-bake on release when already flexed
+  const clip=memoModalClip; if (!clip||!clip.warp||!memoFlexable(clip)) return;
+  memoStopPlay();
+  commit("adjust flex strength",()=>memoBuildWarp(clip, +document.getElementById("memoFlexStrength").value));
+  renderTimeline(); scheduleAutosave(); syncMemoFlex(); drawMemoModalCanvas();
 });
 memoLyricsEl.addEventListener("input",()=>{ if (memoModalClip){ memoModalClip.lyricsText=memoLyricsEl.value; } });
 memoLyricsEl.addEventListener("change",()=>{ renderTimeline(); drawMemoModalCanvas(); });
@@ -5595,6 +5649,122 @@ function memoExportBundle(){
 }
 document.getElementById("memoExport").addEventListener("click",memoExportBundle);
 
+/* ===== Flex time — WSOLA time-stretch / warp-to-grid (self-contained DSP, lifted by test/extract.mjs) ===== */
+// Variable-rate WSOLA (Waveform Similarity Overlap-Add). Pitch-preserving, time-domain,
+// no FFT — chosen over a phase vocoder because memo audio is usually voice / a single
+// instrument, where WSOLA keeps transients crisp and has no phase-smear artifacts.
+// input: mono Float32Array. sr: Hz. anchors: sorted [{src,dst}] in seconds mapping
+// input time -> output time (must begin at {src:0,dst:0} and increase monotonically).
+// Returns a new Float32Array whose length is the last anchor's dst (in samples).
+function flexWarp(input, sr, anchors, opts){
+  opts = opts || {};
+  const N = input.length;
+  if (!anchors || anchors.length < 2 || N === 0) return input.slice(0);
+  // piecewise-linear inverse map: output time (s) -> input time (s).
+  const inv = (tOut) => {
+    if (tOut <= anchors[0].dst) return anchors[0].src;
+    for (let i = 1; i < anchors.length; i++){
+      const a = anchors[i-1], b = anchors[i];
+      if (tOut <= b.dst){
+        const span = b.dst - a.dst;
+        const f = span > 1e-9 ? (tOut - a.dst) / span : 0;
+        return a.src + f * (b.src - a.src);
+      }
+    }
+    return anchors[anchors.length-1].src;
+  };
+  const outN = Math.max(1, Math.round(anchors[anchors.length-1].dst * sr));
+  let W = opts.frame ? Math.round(opts.frame * sr) : Math.round(0.055 * sr);
+  W = Math.max(64, W - (W & 1));              // even frame length
+  const Hs = W >> 1;                           // synthesis hop (50% overlap)
+  const tol = opts.tol != null ? Math.round(opts.tol * sr) : Math.round(0.012 * sr);
+  // Hann window
+  const win = new Float32Array(W);
+  for (let n = 0; n < W; n++) win[n] = 0.5 - 0.5 * Math.cos((2 * Math.PI * n) / (W - 1));
+  const out = new Float32Array(outN);
+  const norm = new Float32Array(outN);
+  const clampA = (i) => i < 0 ? 0 : (i > N - W ? N - W : i);
+  let prevBest = -1;                           // start index of previously placed frame
+  for (let so = 0; so < outN; so += Hs){
+    const tIn = inv(so / sr);
+    let ai = clampA(Math.round(tIn * sr));
+    let best = ai;
+    if (prevBest >= 0 && tol > 0){
+      // expected continuation = the samples that naturally followed the last placed frame
+      const exp0 = clampA(prevBest + Hs);
+      let bestScore = -Infinity;
+      const lo = Math.max(0, ai - tol), hi = Math.min(N - W, ai + tol);
+      for (let cand = lo; cand <= hi; cand++){
+        let dot = 0, ev = 0;
+        for (let n = 0; n < W; n += 4){        // strided correlation — plenty for similarity
+          const e = input[exp0 + n], v = input[cand + n];
+          dot += e * v; ev += v * v;
+        }
+        const score = dot / (Math.sqrt(ev) + 1e-9);
+        if (score > bestScore){ bestScore = score; best = cand; }
+      }
+    }
+    for (let n = 0; n < W; n++){
+      const o = so + n; if (o >= outN) break;
+      out[o] += input[best + n] * win[n];
+      norm[o] += win[n];
+    }
+    prevBest = best;
+  }
+  for (let i = 0; i < outN; i++) if (norm[i] > 1e-6) out[i] /= norm[i];
+  return out;
+}
+
+// Derive warp anchors that snap detected beats onto the project's tempo grid.
+// beats: detected beat times (s). opts: {bpm, dur, strength (0..1), }.
+// strength 1 = beats land exactly on grid lines; 0 = identity (no warp).
+// Missed/extra detected beats are absorbed by rounding each gap to whole grid beats
+// against the median detected interval, so the map stays monotonic and drift-free.
+function flexAnchorsToGrid(beats, opts){
+  opts = opts || {};
+  const strength = opts.strength == null ? 1 : opts.strength;
+  const bpm = opts.bpm || 120, spb = 60 / bpm, dur = opts.dur || 0;
+  const bs = (beats || []).filter(b => b > 1e-3 && (!dur || b < dur - 1e-3)).sort((a, b) => a - b);
+  const anchors = [{ src: 0, dst: 0 }];
+  if (!bs.length){ if (dur > 0) anchors.push({ src: dur, dst: dur }); return anchors; }
+  const ivs = [];
+  for (let i = 1; i < bs.length; i++) ivs.push(bs[i] - bs[i-1]);
+  ivs.sort((a, b) => a - b);
+  const med = ivs.length ? ivs[ivs.length >> 1] : spb;
+  let prevSrc = 0, prevDst = 0, g = 0;
+  for (let i = 0; i < bs.length; i++){
+    const src = bs[i];
+    g += Math.max(1, Math.round((src - prevSrc) / med));   // whole grid-beats since last anchor
+    const grid = g * spb;
+    let dst = src + strength * (grid - src);
+    if (dst <= prevDst + 1e-3) dst = prevDst + 1e-3;
+    anchors.push({ src, dst });
+    prevSrc = src; prevDst = dst;
+  }
+  if (dur > prevSrc + 1e-3) anchors.push({ src: dur, dst: prevDst + (dur - prevSrc) });  // tail at natural rate
+  return anchors;
+}
+
+// Render a warped AudioBuffer from `buf` using clip.warp (ctx works for both the live
+// AudioContext and an OfflineAudioContext bounce). Returns the original buffer untouched
+// when there's no usable warp. Per-channel so stereo stays in phase.
+function applyWarpToBuffer(ctx, buf, warp){
+  if (!buf || !warp || !warp.anchors || warp.anchors.length < 2) return buf;
+  const sr = buf.sampleRate, nch = buf.numberOfChannels, chans = [];
+  for (let ch = 0; ch < nch; ch++) chans.push(flexWarp(buf.getChannelData(ch), sr, warp.anchors));
+  const out = ctx.createBuffer(nch, chans[0].length, sr);
+  for (let ch = 0; ch < nch; ch++) out.copyToChannel(chans[ch], ch);
+  return out;
+}
+// Cache the warped buffer on the clip for live playback. warpedBuffer represents the
+// WHOLE take warped (trim is ignored while a warp is active — flex re-times the take).
+function bakeWarp(clip){
+  if (!clip) return;
+  if (!clip.warp || !clip.buffer){ clip.warpedBuffer = null; clip.warpDur = null; return; }
+  clip.warpedBuffer = applyWarpToBuffer(getCtx(), clip.buffer, clip.warp);
+  clip.warpDur = clip.warpedBuffer ? clip.warpedBuffer.length / clip.warpedBuffer.sampleRate : null;
+}
+
 /* ---- the DSP analysis worker (runs as a Blob worker; everything below is self-contained) ---- */
 function memoWorkerMain(){
   "use strict";
@@ -5934,7 +6104,7 @@ async function renderMix(trackFilter, applyMasterEq, respectMuteSolo){
   } }
   // decode voice blobs into the offline context
   const vbuf={};
-  for (const tr of project.tracks){ if (tr.type!=="voice"&&tr.type!=="memo") continue; if (!pass(tr)) continue; for (const clip of tr.clips){ if (!clip.blob) continue; const b=await decodeBlob(clip.blob, octx); if (b) vbuf[clip.id]=b; } }
+  for (const tr of project.tracks){ if (tr.type!=="voice"&&tr.type!=="memo") continue; if (!pass(tr)) continue; for (const clip of tr.clips){ if (!clip.blob) continue; let b=await decodeBlob(clip.blob, octx); if (b && clip.warp) b=applyWarpToBuffer(octx, b, clip.warp); if (b) vbuf[clip.id]=b; } }
   const glidePrev=new Map();
   forEachClipEvent(ev=>{
     if (!pass(ev.track)) return;
@@ -6210,11 +6380,11 @@ function serializeProject(){
           if (t.type === "sampler"){ return c.kind==="loop"
             ? { start:c.start, name:c.name||undefined,lengthBeats:c.lengthBeats, loopFill:!!c.loopFill, kind:"loop", pad:c.pad, off:c.off||0 }
             : { start:c.start, name:c.name||undefined,lengthBeats:c.lengthBeats, loopFill:!!c.loopFill, kind:"grid", grid:(c.grid||[]).map(r=>r.slice()), pitch:c.pitch?{...c.pitch}:undefined }; }
-          if (t.type === "voice") return { start:c.start, name:c.name||undefined,audioDur:c.audioDur, blob:c.blob, blobId:c.blobId||undefined, offset:c.offset||undefined, length:c.length!=null?c.length:undefined, gain:c.gain!=null?c.gain:undefined };
+          if (t.type === "voice") return { start:c.start, name:c.name||undefined,audioDur:c.audioDur, blob:c.blob, blobId:c.blobId||undefined, offset:c.offset||undefined, length:c.length!=null?c.length:undefined, gain:c.gain!=null?c.gain:undefined, warp:c.warp||undefined };
           if (t.type === "memo") return { start:c.start, name:c.name||undefined,audioDur:c.audioDur, blob:c.blob, blobId:c.blobId||undefined, offset:c.offset||undefined, length:c.length!=null?c.length:undefined,
             analysis: c.analysis?JSON.parse(JSON.stringify(c.analysis)):null,
             lyricsText: c.lyricsText||"", lyricsWords: c.lyricsWords?JSON.parse(JSON.stringify(c.lyricsWords)):null,
-            analysisKey: c.analysisKey||"auto", lyricsLang: c.lyricsLang||null };
+            analysisKey: c.analysisKey||"auto", lyricsLang: c.lyricsLang||null, warp:c.warp||undefined };
           return { start:c.start, name:c.name||undefined,lengthBeats:c.lengthBeats, loopFill:!!c.loopFill, grid:c.grid.map(r=>r.slice()), pitch:c.pitch?{...c.pitch}:undefined };
         })
       };
@@ -6245,7 +6415,7 @@ function loadProject(data){
   project.structure=(data.structure||[]).map(s=>({ id:++structSeq, type:s.type, beat:+s.beat||0, bars:Math.max(1,+s.bars||4) }));
   project.samplerKit.forEach(p=>{ if (p&&p.blob) padsToDecode.push(p); });
   (data.tracks||[]).forEach(t=>{ const tr={id:++trackSeq,uid:t.uid||uuid(),ownerId:t.ownerId||myPeerId(),rev:t.rev||0,updatedAt:t.updatedAt||0,type:t.type,name:t.name,clips:[],fx:mergeFx(t.fx),transpose:t.transpose||0,meter:t.meter||undefined,muted:!!t.muted,soloed:!!t.soloed,automation:serializeAutomation(t.automation)}; if(t.type==="midi") tr.synth=t.synth?cloneVoice(t.synth):cloneVoice(GLOBAL_VOICE);
-    (t.clips||[]).forEach(c=>{ const clip={id:++clipSeq,start:c.start,lengthBeats:c.lengthBeats,loopFill:!!c.loopFill}; if(c.name) clip.name=c.name; if (t.type==="arp"){ clip.rate=c.rate; clip.wave=c.wave; clip.steps=(c.steps||[]).map(s=>({...s})); } else if (t.type==="midi"){ clip.notes=(c.notes||[]).map(n=>({...n})); clip.cc=c.cc?JSON.parse(JSON.stringify(c.cc)):undefined; } else if (t.type==="sampler"){ clip.kind=c.kind||"grid"; if (clip.kind==="loop"){ clip.pad=c.pad||0; clip.off=c.off||0; } else { clip.grid=(c.grid||[]).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } } else if (t.type==="voice"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if(c.blobId) clip.blobId=c.blobId; if(c.offset) clip.offset=c.offset; if(c.length!=null) clip.length=c.length; if(c.gain!=null) clip.gain=c.gain; if (clip.blob) toDecode.push(clip); } else if (t.type==="memo"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if(c.blobId) clip.blobId=c.blobId; if(c.offset) clip.offset=c.offset; if(c.length!=null) clip.length=c.length; clip.analysis=c.analysis||null; clip.lyricsText=c.lyricsText||""; clip.lyricsWords=c.lyricsWords||null; clip.analysisKey=c.analysisKey||"auto"; clip.lyricsLang=c.lyricsLang||null; if (clip.blob) toDecode.push(clip); } else { clip.grid=(c.grid||DRUMS.map(()=>new Array(16).fill(false))).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } tr.clips.push(clip); }); project.tracks.push(tr); });
+    (t.clips||[]).forEach(c=>{ const clip={id:++clipSeq,start:c.start,lengthBeats:c.lengthBeats,loopFill:!!c.loopFill}; if(c.name) clip.name=c.name; if (t.type==="arp"){ clip.rate=c.rate; clip.wave=c.wave; clip.steps=(c.steps||[]).map(s=>({...s})); } else if (t.type==="midi"){ clip.notes=(c.notes||[]).map(n=>({...n})); clip.cc=c.cc?JSON.parse(JSON.stringify(c.cc)):undefined; } else if (t.type==="sampler"){ clip.kind=c.kind||"grid"; if (clip.kind==="loop"){ clip.pad=c.pad||0; clip.off=c.off||0; } else { clip.grid=(c.grid||[]).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } } else if (t.type==="voice"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if(c.blobId) clip.blobId=c.blobId; if(c.offset) clip.offset=c.offset; if(c.length!=null) clip.length=c.length; if(c.gain!=null) clip.gain=c.gain; if(c.warp) clip.warp=c.warp; if (clip.blob) toDecode.push(clip); } else if (t.type==="memo"){ clip.blob=c.blob; clip.audioDur=c.audioDur||1; clip.buffer=null; if(c.blobId) clip.blobId=c.blobId; if(c.offset) clip.offset=c.offset; if(c.length!=null) clip.length=c.length; clip.analysis=c.analysis||null; clip.lyricsText=c.lyricsText||""; clip.lyricsWords=c.lyricsWords||null; clip.analysisKey=c.analysisKey||"auto"; clip.lyricsLang=c.lyricsLang||null; if(c.warp) clip.warp=c.warp; if (clip.blob) toDecode.push(clip); } else { clip.grid=(c.grid||DRUMS.map(()=>new Array(16).fill(false))).map(r=>r.slice()); clip.pitch=c.pitch?{...c.pitch}:undefined; } tr.clips.push(clip); }); project.tracks.push(tr); });
   selectedTrackId=project.tracks[0]?.id||null;
   project.tracks.forEach(ensureTrackChain); applyTrackMuteSolo();
   if (data.layout && typeof applySectionLayout==="function"){ applySectionLayout(data.layout); saveLayout(); }
@@ -6256,7 +6426,7 @@ function loadProject(data){
   // decode voice/memo clips and sampler pads asynchronously, then refresh
   if (toDecode.length || padsToDecode.length){ const ctx=getCtx();
     Promise.all([
-      ...toDecode.map(async clip=>{ clip.buffer=await decodeBlob(clip.blob, ctx); if (clip.buffer) clip.audioDur=clip.buffer.duration; }),
+      ...toDecode.map(async clip=>{ clip.buffer=await decodeBlob(clip.blob, ctx); if (clip.buffer) clip.audioDur=clip.buffer.duration; if (clip.buffer && clip.warp) bakeWarp(clip); }),
       ...padsToDecode.map(async pad=>{ pad.buffer=await decodeBlob(pad.blob, ctx); })
     ]).then(()=>{ renderTimeline(); if (typeof refreshSampler==="function") refreshSampler(); });
   }
@@ -6273,8 +6443,8 @@ function snapClip(type, c){
   if(type==="arp"){ o.rate=c.rate; o.wave=c.wave; o.steps=(c.steps||[]).map(s=>({...s})); }
   else if(type==="midi"){ o.notes=(c.notes||[]).map(n=>({...n})); o.cc=c.cc?JSON.parse(JSON.stringify(c.cc)):undefined; }
   else if(type==="sampler"){ o.kind=c.kind||"grid"; if(o.kind==="loop"){ o.pad=c.pad; o.off=c.off||0; } else { o.grid=(c.grid||[]).map(r=>r.slice()); o.pitch=c.pitch?{...c.pitch}:undefined; } }
-  else if(type==="voice"){ o.audioDur=c.audioDur; if(c.offset) o.offset=c.offset; if(c.length!=null) o.length=c.length; if(c.blobId) o.blobId=c.blobId; }
-  else if(type==="memo"){ o.audioDur=c.audioDur; if(c.offset) o.offset=c.offset; if(c.length!=null) o.length=c.length; if(c.blobId) o.blobId=c.blobId; o.analysis=c.analysis?JSON.parse(JSON.stringify(c.analysis)):null; o.lyricsText=c.lyricsText||""; o.lyricsWords=c.lyricsWords?JSON.parse(JSON.stringify(c.lyricsWords)):null; o.analysisKey=c.analysisKey||"auto"; o.lyricsLang=c.lyricsLang||null; }
+  else if(type==="voice"){ o.audioDur=c.audioDur; if(c.offset) o.offset=c.offset; if(c.length!=null) o.length=c.length; if(c.blobId) o.blobId=c.blobId; if(c.gain!=null) o.gain=c.gain; if(c.warp) o.warp=JSON.parse(JSON.stringify(c.warp)); if(c.warpedBuffer!==undefined) o.warpedBuffer=c.warpedBuffer; if(c.warpDur!=null) o.warpDur=c.warpDur; }
+  else if(type==="memo"){ o.audioDur=c.audioDur; if(c.offset) o.offset=c.offset; if(c.length!=null) o.length=c.length; if(c.blobId) o.blobId=c.blobId; o.analysis=c.analysis?JSON.parse(JSON.stringify(c.analysis)):null; o.lyricsText=c.lyricsText||""; o.lyricsWords=c.lyricsWords?JSON.parse(JSON.stringify(c.lyricsWords)):null; o.analysisKey=c.analysisKey||"auto"; o.lyricsLang=c.lyricsLang||null; if(c.warp) o.warp=JSON.parse(JSON.stringify(c.warp)); if(c.warpedBuffer!==undefined) o.warpedBuffer=c.warpedBuffer; if(c.warpDur!=null) o.warpDur=c.warpDur; }
   else { o.grid=(c.grid||[]).map(r=>r.slice()); o.pitch=c.pitch?{...c.pitch}:undefined; }
   return o;
 }

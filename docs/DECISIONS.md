@@ -1131,3 +1131,41 @@ A large editing/UX batch. The load-bearing, "don't undo this" choices:
   version bump) shown on the timeline; editable via right-click, every editor's
   header field, and double-click on the track name (`renameTrack`). Names are
   `escapeHtml`'d at render since they're now user input.
+
+## 31. Flex time — WSOLA warp-to-grid for memo audio (v2.0.0)
+The flagship "v2" feature: time-stretch a recorded take so its tracked beats
+land on the project's tempo grid, pitch preserved. Load-bearing choices:
+
+- **WSOLA, not a phase vocoder.** Memo audio is usually voice or one
+  instrument, where WSOLA (time-domain waveform-similarity overlap-add) keeps
+  transients crisp and has no phase-smear artifacts. A phase vocoder would
+  smear percussive memos and demand careful phase-locking for no quality win
+  on this content. `flexWarp(input, sr, anchors, opts)` is a variable-rate
+  WSOLA driven by a piecewise-linear time map — kept self-contained (no DOM,
+  no unbalanced-brace string literals) so `test/extract.mjs` lifts it into
+  Node like `memoWorkerMain`. Tested in `test/flex.test.mjs` against
+  synthesized signals (2×/0.5× stretch preserve pitch via autocorrelation,
+  identity map is a no-op, a mid anchor lands at its output time).
+- **Anchors absorb missed beats.** `flexAnchorsToGrid(beats, opts)` maps each
+  detected beat to a whole number of grid beats using the *median* detected
+  interval, so a dropped/extra beat advances the grid count correctly instead
+  of collapsing two beats into one (drift-free, monotonic). `strength` lerps
+  between original and grid time; 0 = identity.
+- **Bake once, substitute the buffer.** Rather than stretch in real time, we
+  render `clip.warpedBuffer` once (`bakeWarp` → `applyWarpToBuffer`, per
+  channel, works for both the live ctx and the offline bounce) and substitute
+  `warpedBuffer || buffer` at all four `createBufferSource` sites. When a warp
+  is active the take plays whole (`aoff=0`, `alen=warpDur`) and trim is ignored
+  — flex re-times the entire take. `clipDuration` returns `warpDur` so the
+  timeline length follows.
+- **Persisted as a map, regenerated as audio.** `clip.warp = {anchors,
+  strength, bpm}` serializes (FORMAT_VERSION 4→5, additive — old sessions load
+  unwarped); `warpedBuffer` is rebuilt from it after decode. `snapClip` carries
+  the map (deep-copied) + baked buffer (by ref) so undo/redo restores flex
+  exactly; `rtcStateForWire` strips `warpedBuffer` (peers re-bake from the map).
+- **Known limits (deliberate, milestone-1):** the memo canvas still draws the
+  *original* analysis times — the waveform/notes don't visually re-flow under a
+  warp (audio plays warped; the analysis describes the source take). Flex lives
+  on memo clips only (they carry `analysis.beats`); voice clips round-trip a
+  `warp` field but have no UI yet. P2P-shared warped clips re-bake only once
+  their audio decodes locally.
