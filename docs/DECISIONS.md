@@ -1169,3 +1169,39 @@ land on the project's tempo grid, pitch preserved. Load-bearing choices:
   on memo clips only (they carry `analysis.beats`); voice clips round-trip a
   `warp` field but have no UI yet. P2P-shared warped clips re-bake only once
   their audio decodes locally.
+
+## 33. v2 redesign — themeable token system + rack aesthetic (v2-redesign branch)
+A full visual overhaul done as a re-skin, not a rebuild — the information
+architecture (sections with grab/collapse/pop-out, color-coded clips, fullscreen
+`.fs-box` modals) was already right. Load-bearing choices:
+
+- **Theme via token indirection.** `:root` is now three layers: a raw palette,
+  a semantic role layer (themes override only this), and **legacy aliases**
+  (`--panel`/`--accent`/`--border`/`--*-clip`) pointing at the new tokens. Because
+  the existing CSS already consumed those alias names, redefining the tokens
+  re-skinned the **whole app** with almost no markup edits. Swapping is real:
+  `html[data-theme]` blocks for `rack` (default true-black/vivid), `classic`
+  (the original blue-charcoal), and `midnight`; `setTheme()` persists to
+  localStorage; a selector lives in Settings. **Do not** reintroduce hardcoded
+  colors in component CSS — add a token and reference it, or theming breaks.
+- **Components restyled in place, not re-classed.** The base `button`/`input`/
+  `select` rules and `.mini`/`.primary`/`.pill` were restyled (fill buttons,
+  recessed-well inputs, `--r-md` radius, vivid states) so every existing control
+  adopted the look without touching call sites. New `.seg` (fused segmented —
+  container owns the border+radius, buttons borderless), `.lcd`, `.tico`, `.svi`
+  are for migrated markup.
+- **Icons are an inline SVG `<symbol>` sprite** (Tabler-style, MIT) at the top of
+  `<body>` + an `icon(name)` helper. Zero dependency, themes via `currentColor`.
+  Emoji on the high-traffic surfaces (transport, close buttons, flex, track type
+  chips, main-page actions) were swapped; JS-toggled labels moved from
+  `textContent` to `innerHTML+icon()`, and `flash()` now save/restores
+  `innerHTML` so icon buttons keep their glyph. ~60 emoji on deeper modal
+  controls remain a follow-up.
+- **Layer type chips** replace the variable-width text badges: `typeChip(type)`
+  renders a `.tico` whose hue is `--type-{type}`, the same token the clip uses —
+  so the layer icon and its clips share one color (read type at a glance).
+- **No dead code removed.** A scan flagged 34 unreferenced functions, but all are
+  either IIFEs (`(function wireSampler(){…})()`) or test-contract-required
+  (`voiceLead`, `analyserPeak`, …). Removing any would regress; none were safe.
+- Guard rail held: `page.test.mjs` enforces a contract of element IDs + function
+  names — every phase kept all 117 tests green. Flex-time v2.0.0 work is retained.
