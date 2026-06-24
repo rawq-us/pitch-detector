@@ -1091,3 +1091,43 @@ Synth filter/envelope and oscillator values are now `<input type=number>` boxes
 bound two-way to their sliders via `bindKnob` (drag → box updates; type+Enter →
 slider moves; both clamp to the slider's min/max). Replaces the old read-only
 `<span>` readouts so values can be dialed in precisely.
+
+## 30. Per-clip editors, arp roll, key-aware backing (v1.52.0)
+A large editing/UX batch. The load-bearing, "don't undo this" choices:
+
+- **Editors relocate, they don't duplicate.** Double-clicking a beat/sampler
+  clip opens a full-screen modal that *borrows* the existing section's
+  `.sec-body` (and restores it on close); the MIDI editor likewise borrows the
+  shared keyboard (`.kbd-row`/`.kbd-foot`) and the Filter/Osc folds. There is
+  exactly ONE of each surface — never two keyboards listening at once.
+  `midiVoiceRestore` returns the folds *inside* `#synthControls` before the
+  keyboard (which now lives at the bottom, matching the MIDI editor); restore
+  order in `closeMidiEditor` is keyboard-then-voice for that reason.
+- **Arp timing is summed, not uniform.** Each step has an optional `rate`
+  (per-step subdivision) and `ratchet` (retriggers within its slot), so pattern
+  length is the SUM of slots. `patternSec`, the live scheduler, the in-clip
+  preview, and the in-editor preview all use `arpStepQ`/`arpPatternQ`/
+  `arpStepStartsQ`. Step fields round-trip free via spread — no FORMAT_VERSION
+  bump.
+- **Scale tiers from diatonic triads.** `scaleTierSets` classifies pitch
+  classes: major-triad degrees = primary (green), minor/dim = secondary (blue),
+  chromatic = out (red). Drives roll shading + note colors in both rolls and the
+  "Scale focus" hide. Geometry is never changed by Scale focus (drag math stays
+  intact); out-of-key notes stay visible (red) so they're fixable.
+- **The standard mode selector keeps native `<select>`s as hidden plumbing.**
+  `openModeSel` is one popover wired to synth/MIDI/backing/memo via
+  `attachModeButton`, which hides the real selects and writes back through them
+  with `dispatchEvent('change')`. This preserves every downstream handler AND
+  the page-contract IDs. `cfg.from` (the mode you're coming from) drives the
+  "smooth changes" cards; omit it for the global default.
+- **Backing follows key changes by scale degree.** A typed/detected progression
+  is re-cast as scale degrees of the song's start key (`progToDegrees`) then
+  rendered diatonically per region (`degreesToProg`) — I–V–vi–IV stays
+  functional across modulations. The backing modal is a chip builder + preset
+  library; the old text field survives hidden inside "Other sources" as the
+  source of truth. `chordsPerBar` replaced `barsPerChord` (`span = bpb/cpb`;
+  default 1 keeps the tests' span = bpb). Dropped per-region AI for simplicity.
+- **Clips/layers are nameable.** Optional `clip.name` (round-trips, additive, no
+  version bump) shown on the timeline; editable via right-click, every editor's
+  header field, and double-click on the track name (`renameTrack`). Names are
+  `escapeHtml`'d at render since they're now user input.
