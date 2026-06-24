@@ -5,15 +5,57 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Pitch Studio — Detector · Keyboard · Beats · Timeline</title>
 <style>
+  /* ===== Design tokens — palette → semantic → legacy aliases. Swap a theme block to re-skin the app. ===== */
   :root {
-    --bg: #0f1117; --panel: #1a1d27; --panel-2: #232735; --text: #e6e9ef; --muted: #9aa3b2;
-    --accent: #4ade80; --accent-2: #38bdf8; --flat: #f87171; --inscale: #2dd4bf;
-    --white-key: #f4f6fb; --white-key-active: #bdf0d0; --black-key: #1b1e27; --black-key-active: #2f7d52;
-    --border: #2c3140; --arp-clip: #6366f1; --beat-clip: #f59e0b; --sampler-clip: #a855f7;
+    /* raw palette (the only place literal colors live) */
+    --pal-black:#000; --pal-ink:#070708; --pal-coal:#0c0c0d; --pal-slate:#121214;
+    --pal-graphite:#1c1c1f; --pal-graphite2:#28282c; --pal-well:#050506;
+    --pal-line:#202024; --pal-line2:#34343b;
+    --pal-fog:#f2f2f5; --pal-mist:#9c9ca6; --pal-faint:#5c5c66;
+    --pal-green:#1fd97a; --pal-cyan:#22b8f5; --pal-amber:#ff9d1c; --pal-red:#ff4d52;
+    --pal-indigo:#6d63ff; --pal-violet:#8b7bff; --pal-purple:#a855f7; --pal-pink:#ff5fa8; --pal-blue:#2da6ff; --pal-teal:#2dd4bf;
+
+    /* semantic roles (themes override THESE) */
+    --bg:var(--pal-black); --bg-glow:#121219; --rail:var(--pal-ink); --surface-1:var(--pal-coal); --surface-2:var(--pal-slate);
+    --control:var(--pal-graphite); --control-hover:var(--pal-graphite2); --well:var(--pal-well);
+    --line:var(--pal-line); --line-strong:var(--pal-line2);
+    --text:var(--pal-fog); --muted:var(--pal-mist); --faint:var(--pal-faint);
+    --brand:var(--pal-green); --info:var(--pal-cyan); --warn:var(--pal-amber); --danger:var(--pal-red);
+    --in-tune:var(--pal-green); --near:var(--pal-amber); --off:var(--pal-red);
+    /* layer / clip type hues — icon ⇄ waveform ⇄ clip share one */
+    --type-arp:var(--pal-indigo); --type-beat:var(--pal-amber); --type-midi:var(--pal-cyan);
+    --type-sampler:var(--pal-purple); --type-voice:var(--pal-pink); --type-memo:var(--pal-green);
+    --type-key:var(--pal-blue); --type-song:var(--pal-violet);
+
+    /* legacy aliases — existing CSS re-skins through these with no edits */
+    --panel:var(--surface-1); --panel-2:var(--surface-2); --border:var(--line);
+    --accent:var(--brand); --accent-2:var(--info); --flat:var(--danger); --inscale:var(--brand); --dim:var(--faint);
+    --arp-clip:var(--type-arp); --beat-clip:var(--type-beat); --sampler-clip:var(--type-sampler);
+    --white-key:#e8eaf0; --white-key-active:#bdf0d0; --black-key:#0b0b0c; --black-key-active:#1f7d52;
+
+    /* spacing · radius · type scales */
+    --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+    --r-sm:5px; --r-md:7px; --r-lg:10px; --r-pill:999px;
+    --fs-label:11px; --fs-ctrl:12px; --fs-val:13px; --fs-name:13px; --fs-head:15px;
+  }
+  /* ===== Alternate themes — set <html data-theme="…"> (persisted by setTheme()) ===== */
+  html[data-theme="classic"] {            /* the original v1 blue-charcoal look */
+    --bg:#0f1117; --bg-glow:#1c2030; --rail:#0c0e14; --surface-1:#1a1d27; --surface-2:#232735;
+    --control:#232735; --control-hover:#2c3242; --well:#11141b;
+    --line:#2c3140; --line-strong:#3a4150; --text:#e6e9ef; --muted:#9aa3b2; --faint:#69707e;
+    --brand:#4ade80; --info:#38bdf8; --warn:#f59e0b; --danger:#f87171;
+    --type-arp:#6366f1; --type-beat:#f59e0b; --type-midi:#38bdf8; --type-sampler:#a855f7; --type-voice:#db2777; --type-memo:#2dd4bf;
+  }
+  html[data-theme="midnight"] {           /* deep blue, cooler accents */
+    --bg:#04060e; --bg-glow:#0c1730; --rail:#070b16; --surface-1:#0b1120; --surface-2:#111a2e;
+    --control:#16203a; --control-hover:#1e2c4c; --well:#05080f;
+    --line:#1c2942; --line-strong:#2c3d5e; --text:#eaf0fb; --muted:#8ea0bd; --faint:#566580;
+    --brand:#5eead4; --info:#60a5fa; --warn:#fbbf24; --danger:#fb7185;
+    --type-arp:#818cf8; --type-beat:#fbbf24; --type-midi:#60a5fa; --type-sampler:#c084fc; --type-voice:#f472b6; --type-memo:#5eead4;
   }
   * { box-sizing: border-box; }
   body { margin: 0; -webkit-user-select: none; -moz-user-select: none; user-select: none; -webkit-touch-callout: none; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: radial-gradient(1200px 600px at 50% -10%, #1c2030, var(--bg)); color: var(--text); min-height: 100vh; padding: 22px 16px 80px; }
+    background: radial-gradient(1200px 600px at 50% -10%, var(--bg-glow), var(--bg)); color: var(--text); min-height: 100vh; padding: 22px 16px 80px; }
   input, textarea { -webkit-user-select: text; user-select: text; }
   h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: 0.3px; }
   .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -1526,6 +1568,11 @@
       <span class="readout" id="settingsStatus" style="flex:1"></span>
     </div>
     <div class="settings-privacy" style="margin-top:14px">
+      <b>🎨 Color theme.</b> Re-skin the whole app. Your choice is remembered on this device.
+      <div class="group" style="margin-top:8px;max-width:240px"><label for="themeSel">Theme</label>
+        <select id="themeSel"><option value="rack">Rack (default)</option><option value="classic">Classic</option><option value="midnight">Midnight</option></select></div>
+    </div>
+    <div class="settings-privacy" style="margin-top:14px">
       <b>🧹 App layout &amp; preferences.</b> Reset the panel order, minimized/expanded (minified) state,
       track-name column width, and keyboard view back to <b>first-open defaults</b> — handy for seeing the
       app the way a brand-new user does. This does <b>not</b> touch your saved sessions or your API keys.
@@ -1831,6 +1878,18 @@
 const APP_VERSION="2.0.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
+
+/* ===== Color themes — swap the :root semantic layer via <html data-theme>. Persisted. ===== */
+const THEMES = ["rack","classic","midnight"];        // "rack" = default (no data-theme attr)
+function setTheme(name){
+  name = THEMES.includes(name) ? name : "rack";
+  if (name === "rack") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", name);
+  try { localStorage.setItem("ps.theme", name); } catch(_){}
+  const sel = document.getElementById("themeSel"); if (sel && sel.value !== name) sel.value = name;
+}
+function currentTheme(){ return document.documentElement.getAttribute("data-theme") || "rack"; }
+(function initTheme(){ let t="rack"; try { t = localStorage.getItem("ps.theme") || "rack"; } catch(_){} setTheme(t); })();
 
 /* ============================== Music theory ============================== */
 const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
@@ -7074,6 +7133,7 @@ function resetAppSettings(){
   location.reload();
 }
 document.getElementById("settingsResetLayout").addEventListener("click",resetAppSettings);
+{ const ts=document.getElementById("themeSel"); if(ts){ ts.value=currentTheme(); ts.addEventListener("change",()=>setTheme(ts.value)); } }
 document.getElementById("settingsTest").addEventListener("click",async()=>{
   const cfg=readSettingsCfg(), st=document.getElementById("settingsStatus"), btn=document.getElementById("settingsTest");
   if(!cfg.key){ st.textContent="Enter your API key first."; return; }
