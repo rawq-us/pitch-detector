@@ -980,7 +980,7 @@
     <button class="mb-btn" id="collabBtn" title="Live collaborate — connect a second browser peer-to-peer; edits &amp; transport sync live (no server)">👥 Collab</button>
     <b id="sessionLabel" style="display:none">Untitled session</b>
     <div class="mb-spacer"></div>
-    <button class="mb-btn" id="settingsBtn" title="Settings — API keys &amp; privacy">⚙ Settings</button>
+    <button class="mb-btn" id="settingsBtn" title="Settings — API keys &amp; privacy"><svg class="svi" aria-hidden="true"><use href="#i-gear"/></svg> Settings</button>
   </div>
   <input type="file" id="midiFileInput" accept=".mid,.midi,audio/midi" style="display:none">
   <h1 style="display:none">Pitch Studio</h1>
@@ -1006,9 +1006,9 @@
         <div class="group"><label for="lenInput">Length (bars)</label><input id="lenInput" class="tl-in" type="text" inputmode="numeric" value="8" /></div>
       </div>
       <div class="tl-center tr-row tl-transport">
-        <div class="group"><label>&nbsp;</label><div class="tr-row" style="gap:3px"><button id="undoBtn" class="mini" title="Nothing to undo" disabled>↩</button><button id="redoBtn" class="mini" title="Nothing to redo" disabled>↪</button></div></div>
-        <div class="group"><label>&nbsp;</label><button id="playBtn" class="primary">▶ Play</button></div>
-        <div class="group"><label>&nbsp;</label><div class="tr-row" style="gap:0"><button id="loopBtn" class="on">🔁 Loop: on</button><button id="loopMenuBtn" class="mini" title="Loop options" style="padding:6px 7px">▾</button></div></div>
+        <div class="group"><label>&nbsp;</label><div class="seg"><button id="undoBtn" title="Nothing to undo" disabled><svg class="svi" aria-hidden="true"><use href="#i-undo"/></svg></button><button id="redoBtn" title="Nothing to redo" disabled><svg class="svi" aria-hidden="true"><use href="#i-redo"/></svg></button></div></div>
+        <div class="group"><label>&nbsp;</label><button id="playBtn" class="primary"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Play</button></div>
+        <div class="group"><label>&nbsp;</label><div class="tr-row" style="gap:0"><button id="loopBtn" class="on"><svg class="svi" aria-hidden="true"><use href="#i-loop"/></svg> Loop: on</button><button id="loopMenuBtn" class="mini" title="Loop options" style="padding:6px 7px">▾</button></div></div>
         <div class="group"><label for="countInSel">Count-in</label>
           <select id="countInSel" class="tl-in">
             <option value="0">Off</option>
@@ -1065,7 +1065,7 @@
         </select>
       </div>
       <div class="group" style="flex:1;min-width:140px"><label>Feel / genres</label><span class="readout" id="modeMoodOut" style="font-size:11px;line-height:1.3">—</span></div>
-      <div class="group"><label>&nbsp;</label><button id="micBtn" class="primary">🎤 Enable mic</button></div>
+      <div class="group"><label>&nbsp;</label><button id="micBtn" class="primary"><svg class="svi" aria-hidden="true"><use href="#i-mic"/></svg> Enable mic</button></div>
       <div class="group"><label>&nbsp;</label><button id="tunerBtn" class="mini" title="Instrument tuners — guitar, bass, mandolin, ukulele, guitalele, in common tunings">🎸 Tuner</button></div>
       <div class="spacer"></div>
       <div class="group" style="flex:1;min-width:200px"><label>&nbsp;</label><span class="hint" style="margin:0">The detector's reference scale, and the song's <b>default</b> key — change it per-section on the timeline's <b>Key / mode</b> lane (top of the timeline).</span></div>
@@ -1192,7 +1192,7 @@
     <div class="modal-box fs-box">
       <div class="modal-head"><b>🎹 Synth — keys</b>
         <span class="ed-keysel" title="The song's base key/mode (the default region at the start of the timeline). The keyboard shades &amp; mutes to it; during playback it follows the timeline's key changes."><span class="ed-keysel-lab">Base key</span><select id="synthKeyRoot"></select><select id="synthKeyMode"></select><span id="synthKeyMood" class="midi-keytag"></span></span>
-        <button id="synthModalClose">✕</button></div>
+        <button id="synthModalClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
       <div id="synthKeyChips" class="tlkey-chips"></div>
       <div class="fs-body" id="synthModalHost"></div>
     </div>
@@ -1335,7 +1335,7 @@
 <!-- Per-track FX modal -->
 <div id="fxModal" class="modal" style="display:none">
   <div class="modal-box">
-    <div class="modal-head"><b id="fxModalTitle">Track FX</b><button id="fxModalClose">✕</button></div>
+    <div class="modal-head"><b id="fxModalTitle">Track FX</b><button id="fxModalClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="knob vert" style="margin-bottom:14px"><label>Track level <span id="lvlOut">100%</span></label><input id="lvlR" type="range" min="0" max="1.5" step="0.01" value="1" /></div>
     <div class="fx-grid">
       <div class="fx" id="fx-drive">
@@ -1379,7 +1379,7 @@
 <!-- Song package export modal -->
 <div id="songModal" class="modal" style="display:none">
   <div class="modal-box" style="max-width:680px">
-    <div class="modal-head"><b>Export song package</b><button id="songModalClose">✕</button></div>
+    <div class="modal-head"><b>Export song package</b><button id="songModalClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" style="margin-top:0">Bounces a finished track with embedded artwork, genre &amp; metadata, a karaoke (instrumental) mix, synced lyrics (LRC/SRT) ready for Musixmatch, isolated stems, and a manifest — all in one zip. Audio is MP3 where the browser can encode it, otherwise a tagged WAV.</div>
     <div class="row knobrow" style="gap:12px">
       <div class="group" style="flex:1"><label for="songTitle">Title</label><input id="songTitle" type="text" placeholder="Song title"></div>
@@ -1406,7 +1406,7 @@
 <!-- AI Composer modal -->
 <div id="welcomeModal" class="modal" style="display:none">
   <div class="welcome-box">
-    <button id="welcomeClose" class="welcome-close" title="Close">✕</button>
+    <button id="welcomeClose" class="welcome-close" title="Close"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button>
     <div class="welcome-scroll">
     <div class="welcome-eyebrow">Free · Open source · 100% in your browser</div>
     <div class="welcome-hero">Pitch Studio</div>
@@ -1449,7 +1449,7 @@
 
 <div id="addLayerModal" class="modal" style="display:none">
   <div class="modal-box" style="max-width:640px">
-    <div class="modal-head"><b>＋ Add a layer</b><button id="addLayerClose">✕</button></div>
+    <div class="modal-head"><b>＋ Add a layer</b><button id="addLayerClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" style="margin-top:0">Pick a layer type — each lands as its own editable, transposable track on the timeline.</div>
     <div class="layer-grid" id="layerGrid"></div>
   </div>
@@ -1457,7 +1457,7 @@
 
 <div id="collabModal" class="modal" style="display:none">
   <div class="modal-box collab-box" style="max-width:620px">
-    <div class="modal-head"><b>👥 Collaborate live</b><button id="collabClose">✕</button></div>
+    <div class="modal-head"><b>👥 Collaborate live</b><button id="collabClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="collab-status-row"><span id="collabStatus" class="dim">Not connected.</span><span id="collabPeers" class="dim"></span></div>
 
     <!-- STEP: start — the only way to begin is to host; joining happens by opening a link -->
@@ -1510,7 +1510,7 @@
 
 <div id="backingModal" class="modal" style="display:none">
   <div class="modal-box back-box">
-    <div class="modal-head"><b>🎸 Generate backing</b><button id="backingClose">✕</button></div>
+    <div class="modal-head"><b>🎸 Generate backing</b><button id="backingClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="back-intro">A chord progression → editable <b>pad · bass · arp · drum</b> layers, each on its own track and in key.</div>
 
     <div class="back-sec">
@@ -1573,7 +1573,7 @@
 
 <div id="aiModal" class="modal" style="display:none">
   <div class="modal-box" style="max-width:680px">
-    <div class="modal-head"><b>🤖 AI Composer</b><button id="aiModalClose">✕</button></div>
+    <div class="modal-head"><b>🤖 AI Composer</b><button id="aiModalClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" style="margin-top:0">Describe what you want — start a new idea, or <b>edit what you already have</b> ("make the beat busier", "add a bassline in the key", "use my Kick &amp; Snare pads for a trap pattern", "switch to D minor"). The model is sent a summary of your <b>current project</b> (tempo, key, tracks, loaded sampler pad names, lyrics) and replies with edit operations the app applies — building isolated stems with this app's own synth, drum & sampler engine. Bring your own API key — stored only in this browser. The LLM composes/edits; it does not synthesize audio (your recorded/sampled audio is summarized, never uploaded). Optional: an audio-generation endpoint can import a generated stem.</div>
     <div class="ai-cfg-line">
       <span id="aiCfgSummary" class="dim">No API key set — add one in Settings.</span>
@@ -1595,7 +1595,7 @@
 <!-- Settings modal — API keys & privacy -->
 <div id="settingsModal" class="modal" style="display:none">
   <div class="modal-box" style="max-width:640px">
-    <div class="modal-head"><b>⚙ Settings — API keys</b><button id="settingsClose">✕</button></div>
+    <div class="modal-head"><b>⚙ Settings — API keys</b><button id="settingsClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="settings-privacy">
       <b>🔒 Your keys stay in your browser.</b> Everything below is saved only in this browser's
       local storage and sent only to the vendor you pick (e.g. OpenRouter) to fulfil the requests
@@ -1678,7 +1678,7 @@
     <div class="modal-head"><b>🎹 <span id="midiTitle">MIDI editor</span></b>
       <input id="midiClipName" class="clip-name-in" placeholder="clip name…" title="Name this clip — shows on the timeline">
       <span class="ed-keysel" title="The key/mode at this clip's spot on the timeline. Changing it edits the timeline's key here — not a global setting."><span class="ed-keysel-lab">Key at this clip</span><select id="midiKeyRoot"></select><select id="midiKeyMode"></select><span id="midiKeyTag" class="midi-keytag"></span></span>
-      <button id="midiClose">✕</button></div>
+      <button id="midiClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="row midi-toolbar">
       <label class="midi-tl-field">Bars <select id="midiBars" class="midi-in"></select></label>
       <label class="midi-tl-field">Snap <select id="midiSnap" class="midi-in"><option value="1">1/4</option><option value="0.5" selected>1/8</option><option value="0.25">1/16</option><option value="0.3333">1/8 trip</option><option value="0">off</option></select></label>
@@ -1697,7 +1697,7 @@
     <div id="midiKeyChips" class="tlkey-chips"></div>
     <div id="midiRollWrap"><div id="midiKeyRuler"></div><div id="midiRoll"></div></div>
     <div id="midiLib" class="midi-lib" style="display:none">
-      <div class="midi-lib-head"><b>📚 Pattern library</b><button id="midiLibClose" class="mini">✕</button></div>
+      <div class="midi-lib-head"><b>📚 Pattern library</b><button id="midiLibClose" class="mini"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
       <div class="row" style="gap:8px;align-items:flex-end;margin:6px 0"><div class="group" style="flex:1"><label for="midiLibGenre">Genre</label><select id="midiLibGenre" style="width:100%"></select></div></div>
       <div class="hint" style="margin:0 0 6px">Rendered in <b id="midiLibKey">C major</b>. ▶ preview · ＋ adds to this clip after the last note.</div>
       <div id="midiLibList" class="midi-lib-list"></div>
@@ -1713,7 +1713,7 @@
 </div>
 <div id="tunerModal" class="modal" style="display:none">
   <div class="modal-box" style="max-width:680px">
-    <div class="modal-head"><b>🎸 Instrument tuner</b><button id="tunerClose">✕</button></div>
+    <div class="modal-head"><b>🎸 Instrument tuner</b><button id="tunerClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" style="margin-top:0">Pick an instrument &amp; tuning, then <b>enable the mic and pluck a string</b> — the meter shows how many cents sharp/flat you are and snaps to the nearest string. Click a string to hear its reference pitch.</div>
     <div class="row ctl-row" style="gap:16px;align-items:flex-end;margin:14px 0">
       <div class="group"><label for="tunerInst">Instrument</label><select id="tunerInst"></select></div>
@@ -1738,7 +1738,7 @@
 <!-- Lyrics generation wizard -->
 <div id="lyrWizModal" class="modal" style="display:none">
   <div class="modal-box"><div class="modal-inner">
-    <div class="modal-head"><b>✨ Generate lyrics</b><button id="lyrWizClose">✕</button></div>
+    <div class="modal-head"><b>✨ Generate lyrics</b><button id="lyrWizClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" style="margin-top:0">Configure the song; the AI (your Settings model — e.g. Gemini via OpenRouter) writes a structured lyric sheet in Pitch Studio's format (key, mode, tempo, sections, singers) that you can tweak, sync and reword. <b>Artist/song references are only used to infer a style — their names never appear in the output.</b></div>
     <div class="lyrwiz-grid">
       <label class="lw-full">What's the song about?<textarea id="lwTheme" rows="2" placeholder="e.g. shaking off a bad week and going out anyway"></textarea></label>
@@ -1774,7 +1774,7 @@
 <!-- Lyrics mulligan (reword selection → 6 variations) -->
 <div id="lyrMullModal" class="modal" style="display:none">
   <div class="modal-box"><div class="modal-inner">
-    <div class="modal-head"><b>✨ Reword selection</b><button id="lyrMullClose">✕</button></div>
+    <div class="modal-head"><b>✨ Reword selection</b><button id="lyrMullClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" style="margin-top:0">The AI rewrites just your selected lines in the context of the whole song and returns 6 options. Pick one to drop in, edit it first, or reprompt.</div>
     <label class="lw-full lm-lab">Selected<textarea id="lmSel" rows="3" readonly></textarea></label>
     <label class="lw-full lm-lab">What do you want changed? <span class="dim">(optional)</span><textarea id="lmComments" rows="2" placeholder="e.g. punchier, keep the rhyme, less cheesy"></textarea></label>
@@ -1789,7 +1789,7 @@
 <!-- Pitch-map editor (per-sound piano roll) -->
 <div id="pitchModal" class="modal" style="display:none">
   <div class="modal-box">
-    <div class="modal-head"><b id="pitchTitle">Pitch map</b><button id="pitchClose">✕</button></div>
+    <div class="modal-head"><b id="pitchTitle">Pitch map</b><button id="pitchClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" id="pitchHint" style="margin-top:0">Click a step at a pitch to place a hit; click it again to remove it. Drag a hit up/down to retune it (it re-triggers as you move). One hit per step.</div>
     <div class="row" style="margin-bottom:8px">
       <div class="group" id="pitchModeGroup"><label>Scale lock</label><button id="pitchModeLock" class="mini" title="Snap drags to the current musical mode">Off</button></div>
@@ -1813,7 +1813,7 @@
   <div class="modal-box memo-box">
     <div class="modal-head"><b id="memoTitle">Memo</b>
       <input id="memoClipName" class="clip-name-in" placeholder="memo name…" title="Name this memo clip — shows on the timeline">
-      <button id="memoClose">✕</button></div>
+      <button id="memoClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="memo-sum" id="memoSummary"></div>
     <div class="row" style="margin-bottom:12px">
       <div class="group"><label for="memoKeySel">Analysis key</label><select id="memoKeySel"></select></div>
@@ -1826,9 +1826,9 @@
       <div class="group"><label>&nbsp;</label><button id="memoUseBpm" title="Set the project BPM to this memo's tracked tempo">Use BPM in project</button></div>
     </div>
     <div class="row" id="memoFlexRow" style="margin-bottom:12px; align-items:flex-end">
-      <div class="group"><label>Flex time <span class="dim">— warp the take onto the grid</span></label><button id="memoFlexBtn" title="Time-stretch this take so its tracked beats land on the project's tempo grid (pitch preserved)">🔀 Flex to grid</button></div>
+      <div class="group"><label>Flex time <span class="dim">— warp the take onto the grid</span></label><button id="memoFlexBtn" title="Time-stretch this take so its tracked beats land on the project's tempo grid (pitch preserved)"><svg class="svi" aria-hidden="true"><use href="#i-flex"/></svg> Flex to grid</button></div>
       <div class="group"><label for="memoFlexStrength">Strength <span class="readout" id="memoFlexStrengthOut">100%</span></label><input id="memoFlexStrength" type="range" min="0" max="1" step="0.05" value="1" title="100% snaps beats exactly to the grid · lower values keep some of the original feel"></div>
-      <div class="group"><label>&nbsp;</label><button id="memoFlexReset" class="mini" title="Remove flex — restore the original timing">↻ Unflex</button></div>
+      <div class="group"><label>&nbsp;</label><button id="memoFlexReset" class="mini" title="Remove flex — restore the original timing"><svg class="svi" aria-hidden="true"><use href="#i-rotate"/></svg> Unflex</button></div>
       <div class="group"><label>&nbsp;</label><span class="readout" id="memoFlexInfo" style="line-height:36px"></span></div>
     </div>
     <div class="memo-canvas-wrap"><canvas id="memoCanvas" height="260"></canvas></div>
@@ -1867,7 +1867,7 @@
 <!-- chord edit popup (opens above the memo modal, so it must out-stack it) -->
 <div id="chordPopup" class="popup" style="display:none; z-index:130">
   <label>Chord</label>
-  <div class="row" style="gap:6px;flex-wrap:nowrap"><select id="chordRootSel"></select><select id="chordQualSel"></select><button id="chordDel" class="mini" title="Remove this chord span">✕</button></div>
+  <div class="row" style="gap:6px;flex-wrap:nowrap"><select id="chordRootSel"></select><select id="chordQualSel"></select><button id="chordDel" class="mini" title="Remove this chord span"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
 </div>
 <div id="keyPopup" class="popup" style="display:none; z-index:130">
   <label>Key / mode change <span id="keyPopupAt" class="dim" style="font-weight:400"></span></label>
@@ -1915,7 +1915,7 @@
 <!-- Sessions modal -->
 <div id="sessionModal" class="modal" style="display:none">
   <div class="modal-box">
-    <div class="modal-head"><b>Sessions</b><button id="modalClose">✕</button></div>
+    <div class="modal-head"><b>Sessions</b><button id="modalClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="modal-save">
       <input id="sessLabel" type="text" placeholder="Session label" />
       <input id="sessDesc" type="text" placeholder="Description (optional)" />
@@ -1946,6 +1946,9 @@ function currentTheme(){ return document.documentElement.getAttribute("data-them
 (function initTheme(){ let t="rack"; try { t = localStorage.getItem("ps.theme") || "rack"; } catch(_){} setTheme(t); })();
 /* Inline-icon helper — emits an <svg><use> referencing the sprite. cls adds modifier classes. */
 function icon(name, cls){ return '<svg class="svi'+(cls?' '+cls:'')+'" aria-hidden="true"><use href="#i-'+name+'"/></svg>'; }
+/* Layer type → sprite icon (color comes from --type-{type}; clip ⇄ icon share the hue). */
+const TYPE_ICON = { arp:"music", beat:"beat", midi:"keyboard", sampler:"beat", voice:"mic", memo:"wave" };
+function typeChip(type){ const ic=TYPE_ICON[type]||"music"; return '<span class="tico" title="'+type+'" style="color:var(--type-'+type+');background:color-mix(in srgb, var(--type-'+type+') 18%, transparent)">'+icon(ic)+'</span>'; }
 
 /* ============================== Music theory ============================== */
 const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
@@ -2623,7 +2626,7 @@ micBtn.addEventListener("click", async () => {
     micCtx = getCtx();
     const src = micCtx.createMediaStreamSource(micStream);
     analyser = micCtx.createAnalyser(); analyser.fftSize = 2048; src.connect(analyser);
-    micBtn.textContent="⏹ Stop mic"; micBtn.classList.remove("primary"); micBtn.classList.add("danger"); if(typeof syncTunerMic==="function") syncTunerMic();
+    micBtn.innerHTML=icon("stop")+" Stop mic"; micBtn.classList.remove("primary"); micBtn.classList.add("danger"); if(typeof syncTunerMic==="function") syncTunerMic();
     statusEl.textContent="Listening… sing or play a note."; detectLoop();
   } catch(err){ statusEl.textContent="Mic access denied or unavailable: "+err.message; }
 });
@@ -2631,7 +2634,7 @@ function stopMic(){
   if (detectRAF) cancelAnimationFrame(detectRAF); detectRAF=null;
   if (micStream) micStream.getTracks().forEach(t=>t.stop());
   micStream=null; analyser=null;
-  micBtn.textContent="🎤 Enable mic"; micBtn.classList.add("primary"); micBtn.classList.remove("danger"); if(typeof syncTunerMic==="function") syncTunerMic(); if(typeof tunerLiveUpdate==="function") tunerLiveUpdate(null);
+  micBtn.innerHTML=icon("mic")+" Enable mic"; micBtn.classList.add("primary"); micBtn.classList.remove("danger"); if(typeof syncTunerMic==="function") syncTunerMic(); if(typeof tunerLiveUpdate==="function") tunerLiveUpdate(null);
   statusEl.textContent="Mic off."; noteBig.textContent="—"; freqOut.textContent="no signal"; needle.style.left="50%"; clearDetected();
 }
 const buf = new Float32Array(2048);
@@ -3598,7 +3601,7 @@ function renderTimeline(){
   const beatPx=bu*PX_PER_SEC, barPx=bpb*bu*PX_PER_SEC;
   project.tracks.forEach(track=>{
     const head=document.createElement("div"); head.className="tl-head "+track.type+(track.id===selectedTrackId?" selected":"")+(trackAudible(track)?"":" muted");
-    head.innerHTML='<div class="tname"><span class="badge '+track.type+'">'+track.type+'</span><span class="tnm" title="Double-click to rename this layer">'+escapeHtml(track.name)+'</span></div><div class="tl-head-acts"></div>';
+    head.innerHTML='<div class="tname">'+typeChip(track.type)+'<span class="tnm" title="Double-click to rename this layer">'+escapeHtml(track.name)+'</span></div><div class="tl-head-acts"></div>';
     const tname=head.querySelector(".tname"), acts=head.querySelector(".tl-head-acts");
     tname.querySelector(".tnm").addEventListener("dblclick",(e)=>{ e.stopPropagation(); renameTrack(track); });
     // live level meter (item 7): a slim vertical bar on the head's right edge; the viz loop drives ._meterFill
@@ -4336,7 +4339,7 @@ function transportPlay(){
   // count-in metronome: one click per beat, accent on each bar downbeat
   if (ci>0){ const bu=beatUnitSec(), bpb=beatsPerBar(), n=project.countInBars*bpb; for(let i=0;i<n;i++) playClick(startCtx+i*bu, (i%bpb)===0); }
   transport.timer=setInterval(transportScheduler,25); transport.raf=requestAnimationFrame(transportTick);
-  tlPlayhead.style.display="block"; playBtn.textContent="■ Stop"; playBtn.classList.remove("primary"); playBtn.classList.add("danger");
+  tlPlayhead.style.display="block"; playBtn.innerHTML=icon("stop")+" Stop"; playBtn.classList.remove("primary"); playBtn.classList.add("danger");
   if(typeof rtcSendTransport==="function") rtcSendTransport("play", transport.loopStart);
 }
 function transportScheduler(){
@@ -4389,7 +4392,7 @@ function transportStop(){
   transport.srcs.clear();
   // release any automation override back to the static fader/centre so a stopped track sits at its set level
   project.tracks.forEach(t=>{ const ch=t._chain; if(!ch) return; if(t.automation&&t.automation.volume&&t.automation.volume.length) ch.level.gain.value=(t.fx||fxDefaults()).level; if(ch.pan && t.automation&&t.automation.pan&&t.automation.pan.length) ch.pan.pan.value=0; });
-  playBtn.textContent="▶ Play"; playBtn.classList.add("primary"); playBtn.classList.remove("danger");
+  playBtn.innerHTML=icon("play")+" Play"; playBtn.classList.add("primary"); playBtn.classList.remove("danger");
   if(typeof rtcSendTransport==="function") rtcSendTransport("stop");
 }
 // Follow the playhead: drive each automated track's level/pan from its lane (live transport only).
@@ -4405,7 +4408,7 @@ function applyLiveAutomation(posSec){
 /* ============================== Timeline controls ============================== */
 const bpmInput=document.getElementById("bpmInput"), tsSel=document.getElementById("tsSel"), lenInput=document.getElementById("lenInput"),
       playBtn=document.getElementById("playBtn"), loopBtn=document.getElementById("loopBtn");
-function updateLoopButtons(){ loopBtn.classList.toggle("on",project.loopEnabled); loopBtn.textContent="🔁 Loop: "+(project.loopEnabled?"on":"off"); }
+function updateLoopButtons(){ loopBtn.classList.toggle("on",project.loopEnabled); loopBtn.innerHTML=icon("loop")+" Loop: "+(project.loopEnabled?"on":"off"); }
 // changing tempo / meter keeps the song the same number of BARS (seconds are derived) — the
 // bar-centric model: you compose in bars, not seconds
 bpmInput.addEventListener("input",()=>{ const bars=projectBars(); project.bpm=clamp(parseFloat(bpmInput.value)||90,20,400); updateMsReadout(); updateBeatLen(); applyDelaySync(); setLength(bars*barSec()); if (transport.playing){ transportStop(); transportPlay(); } });
@@ -5007,7 +5010,7 @@ function syncMemoFlex(){
   if (!btn) return;
   const flexed=!!clip.warp;
   btn.disabled=!memoFlexable(clip);
-  btn.textContent=flexed?"🔀 Re-flex to grid":"🔀 Flex to grid";
+  btn.innerHTML=icon("flex")+(flexed?" Re-flex to grid":" Flex to grid");
   reset.style.display=flexed?"":"none";
   if (flexed && clip.warp.strength!=null) slider.value=String(clip.warp.strength);
   out.textContent=Math.round(+slider.value*100)+"%";
@@ -6253,7 +6256,7 @@ async function doExportStems(){
   }
   exportBtn.textContent=old; exportBtn.disabled=false;
 }
-function flash(btn, msg){ const old=btn.textContent; btn.textContent=msg; btn.classList.add("danger"); setTimeout(()=>{ btn.textContent=old; btn.classList.remove("danger"); },1100); }
+function flash(btn, msg){ const old=btn.innerHTML; btn.textContent=msg; btn.classList.add("danger"); setTimeout(()=>{ btn.innerHTML=old; btn.classList.remove("danger"); },1100); }
 
 /* ============================== Song package export ============================== */
 // Encode a render to MP3 via WebCodecs when the browser supports it (frames concatenate
@@ -8086,7 +8089,7 @@ function buildOscUI(){
   synthParams.oscs.forEach((o,i)=>{
     const row=document.createElement("div"); row.className="osc-row on"; row.style.borderLeftColor=oscColor(i);
     const wave = '<select data-osc="'+i+'" data-k="wave">'+["sine","triangle","square","sawtooth"].map(w=>'<option value="'+w+'"'+(o.wave===w?" selected":"")+'>'+w+'</option>').join("")+'</select>';
-    const rm = i===0 ? '' : '<button class="osc-rm" data-osc="'+i+'" title="Remove this oscillator">✕</button>';
+    const rm = i===0 ? '' : '<button class="osc-rm" data-osc="'+i+'" title="Remove this oscillator"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button>';
     row.innerHTML =
       '<span class="osc-name" style="color:'+oscColor(i)+'">OSC '+(i+1)+'</span>'+ wave +
       '<label class="osc-knob">Oct <input type="number" data-osc="'+i+'" data-k="octave" min="-3" max="3" step="1" value="'+(o.octave||0)+'"></label>'+
