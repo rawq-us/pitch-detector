@@ -115,3 +115,18 @@ test("flexAnchorsToGrid: a missed beat (double gap) advances two grid beats", ()
   assert.ok(a && Math.abs(a.dst - 4 * spb) < 0.02, `src 2.0 -> grid beat 4 (${(4*spb).toFixed(3)}s), got ${a && a.dst.toFixed(3)}`);
   assert.ok(Math.abs(a.dst - 3 * spb) > 0.1, "did not collapse the missed beat into grid beat 3");
 });
+
+const memoSliceAnalysis = new Function(extractFunction(src, "memoSliceAnalysis") + "\nreturn memoSliceAnalysis;")();
+test("memoSliceAnalysis: shifts + clips beats/chords/notes to the kept region", () => {
+  const a = { dur:10, beats:[1,2,3,4,5],
+    chords:[{start:0,end:4,root:0,quality:""},{start:4,end:8,root:5,quality:"m"}],
+    notes:[{start:1,dur:2,midi:60},{start:6,dur:2,midi:62}] };
+  const v = memoSliceAnalysis(a, 3, 7);            // keep [3,7] → 4s window
+  assert.equal(v.dur, 4);
+  assert.deepEqual(v.beats, [0,1,2]);              // beats 3,4,5 → shifted
+  assert.equal(v.chords.length, 2);
+  assert.deepEqual(v.chords[0], {start:0,end:1,root:0,quality:""});   // 0–4 clipped to window head
+  assert.deepEqual(v.chords[1], {start:1,end:4,root:5,quality:"m"});  // 4–8 clipped to window tail
+  assert.equal(v.notes.length, 1);                 // note 1–3 ends at the boundary → dropped
+  assert.equal(v.notes[0].start, 3); assert.equal(v.notes[0].dur, 1);
+});

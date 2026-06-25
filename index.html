@@ -3780,13 +3780,25 @@ function splitClipAt(track, clip, atSec){
       if(typeof midiEd!=="undefined"&&midiEd&&midiEd.clip===clip){ midiEd.clip=L; }   // keep an open editor pointed at the head
       renderTimeline(); scheduleAutosave();
     });
-  } else if(track.type==="voice"||track.type==="memo"){
+  } else if(track.type==="voice"){
     const total=clipDuration(track,clip);
     if(!(local>0.02 && local<total-0.02)){ if(typeof statusEl!=="undefined"&&statusEl) statusEl.textContent="Click inside the clip to split."; return; }
     commit("split clip", ()=>{
       const off=clip.offset||0;
       const R={ ...cloneClipData(track.type, clip), id:++clipSeq, start:snapSec(clip.start+local), offset:off+local, length:total-local };
       clip.length=local; track.clips.push(R); renderTimeline(); scheduleAutosave();
+    });
+  } else if(track.type==="memo"){
+    const total=clipDuration(track,clip);
+    if(!(local>0.02 && local<total-0.02)){ if(typeof statusEl!=="undefined"&&statusEl) statusEl.textContent="Click inside the clip to split."; return; }
+    if(!clip.buffer){ if(typeof statusEl!=="undefined"&&statusEl) statusEl.textContent="Memo audio still loading — try again."; return; }
+    commit("split memo", ()=>{   // slice into two self-consistent memos (audio + shifted analysis)
+      const off=clip.offset||0;
+      const L=makeMemoSlice(clip, off, off+local); L.start=clip.start;
+      const R=makeMemoSlice(clip, off+local, off+total); R.start=snapSec(clip.start+local);
+      const idx=track.clips.indexOf(clip); if(idx<0) return; track.clips.splice(idx,1,L,R);
+      if(typeof memoModalClip!=="undefined" && memoModalClip===clip) memoModalClip=L;
+      renderTimeline(); scheduleAutosave();
     });
   } else if(typeof statusEl!=="undefined"&&statusEl) statusEl.textContent="Split supports MIDI and audio clips.";
 }
@@ -4623,6 +4635,33 @@ function wav24Bytes(buf){
   return new Uint8Array(ab);
 }
 function audioBufferToWav24(buf){ return new Blob([wav24Bytes(buf)],{type:"audio/wav"}); }
+// ===== Crop/split a memo by SLICING — produces a self-consistent new memo of the kept
+// region (audio + shifted analysis) so all the existing memo rendering/flex/export just work.
+// memoSliceAnalysis is pure (no DOM/audio) so it's unit-tested via test/extract.mjs.
+function memoSliceAnalysis(a, startSec, endSec){
+  if(!a) return null;
+  const off=startSec, len=endSec-startSec, end=endSec, num=(x)=>+x;
+  const beats=(a.beats||[]).map(num).filter(b=>b>=off-1e-3 && b<=end+1e-3).map(b=>+(b-off).toFixed(4));
+  const chords=(a.chords||[]).filter(c=>num(c.end)>off+1e-3 && num(c.start)<end-1e-3)
+    .map(c=>({ ...c, start:+(Math.max(0,num(c.start)-off)).toFixed(3), end:+(Math.min(len,num(c.end)-off)).toFixed(3) }));
+  const notes=(a.notes||[]).filter(n=>(num(n.start)+num(n.dur))>off+1e-3 && num(n.start)<end-1e-3)
+    .map(n=>{ const st=Math.max(0,num(n.start)-off), d=Math.min(len-st, num(n.dur)-Math.max(0,off-num(n.start))); return { ...n, start:+st.toFixed(3), dur:+d.toFixed(3) }; });
+  return { ...a, dur:+len.toFixed(3), beats, chords, notes };
+}
+function sliceAudioBuffer(buf, startSec, endSec){
+  const ctx=getCtx(), sr=buf.sampleRate;
+  const s=Math.max(0,Math.floor(startSec*sr)), e=Math.min(buf.length,Math.ceil(endSec*sr)), n=Math.max(1,e-s);
+  const out=ctx.createBuffer(buf.numberOfChannels, n, sr);
+  for(let ch=0;ch<buf.numberOfChannels;ch++) out.copyToChannel(buf.getChannelData(ch).slice(s,e), ch);
+  return out;
+}
+function makeMemoSlice(src, startSec, endSec){
+  const buf=sliceAudioBuffer(src.buffer, startSec, endSec);
+  return { id:++clipSeq, blob:audioBufferToWav24(buf), buffer:buf, audioDur:buf.duration, start:src.start,
+    analysis: src.analysis?memoSliceAnalysis(src.analysis, startSec, endSec):null,
+    lyricsText:src.lyricsText||"", lyricsWords:null, analysisKey:src.analysisKey||"auto", lyricsLang:src.lyricsLang||null,
+    name:src.name };
+}
 
 /* ---- raw-PCM memo recorder (AudioWorklet, ScriptProcessor fallback) ---- */
 const MEMO_CAP_SRC = "class MemoCap extends AudioWorkletProcessor{ constructor(){ super(); this.buf=new Float32Array(16384); this.n=0; this.port.onmessage=()=>{ this.port.postMessage(this.buf.slice(0,this.n)); this.n=0; }; } process(inputs){ const c=inputs[0]&&inputs[0][0]; if(c){ if(this.n+c.length>this.buf.length){ this.port.postMessage(this.buf.slice(0,this.n)); this.n=0; } this.buf.set(c,this.n); this.n+=c.length; } return true; } } registerProcessor('memo-cap',MemoCap);";
