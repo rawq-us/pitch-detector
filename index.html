@@ -1145,7 +1145,7 @@
         <div class="group"><label>&nbsp;</label><button id="arpClearBtn">Clear</button></div>
         <div class="group"><label>Zoom</label><div class="tr-row"><button id="arpZoomOut" class="mini" title="Zoom out">−</button><button id="arpZoomIn" class="mini" title="Zoom in">+</button></div></div>
         <div class="group"><label>&nbsp;</label><button id="arpToMidiBtn" title="Convert this arp into an editable MIDI layer — rates &amp; repeats expand into notes (the arp stays too)">→ MIDI</button></div>
-        <div class="group"><label>&nbsp;</label><button id="arpAddBtn" class="primary">＋ Timeline</button></div>
+        <div class="group"><label>&nbsp;</label><button id="arpAddBtn" class="primary"><svg class="svi" aria-hidden="true"><use href="#i-plus"/></svg> Timeline</button></div>
       </div>
       <div class="seq" id="seq"></div>
       <div class="arp-stepctl" id="arpStepCtl"></div>
@@ -1226,27 +1226,23 @@
   <!-- ===== Beat machine ===== -->
   <div class="panel csec" data-key="beat">
     <h2>Synth beat</h2>
+    <div class="row beat-toolbar" style="margin-bottom:12px">
+      <div class="group"><label for="beatBarsSel">Length <span class="help" id="beatHelp" tabindex="0">?</span></label>
+        <select id="beatBarsSel"><option value="1">1 bar</option><option value="2">2 bars</option><option value="4">4 bars</option></select>
+      </div>
+      <div class="group"><label>Pattern</label><span class="readout" id="beatLenOut">— steps · — s</span></div>
+      <div class="group"><label>&nbsp;</label><button id="liveRecBtn"><svg class="svi" aria-hidden="true"><use href="#i-record"/></svg> Live record</button></div>
+      <div class="group"><label>&nbsp;</label><button id="beatPrevBtn"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Preview</button></div>
+      <div class="group"><label>&nbsp;</label><button id="beatClearBtn">Clear grid</button></div>
+      <div class="spacer"></div>
+      <div class="group"><label>&nbsp;</label><button id="beatAddBtn" class="primary"><svg class="svi" aria-hidden="true"><use href="#i-plus"/></svg> Timeline</button></div>
+    </div>
     <div class="padlayout">
       <div class="padside">
         <div class="pads" id="pads"></div>
         <div class="pad-legend" id="padLegend"></div>
       </div>
       <div class="gridside">
-        <div class="row" style="margin-bottom:12px">
-          <div class="group"><label for="beatBarsSel">Length <span class="help" id="beatHelp" tabindex="0">?</span></label>
-            <select id="beatBarsSel">
-              <option value="1">1 bar</option>
-              <option value="2">2 bars</option>
-              <option value="4">4 bars</option>
-            </select>
-          </div>
-          <div class="group"><label>Pattern</label><span class="readout" id="beatLenOut">— steps · — s</span></div>
-          <div class="group"><label>&nbsp;</label><button id="liveRecBtn"><svg class="svi" aria-hidden="true"><use href="#i-record"/></svg> Live record</button></div>
-          <div class="group"><label>&nbsp;</label><button id="beatPrevBtn"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Preview</button></div>
-          <div class="group"><label>&nbsp;</label><button id="beatClearBtn">Clear grid</button></div>
-          <div class="spacer"></div>
-          <div class="group"><label>&nbsp;</label><button id="beatAddBtn" class="primary">＋ Timeline</button></div>
-        </div>
         <div class="grid-wrap"><table class="gridtable"><tbody id="gridBody"></tbody></table></div>
       </div>
     </div>
@@ -1268,19 +1264,19 @@
       </div>
       <div class="group"><label>Grid</label><span class="readout" id="sampLenOut">— steps</span></div>
     </div>
+    <div class="row beat-toolbar" style="margin-bottom:10px">
+      <div class="group"><label>&nbsp;</label><button id="sampPrevBtn"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Preview</button></div>
+      <div class="group"><label>&nbsp;</label><button id="sampLiveRecBtn" title="In Play mode, tap pads while this is on to record hits at the playhead"><svg class="svi" aria-hidden="true"><use href="#i-record"/></svg> Live record</button></div>
+      <div class="group"><label>&nbsp;</label><button id="sampClearBtn">Clear grid</button></div>
+      <div class="spacer"></div>
+      <div class="group"><label>&nbsp;</label><button id="sampAddBtn" class="primary"><svg class="svi" aria-hidden="true"><use href="#i-plus"/></svg> Timeline</button></div>
+    </div>
     <div class="padlayout">
       <div class="padside">
         <div class="samp-bank" id="sampBank"></div>
         <div class="samp-detail" id="sampPadDetail"></div>
       </div>
       <div class="gridside">
-        <div class="row" style="margin-bottom:10px">
-          <div class="group"><label>&nbsp;</label><button id="sampPrevBtn"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Preview</button></div>
-          <div class="group"><label>&nbsp;</label><button id="sampLiveRecBtn" title="In Play mode, tap pads while this is on to record hits at the playhead"><svg class="svi" aria-hidden="true"><use href="#i-record"/></svg> Live record</button></div>
-          <div class="group"><label>&nbsp;</label><button id="sampClearBtn">Clear grid</button></div>
-          <div class="spacer"></div>
-          <div class="group"><label>&nbsp;</label><button id="sampAddBtn" class="primary">＋ Timeline</button></div>
-        </div>
         <div class="grid-wrap"><table class="gridtable"><tbody id="sampGridBody"></tbody></table></div>
       </div>
     </div>
