@@ -1960,7 +1960,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="2.0.1";
+const APP_VERSION="2.0.2";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -4366,7 +4366,8 @@ function forEachClipEvent(cb){
   }
 }
 function buildEvents(){
-  const start=project.loop.start, end=project.loop.end, evs=[];
+  // loop on → play/loop the cycle region; loop off → play from the playhead to the song's end
+  const start=project.loop.start, end=(project.loopEnabled ? project.loop.end : project.lengthSec), evs=[];
   forEachClipEvent(ev=>{ if (ev.time>=start && ev.time<end){ if (ev.kind==="voice") evs.push({ t:ev.time-start, kind:"voice", buffer:ev.clip.warpedBuffer||ev.clip.buffer, aoff:ev.aoff, alen:ev.alen, gain:ev.clip.gain, track:ev.track }); else evs.push({ t:ev.time-start, kind:ev.kind, midi:ev.midi, dur:ev.dur, wave:ev.wave, drum:ev.drum, pad:ev.pad, loop:ev.loop, off:ev.off, track:ev.track }); } });
   evs.sort((a,b)=>a.t-b.t);
   transport.events=evs; transport.loopStart=start; transport.loopLen=Math.max(0.1, end-start);
