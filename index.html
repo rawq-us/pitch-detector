@@ -1861,6 +1861,7 @@
       <div class="group"><label>Flex time <span class="dim">— warp the take onto the grid</span></label><button id="memoFlexBtn" title="Time-stretch this take so its tracked beats land on the project's tempo grid (pitch preserved)"><svg class="svi" aria-hidden="true"><use href="#i-flex"/></svg> Flex to grid</button></div>
       <div class="group"><label for="memoFlexStrength">Strength <span class="readout" id="memoFlexStrengthOut">100%</span></label><input id="memoFlexStrength" type="range" min="0" max="1" step="0.05" value="1" title="100% snaps beats exactly to the grid · lower values keep some of the original feel"></div>
       <div class="group"><label>&nbsp;</label><button id="memoFlexReset" class="mini" title="Remove flex — restore the original timing"><svg class="svi" aria-hidden="true"><use href="#i-rotate"/></svg> Unflex</button></div>
+      <div class="group"><label>Crop <span class="dim">— drag on the waveform</span></label><button id="memoCropBtn" class="mini" disabled title="Crop the memo to the selected region — drag across the waveform to select"><svg class="svi" aria-hidden="true"><use href="#i-cut"/></svg> Crop to selection</button></div>
       <div class="group"><label>&nbsp;</label><span class="readout" id="memoFlexInfo" style="line-height:36px"></span></div>
     </div>
     <div class="memo-canvas-wrap"><canvas id="memoCanvas" height="260"></canvas></div>
@@ -4902,7 +4903,7 @@ const memoModal=document.getElementById("memoModal"), memoKeySel=document.getEle
       memoCanvas=document.getElementById("memoCanvas"), memoChipsEl=document.getElementById("memoChips"),
       memoSummaryEl=document.getElementById("memoSummary"), memoLyricsEl=document.getElementById("memoLyrics"),
       memoTransStatus=document.getElementById("memoTransStatus");
-let memoModalTrack=null, memoModalClip=null, memoSeekT=0;
+let memoModalTrack=null, memoModalClip=null, memoSeekT=0, memoSel=null, memoSelDrag=null;
 (function buildMemoKeySel(){
   let html='<option value="auto">Auto — guess from audio</option><option value="project">Project key &amp; mode</option>';
   Object.keys(SCALES).forEach(mode=>{ NOTE_NAMES.forEach((n,r)=>{ html+='<option value="'+r+'|'+mode+'">'+n+' '+mode+'</option>'; }); });
@@ -4910,7 +4911,7 @@ let memoModalTrack=null, memoModalClip=null, memoSeekT=0;
 })();
 function modeLabel(mode){ return mode ? mode.charAt(0).toUpperCase()+mode.slice(1) : "?"; }
 function openMemoModal(track, clip){
-  memoModalTrack=track; memoModalClip=clip; memoSeekT=0;
+  memoModalTrack=track; memoModalClip=clip; memoSeekT=0; memoSel=null;
   memoZoom=1; memoCanvas.parentElement.scrollLeft=0;
   const zr=document.getElementById("memoZoomReset"); if (zr) zr.textContent="100%";
   document.getElementById("memoTitle").textContent=track.name+" — annotated memo";
@@ -4953,7 +4954,7 @@ function renderMemoChips(){
     memoChipsEl.appendChild(d);
   });
 }
-function syncMemoModal(){ if (!memoModalClip) return; renderMemoSummary(); renderMemoChips(); syncMemoFlex(); drawMemoModalCanvas(); }
+function syncMemoModal(){ if (!memoModalClip) return; renderMemoSummary(); renderMemoChips(); syncMemoFlex(); syncMemoCrop(); drawMemoModalCanvas(); }
 let memoZoom=1;
 function setMemoZoom(z, anchorPx){
   const wrap=memoCanvas.parentElement, baseW=Math.max(100, wrap.clientWidth||800);
@@ -5022,6 +5023,10 @@ function drawMemoModalCanvas(playT){
     let lastEnd=-1e9;
     clip.lyricsWords.forEach(wd=>{ const x=X(wd.start); if (x>lastEnd+2){ c.fillText(wd.text, x, h-8); lastEnd=x+c.measureText(wd.text).width; } });
   } else if (clip.lyricsText){ c.fillStyle="#99f6e4"; c.font="italic 10px sans-serif"; c.fillText(clip.lyricsText.slice(0,180), 4, h-8); }
+  if (memoSel && memoSel.b-memoSel.a>0.02){ const x0=X(memoSel.a), x1=X(memoSel.b);   // crop selection
+    c.fillStyle="rgba(0,0,0,0.5)"; c.fillRect(0,0,x0,h); c.fillRect(x1,0,w-x1,h);
+    c.strokeStyle="#1fd97a"; c.lineWidth=2; c.strokeRect(x0+1,1,Math.max(1,x1-x0-2),h-2);
+  }
   // playhead / seek cursor
   const cur=(playT!=null)?playT:(memoSeekT||0);
   if (cur>0){ c.fillStyle=(playT!=null)?"#ffffff":"rgba(255,255,255,0.45)"; c.fillRect(Math.round(X(cur)),0,2,h); }
@@ -5037,11 +5042,36 @@ memoCanvas.parentElement.addEventListener("wheel",(e)=>{
   setMemoZoom(memoZoom*Math.exp(-clamp(e.deltaY,-70,70)*0.01), e.clientX-r.left);
 },{passive:false});
 attachPinch(memoCanvas.parentElement, ()=>memoZoom, (z,cx)=>setMemoZoom(z,cx));
+function memoCanvasTime(e){ const clip=memoModalClip, r=memoCanvas.getBoundingClientRect(); return clamp((e.clientX-r.left)/r.width,0,1)*((clip&&clip.audioDur)||1); }
+function syncMemoCrop(){ const b=document.getElementById("memoCropBtn"); if(b) b.disabled=!(memoSel && memoModalClip && memoModalClip.buffer && (memoSel.b-memoSel.a)>0.1); }
+function memoCropToSelection(){
+  const clip=memoModalClip, track=memoModalTrack; if(!clip||!track||!clip.buffer||!memoSel||(memoSel.b-memoSel.a)<0.1) return;
+  if(!confirm("Crop this memo to the selected "+fmtTime(memoSel.b-memoSel.a)+"? The audio outside is removed (undoable).")) return;
+  const a=memoSel.a, b=memoSel.b;
+  commit("crop memo",()=>{
+    const nc=makeMemoSlice(clip, a, b); nc.start=clip.start;
+    const idx=track.clips.indexOf(clip); if(idx<0) return; track.clips.splice(idx,1,nc);
+    memoModalClip=nc; memoSel=null; renderTimeline(); scheduleAutosave();
+  });
+  syncMemoModal();
+}
 memoCanvas.addEventListener("pointerdown",(e)=>{
   const clip=memoModalClip; if (!clip) return;
-  const r=memoCanvas.getBoundingClientRect();
-  memoSeekT=clamp((e.clientX-r.left)/r.width,0,1)*(clip.audioDur||1);
-  if (memoPlaySrc){ memoStopPlay(); memoTogglePlay(); } else drawMemoModalCanvas();
+  memoSelDrag={ a:memoCanvasTime(e), x0:e.clientX, moved:false }; memoCanvas.setPointerCapture?.(e.pointerId);
+});
+memoCanvas.addEventListener("pointermove",(e)=>{
+  if(!memoSelDrag || !memoModalClip) return;
+  if(!memoSelDrag.moved && Math.abs(e.clientX-memoSelDrag.x0)<5) return;
+  memoSelDrag.moved=true; const t=memoCanvasTime(e);
+  memoSel={ a:Math.min(memoSelDrag.a,t), b:Math.max(memoSelDrag.a,t) };
+  syncMemoCrop(); drawMemoModalCanvas();
+});
+document.getElementById("memoCropBtn").addEventListener("click",memoCropToSelection);
+memoCanvas.addEventListener("pointerup",(e)=>{
+  const d=memoSelDrag; memoSelDrag=null; const clip=memoModalClip; if(!clip) return;
+  if(d && !d.moved){ memoSel=null; syncMemoCrop(); memoSeekT=memoCanvasTime(e);   // a plain click = seek (clears selection)
+    if (memoPlaySrc){ memoStopPlay(); memoTogglePlay(); } else drawMemoModalCanvas();
+  } else drawMemoModalCanvas();
 });
 /* modal playback */
 let memoPlaySrc=null, memoPlayT0=0, memoPlayOff=0, memoPlayRaf=null;
