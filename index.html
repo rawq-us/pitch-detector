@@ -860,7 +860,8 @@
   @media (max-width: 640px){ .welcome-grid { grid-template-columns: 1fr; } .welcome-box { padding: 34px 22px; } }
   .tl-clip .cloop { position: absolute; bottom: 3px; right: 4px; font-size: 10px; background: rgba(0,0,0,0.4); border-radius: 5px; padding: 1px 5px; cursor: pointer; }
   .tl-clip .cloop:hover { background: rgba(0,0,0,0.7); }
-  .tl-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.7); z-index: 5; pointer-events: none; display: none; }
+  .tl-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.55); z-index: 6; pointer-events: none; display: none; }
+  .tl-playhead::before { content: ""; position: absolute; top: 0; left: -5px; width: 12px; height: 9px; background: #fff; clip-path: polygon(0 0, 100% 0, 50% 100%); }
 
   .popup { position: absolute; z-index: 60; background: var(--panel); border: 1px solid var(--accent-2); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 5px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
   .popup label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
@@ -3614,8 +3615,9 @@ function renderTimeline(){
   tlLoopBand.style.left=(origin+project.loop.start*PX_PER_SEC)+"px";
   tlLoopBand.style.width=((project.loop.end-project.loop.start)*PX_PER_SEC)+"px";
   const loopFull = project.loop.start<=0.01 && project.loop.end>=project.lengthSec-0.01;   // whole song selected = nothing selected
-  tlLoopBand.style.display = (project.loopEnabled && !loopFull) ? "block" : "none";
+  tlLoopBand.style.display = (project.loopEnabled && project.loop.region && !loopFull) ? "block" : "none";
   loopReadout.textContent = fmtBars(project.loop.start)+" – "+fmtBars(project.loop.end);
+  if (typeof transport!=="undefined" && !transport.playing) positionPlayhead(null);   // start-line visible at rest
   // lanes + headers
   tlLanes.innerHTML=""; tlHeadCol.innerHTML="";
   const spacer=document.createElement("div"); spacer.className="tl-head rulerspace";
@@ -4272,16 +4274,22 @@ function rtcTeardown(msg){
 
 /* cycle region select on the ruler */
 let loopDrag=null;
-tlRuler.addEventListener("pointerdown",(e)=>{ const rect=tlRuler.getBoundingClientRect(); loopDrag={ anchor: clamp(snapSec((e.clientX-rect.left-originPx())/PX_PER_SEC),0,project.lengthSec) }; tlRuler.setPointerCapture?.(e.pointerId); });
+tlRuler.addEventListener("pointerdown",(e)=>{ const rect=tlRuler.getBoundingClientRect(); loopDrag={ anchor: clamp(snapSec((e.clientX-rect.left-originPx())/PX_PER_SEC),0,project.lengthSec), startX:e.clientX, moved:false }; tlRuler.setPointerCapture?.(e.pointerId); });
 tlRuler.addEventListener("pointermove",(e)=>{
   if (!loopDrag) return;
+  if (!loopDrag.moved && Math.abs(e.clientX-loopDrag.startX)<4) return;   // tiny move = still a click
+  loopDrag.moved=true;
   const rect=tlRuler.getBoundingClientRect();
   const sec=clamp(snapSec((e.clientX-rect.left-originPx())/PX_PER_SEC),0,project.lengthSec);
   project.loop.start=Math.min(loopDrag.anchor,sec); project.loop.end=Math.max(loopDrag.anchor,sec);
   if (project.loop.end-project.loop.start < 0.05) project.loop.end=project.loop.start+beatUnitSec();
-  project.loopEnabled=true; updateLoopButtons(); renderTimeline();
+  project.loop.region=true; project.loopEnabled=true; updateLoopButtons(); renderTimeline();
 });
-tlRuler.addEventListener("pointerup",()=>{ loopDrag=null; if (transport.playing){ transportStop(); transportPlay(); } });
+tlRuler.addEventListener("pointerup",()=>{
+  const d=loopDrag; loopDrag=null;
+  if (d && !d.moved){ project.loop.start=d.anchor; project.loop.end=project.lengthSec; project.loop.region=false; updateLoopButtons(); renderTimeline(); positionPlayhead(null); }   // a click → move the start-line
+  if (transport.playing){ transportStop(); transportPlay(); }
+});
 
 /* loop-length popup */
 const loopPopup=document.getElementById("loopPopup"), loopPopupInput=document.getElementById("loopPopupInput");
@@ -4405,7 +4413,7 @@ function transportTick(){
   }
   transport.raf=requestAnimationFrame(transportTick);
 }
-function positionPlayhead(pos){ if (pos==null){ if (!transport.playing){ tlPlayhead.style.display="none"; return; } pos=transport.loopStart; } tlPlayhead.style.left=(originPx()+pos*PX_PER_SEC)+"px"; }
+function positionPlayhead(pos){ if(!tlPlayhead) return; if (pos==null){ pos = transport.playing ? transport.loopStart : ((project.loop&&project.loop.start)||0); } tlPlayhead.style.display="block"; tlPlayhead.style.left=(originPx()+pos*PX_PER_SEC)+"px"; }
 // Current insertion point in timeline seconds: the live playhead while playing, else the cycle-region start.
 function playheadSec(){
   if(transport.playing){ const ctx=getCtx(), elapsed=ctx.currentTime-transport.musicCtx; if(elapsed>=0) return transport.loopStart + (elapsed % transport.loopLen); }
@@ -4414,7 +4422,7 @@ function playheadSec(){
 function transportStop(){
   transport.playing=false;
   if (transport.timer) clearInterval(transport.timer); if (transport.raf) cancelAnimationFrame(transport.raf);
-  transport.timer=transport.raf=null; tlPlayhead.style.display="none";
+  transport.timer=transport.raf=null; positionPlayhead(null);
   if (typeof keyFollowReset==="function") keyFollowReset();   // back to the global key
   // audio clips (voice/memo) are long-running buffer sources — kill any that are still sounding
   transport.srcs.forEach(s=>{ try { s.onended=null; s.stop(); } catch(_){} });
