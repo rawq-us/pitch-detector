@@ -954,6 +954,7 @@
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
 <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13 -8z" fill="currentColor" stroke="none"/></symbol>
 <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-skip-back" viewBox="0 0 24 24"><path d="M19 5v14l-11 -7z" fill="currentColor" stroke="none"/><rect x="5" y="5" width="2.4" height="14" rx="0.6" fill="currentColor" stroke="none"/></symbol>
 <symbol id="i-record" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="currentColor" stroke="none"/></symbol>
 <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
 <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
@@ -1049,9 +1050,9 @@
       </div>
       <div class="tl-center tr-row tl-transport">
         <div class="group"><label>&nbsp;</label><div class="seg"><button id="undoBtn" title="Nothing to undo" disabled><svg class="svi" aria-hidden="true"><use href="#i-undo"/></svg></button><button id="redoBtn" title="Nothing to redo" disabled><svg class="svi" aria-hidden="true"><use href="#i-redo"/></svg></button></div></div>
-        <div class="group"><label>&nbsp;</label><button id="playBtn" class="primary play-btn" title="Play / Stop"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg></button></div>
+        <div class="group"><label>&nbsp;</label><div class="seg seg-transport"><button id="rewindBtn" title="Rewind to start"><svg class="svi" aria-hidden="true"><use href="#i-skip-back"/></svg></button><button id="playBtn" class="primary play-btn" title="Play / Stop"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg></button></div></div>
         <div class="group"><label>&nbsp;</label><div class="seg"><button id="loopBtn" class="on" title="Loop on/off"><svg class="svi" aria-hidden="true"><use href="#i-loop"/></svg></button><button id="loopMenuBtn" title="Loop options"><svg class="svi" aria-hidden="true"><use href="#i-chev-down"/></svg></button></div></div>
-        <div class="group"><label>&nbsp;</label><div class="countin-ctl" title="Count-in metronome — bars counted in before recording"><svg class="svi countin-ico" aria-hidden="true"><use href="#i-metro"/></svg><select id="countInSel" class="tl-in" title="Count-in metronome bars"><option value="0">Off</option><option value="1" selected>1 bar</option><option value="2">2 bars</option></select></div></div>
+        <div class="group"><label>&nbsp;</label><button id="metroBtn" title="Metronome &amp; count-in settings"><svg class="svi" aria-hidden="true"><use href="#i-metro"/></svg> <span id="metroBtnLabel">Off</span></button></div>
       </div>
       <div class="tl-right">
         <span id="loopReadout" style="display:none"></span>
@@ -1473,6 +1474,13 @@
   </div>
 </div>
 
+<div id="metroMenu" class="popup" style="display:none; min-width:180px">
+  <label>Metronome click (while playing)</label>
+  <div class="seg" style="width:100%"><button id="metroOffBtn" class="mini" style="flex:1">Off</button><button id="metroOnBtn" class="mini" style="flex:1">On</button></div>
+  <label style="margin-top:6px">Count-in (before record &amp; play)</label>
+  <select id="countInSel" class="tl-in" title="Count-in bars" style="width:100%"><option value="0">Off</option><option value="1" selected>1 bar</option><option value="2">2 bars</option></select>
+  <div class="dim" style="font-size:11px; margin-top:2px">Counts you in with clicks before playback starts.</div>
+</div>
 <div id="loopMenu" class="popup" style="display:none">
   <button id="loopWholeBtn" class="mini">⤢ Loop the whole piece</button>
   <div id="loopRegionReadout" class="dim" style="font-size:11px"></div>
@@ -2807,7 +2815,7 @@ function setKbOctave(v){ kbOctave=clamp(Math.round(v),-4,4); try{ localStorage.s
 
 /* ============================== Project / timing ============================== */
 const FORMAT_VERSION = 5; // v5: clip flex-time warp map; v4: P2P sync identity (sessionId + per-track uid/ownerId/rev); v3: sampler layer; v2: memo layer + clip loopFill
-const project = { sessionId:null, bpm:90, timeSig:{num:4,den:4}, lengthSec:32, loop:{start:0,end:32}, loopEnabled:true, countInBars:1, tracks:[], samplerKit:[], keyMap:[], structure:[], meta:{ title:"", artist:"", album:"", genre:"", year:"", key:"", take:1, coverBlob:null }, syncBase:null };
+const project = { sessionId:null, bpm:90, timeSig:{num:4,den:4}, lengthSec:32, loop:{start:0,end:32}, loopEnabled:true, countInBars:1, metronome:false, tracks:[], samplerKit:[], keyMap:[], structure:[], meta:{ title:"", artist:"", album:"", genre:"", year:"", key:"", take:1, coverBlob:null }, syncBase:null };
 // stable per-install peer id (becomes track.ownerId); session id = the song's identity across machines
 function myPeerId(){ try{ let id=localStorage.getItem("ps_peer_id"); if(!id){ id=uuid(); localStorage.setItem("ps_peer_id", id); } return id; }catch(e){ return "peer-local"; } }
 function ensureSessionId(){ if(!project.sessionId) project.sessionId=uuid(); return project.sessionId; }
@@ -4399,6 +4407,7 @@ function transportPlay(){
   const startCtx=ctx.currentTime+0.12, ci=countInSec();
   transport.countIn=ci;
   transport.musicCtx=startCtx+ci;   // ctx time where timeline position loopStart begins
+  transport.metroK=0; transport.metroCtx=transport.musicCtx;   // running metronome cursor (one click per beat)
   // count-in metronome: one click per beat, accent on each bar downbeat
   if (ci>0){ const bu=beatUnitSec(), bpb=beatsPerBar(), n=project.countInBars*bpb; for(let i=0;i<n;i++) playClick(startCtx+i*bu, (i%bpb)===0); }
   transport.timer=setInterval(transportScheduler,25); transport.raf=requestAnimationFrame(transportTick);
@@ -4407,6 +4416,13 @@ function transportPlay(){
 }
 function transportScheduler(){
   const ctx=getCtx(), ahead=ctx.currentTime+0.12, ev=transport.events;
+  if (project.metronome && transport.metroCtx!=null){   // audible click on every beat during playback
+    const bu=beatUnitSec(), bpb=beatsPerBar(), base=Math.round((transport.loopStart||0)/bu);
+    while (transport.metroCtx < ahead){
+      if (transport.metroCtx >= ctx.currentTime-0.02) playClick(transport.metroCtx, ((base+transport.metroK)%bpb)===0);
+      transport.metroK++; transport.metroCtx += bu;
+    }
+  }
   if (!ev.length) return;
   while (true){
     const e=ev[transport.evIdx];
@@ -4494,7 +4510,17 @@ loopMenuBtn.addEventListener("click",(e)=>{
 });
 document.getElementById("loopWholeBtn").addEventListener("click",()=>{ project.loop.start=0; project.loop.end=project.lengthSec; project.loopEnabled=true; updateLoopButtons(); renderTimeline(); closeLoopMenu(); if (transport.playing){ transportStop(); transportPlay(); } });
 document.addEventListener("click",(e)=>{ if(loopMenu.style.display==="flex" && !loopMenu.contains(e.target) && e.target!==loopMenuBtn) closeLoopMenu(); });
-document.getElementById("countInSel").addEventListener("change",(e)=>{ project.countInBars=parseInt(e.target.value,10)||0; renderTimeline(); });
+const metroMenu=document.getElementById("metroMenu"), metroBtn=document.getElementById("metroBtn");
+function metroSummary(){ const ci=project.countInBars||0, parts=[]; parts.push(project.metronome?"On":"Off"); if(ci>0) parts.push(ci+" bar"+(ci>1?"s":"")+" in"); return parts.join(" \u00b7 "); }
+function syncMetroUI(){ const lab=document.getElementById("metroBtnLabel"); if(lab) lab.textContent=metroSummary(); if(metroBtn) metroBtn.classList.toggle("on", !!project.metronome); const on=document.getElementById("metroOnBtn"), off=document.getElementById("metroOffBtn"); if(on) on.classList.toggle("seg-on", !!project.metronome); if(off) off.classList.toggle("seg-on", !project.metronome); const ci=document.getElementById("countInSel"); if(ci) ci.value=String(project.countInBars||0); }
+function closeMetroMenu(){ metroMenu.style.display="none"; }
+metroBtn.addEventListener("click",(e)=>{ e.stopPropagation(); if(metroMenu.style.display==="flex"){ closeMetroMenu(); return; } const r=metroBtn.getBoundingClientRect(); metroMenu.style.left=(window.scrollX+Math.min(r.left, window.innerWidth-200))+"px"; metroMenu.style.top=(window.scrollY+r.bottom+6)+"px"; syncMetroUI(); metroMenu.style.display="flex"; });
+document.getElementById("metroOnBtn").addEventListener("click",()=>{ project.metronome=true; syncMetroUI(); });
+document.getElementById("metroOffBtn").addEventListener("click",()=>{ project.metronome=false; syncMetroUI(); });
+document.addEventListener("click",(e)=>{ if(metroMenu.style.display==="flex" && !metroMenu.contains(e.target) && e.target!==metroBtn && !metroBtn.contains(e.target)) closeMetroMenu(); });
+document.getElementById("rewindBtn").addEventListener("click",()=>{ const was=transport.playing; if(was) transportStop(); project.loop.start=0; project.loop.end=project.lengthSec; project.loop.region=false; if(typeof updateLoopButtons==="function") updateLoopButtons(); renderTimeline(); positionPlayhead(null); if(typeof scrollTimelineToBeat==="function") scrollTimelineToBeat(0); if(was) transportPlay(); });
+syncMetroUI();
+document.getElementById("countInSel").addEventListener("change",(e)=>{ project.countInBars=parseInt(e.target.value,10)||0; renderTimeline(); syncMetroUI(); });
 // ---- Add layer: one button → a modal of descriptive type cards ----
 const LAYER_TYPES=[
   { type:"midi",    icon:"🎼", name:"MIDI instrument", desc:"Program melodies, basslines & chords on a piano roll — record live or draw notes. Its own synth voice." },
@@ -6628,7 +6654,7 @@ function scheduleAutosave(){ if (!autosaveReady) return; if (autosaveTimer) clea
 function serializeProject(){
   return {
     version: FORMAT_VERSION, sessionId: ensureSessionId(), syncBase: project.syncBase||undefined, bpm: project.bpm, timeSig: {...project.timeSig},
-    lengthSec: project.lengthSec, loop: {...project.loop}, loopEnabled: project.loopEnabled, countInBars: project.countInBars,
+    lengthSec: project.lengthSec, loop: {...project.loop}, loopEnabled: project.loopEnabled, countInBars: project.countInBars, metronome: !!project.metronome,
     synth: {...GLOBAL_VOICE}, masterEq: {...masterEqParams}, layout: currentLayout(),
     meta: project.meta ? {...project.meta} : undefined,
     samplerKit: (project.samplerKit||[]).map(p=> p ? { name:p.name, gain:(p.gain==null?1:p.gain), loop:!!p.loop, blob:p.blob } : null),
@@ -6665,7 +6691,9 @@ function loadProject(data){
   project.loop = data.loop||{start:0,end:project.lengthSec};
   project.loopEnabled = data.loopEnabled!==false;
   project.countInBars = data.countInBars!=null ? data.countInBars : 1;
+  project.metronome = !!data.metronome;
   const ciSel=document.getElementById("countInSel"); if (ciSel) ciSel.value=String(project.countInBars);
+  if (typeof syncMetroUI==="function") syncMetroUI();
   if (data.synth){ Object.assign(GLOBAL_VOICE, data.synth); if(data.synth.oscs) GLOBAL_VOICE.oscs=data.synth.oscs.map(o=>({...o})); }
   synthParams = GLOBAL_VOICE;   // a load resets the active voice to the song default
   if (data.masterEq) Object.assign(masterEqParams, data.masterEq);
