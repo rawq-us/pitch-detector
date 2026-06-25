@@ -1,6 +1,6 @@
 {
   "name": "pitch-studio",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "description": "Single-file, in-browser music workstation — pitch detection, annotated memos, arps, beats, timeline. No build, no dependencies.",
   "type": "module",
