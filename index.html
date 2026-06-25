@@ -7437,7 +7437,7 @@ async function aiComplete(cfg, system, user, opts){
   if (cfg.provider==="openrouter"){ headers["HTTP-Referer"]=location.origin; headers["X-Title"]="Pitch Studio"; }
   const body={ model:cfg.model, messages:[{role:"system",content:system},{role:"user",content:user}], temperature:opts.temperature!=null?opts.temperature:0.8 };
   const res=await fetch(url,{ method:"POST", headers, body:JSON.stringify(body) });
-  if (!res.ok){ let t=""; try { t=(await res.json()).error?.message||""; } catch(e){ try { t=await res.text(); } catch(_){} } throw new Error("HTTP "+res.status+(t?": "+t.slice(0,160):"")); }
+  if (!res.ok){ let t=""; try { t=(await res.json()).error?.message||""; } catch(e){ try { t=await res.text(); } catch(_){} } let hint=""; if(res.status===401||res.status===403){ hint = cfg.provider==="openrouter" ? " \u2014 your key was rejected. Use an OpenRouter key from openrouter.ai/keys (it starts with sk-or-v1-), not an Anthropic (sk-ant-) or OpenAI key." : " \u2014 the provider rejected your key; double-check it and the base URL."; } throw new Error("HTTP "+res.status+(t?": "+t.slice(0,160):"")+hint); }
   const data=await res.json();
   return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
 }
