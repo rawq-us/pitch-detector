@@ -316,8 +316,9 @@
   .struct-seg:hover { filter: brightness(1.1); }
   .struct-seg .ss-bars { font-size: 9px; opacity: 0.7; font-weight: 600; }
   .struct-summary { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; font-size: 11px; }
-  .ss-dot { width: 11px; height: 11px; min-width: 11px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; flex: none; transition: transform 0.1s; }
-  .ss-dot:hover { transform: scale(1.3); }
+  .ss-lab { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); font-weight: 500; margin-right: 1px; }
+  .struct-summary .ss-dot { width: 10px; height: 10px; min-width: 10px; max-width: 10px; min-height: 10px; max-height: 10px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; flex: none; align-self: center; transition: transform 0.1s; }
+  .struct-summary .ss-dot:hover { transform: scale(1.4); }
   .ss-bars-count { font-size: 10px; color: var(--faint); margin-left: 2px; white-space: nowrap; }
   .ss-sum-lab { text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-size: 10px; margin-right: 2px; }
   .ss-sum-chip { padding: 1px 6px; border-radius: 5px; font-size: 10px; font-weight: 700; color: #0b0e16; }
@@ -447,6 +448,15 @@
   .tl-row1 .tl-center { justify-self: center; }
   .tl-row1 .tl-right { justify-self: end; min-width: 0; display: flex; justify-content: flex-end; }
   .tl-row1 .struct-summary { justify-content: flex-end; }
+  .song-meta { display: inline-flex; align-items: stretch; gap: 0; background: var(--well); border: 1px solid var(--line-strong); border-radius: var(--r-md); padding: 2px; }
+  .sm-field { display: flex; flex-direction: column; gap: 0; padding: 2px 9px; }
+  .sm-field + .sm-field { border-left: 1px solid var(--line); }
+  .sm-field > span { font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); font-weight: 500; }
+  .song-meta .tl-in { background: transparent !important; border: 0; padding: 0; height: 20px; width: 50px; font-size: 14px; font-family: ui-monospace, Menlo, monospace; border-radius: 0; }
+  .song-meta select.tl-in { width: 58px; padding-right: 15px; background-position: right 1px center; }
+  .song-meta .tl-in:focus { outline: none; border: 0; }
+  .countin-ctl { display: inline-flex; align-items: center; gap: 7px; }
+  .countin-ico { font-size: 16px; color: var(--muted); flex: none; }
   /* per-layer meter (polymeter) */
   select.trk-meter { font-size: 11px; padding: 3px 24px 3px 8px; width: 84px; min-width: 0; flex: none; margin-left: auto; }
   /* MIDI piano-roll editor */
@@ -661,7 +671,7 @@
     background: repeating-linear-gradient(45deg, rgba(245,158,11,0.05), rgba(245,158,11,0.05) 7px, rgba(245,158,11,0.11) 7px, rgba(245,158,11,0.11) 14px);
     border-right: 1px solid var(--accent); }
   .preroll-lbl { position: absolute; top: 50px; left: 5px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); }
-  .tl-loopband { position: absolute; top: 0; bottom: 0; background: rgba(74,222,128,0.10); border-left: 2px solid var(--accent); border-right: 2px solid var(--accent); z-index: 1; pointer-events: none; }
+  .tl-loopband { position: absolute; top: 0; height: 46px; background: rgba(31,217,114,0.18); border-left: 2px solid var(--accent); border-right: 2px solid var(--accent); z-index: 4; pointer-events: none; }
   .tl-lanes { position: relative; }
   .tl-lane { position: relative; height: 58px; border-bottom: 1px solid var(--line); }
   .tl-lane.beat { background: rgba(245,158,11,0.04); }
@@ -1021,31 +1031,17 @@
     <h2>Timeline / arrangement</h2>
     <div class="row tl-controls tl-row1" style="margin-bottom:10px">
       <div class="tl-left">
-        <div class="group"><label for="bpmInput">Project BPM</label><input id="bpmInput" class="tl-in" type="number" min="20" max="400" step="1" value="90" /></div>
-        <div class="group"><label for="tsSel">Time signature</label>
-          <select id="tsSel" class="tl-in">
-            <option value="4/4">4/4</option>
-            <option value="3/4">3/4</option>
-            <option value="2/4">2/4</option>
-            <option value="6/8">6/8</option>
-            <option value="5/4">5/4</option>
-            <option value="7/8">7/8</option>
-            <option value="12/8">12/8</option>
-          </select>
+        <div class="song-meta">
+          <label class="sm-field" for="bpmInput"><span>BPM</span><input id="bpmInput" class="tl-in" type="number" min="20" max="400" step="1" value="90" /></label>
+          <label class="sm-field" for="tsSel"><span>Time</span><select id="tsSel" class="tl-in"><option value="4/4">4/4</option><option value="3/4">3/4</option><option value="2/4">2/4</option><option value="6/8">6/8</option><option value="5/4">5/4</option><option value="7/8">7/8</option><option value="12/8">12/8</option></select></label>
+          <label class="sm-field" for="lenInput"><span>Bars</span><input id="lenInput" class="tl-in" type="text" inputmode="numeric" value="8" /></label>
         </div>
-        <div class="group"><label for="lenInput">Length (bars)</label><input id="lenInput" class="tl-in" type="text" inputmode="numeric" value="8" /></div>
       </div>
       <div class="tl-center tr-row tl-transport">
         <div class="group"><label>&nbsp;</label><div class="seg"><button id="undoBtn" title="Nothing to undo" disabled><svg class="svi" aria-hidden="true"><use href="#i-undo"/></svg></button><button id="redoBtn" title="Nothing to redo" disabled><svg class="svi" aria-hidden="true"><use href="#i-redo"/></svg></button></div></div>
         <div class="group"><label>&nbsp;</label><button id="playBtn" class="primary play-btn" title="Play / Stop"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg></button></div>
         <div class="group"><label>&nbsp;</label><div class="seg"><button id="loopBtn" class="on" title="Loop on/off"><svg class="svi" aria-hidden="true"><use href="#i-loop"/></svg></button><button id="loopMenuBtn" title="Loop options"><svg class="svi" aria-hidden="true"><use href="#i-chev-down"/></svg></button></div></div>
-        <div class="group"><label for="countInSel" title="Count-in metronome — bars counted before recording"><svg class="svi" aria-hidden="true" style="font-size:15px"><use href="#i-metro"/></svg></label>
-          <select id="countInSel" class="tl-in" title="Count-in metronome bars">
-            <option value="0">Off</option>
-            <option value="1" selected>1 bar</option>
-            <option value="2">2 bars</option>
-          </select>
-        </div>
+        <div class="group"><label>&nbsp;</label><div class="countin-ctl" title="Count-in metronome — bars counted in before recording"><svg class="svi countin-ico" aria-hidden="true"><use href="#i-metro"/></svg><select id="countInSel" class="tl-in" title="Count-in metronome bars"><option value="0">Off</option><option value="1" selected>1 bar</option><option value="2">2 bars</option></select></div></div>
       </div>
       <div class="tl-right">
         <span id="loopReadout" style="display:none"></span>
@@ -3617,7 +3613,8 @@ function renderTimeline(){
   // loop band
   tlLoopBand.style.left=(origin+project.loop.start*PX_PER_SEC)+"px";
   tlLoopBand.style.width=((project.loop.end-project.loop.start)*PX_PER_SEC)+"px";
-  tlLoopBand.style.display = project.loopEnabled ? "block" : "none";
+  const loopFull = project.loop.start<=0.01 && project.loop.end>=project.lengthSec-0.01;   // whole song selected = nothing selected
+  tlLoopBand.style.display = (project.loopEnabled && !loopFull) ? "block" : "none";
   loopReadout.textContent = fmtBars(project.loop.start)+" – "+fmtBars(project.loop.end);
   // lanes + headers
   tlLanes.innerHTML=""; tlHeadCol.innerHTML="";
@@ -7880,6 +7877,7 @@ function scrollTimelineToBeat(beat){
 function renderStructSummary(){
   const el=document.getElementById("structSummary"); if(!el) return; el.innerHTML="";
   const secs=structSorted(); if(!secs.length) return;
+  const lab=document.createElement("span"); lab.className="ss-lab"; lab.textContent="Structure"; el.appendChild(lab);
   secs.forEach(s=>{
     const d=document.createElement("button"); d.type="button"; d.className="ss-dot";
     d.style.background=(SECTION_TYPES[s.type]||{}).color||"#888";
