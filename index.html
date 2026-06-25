@@ -1960,7 +1960,7 @@
 "use strict";
 
 /* Keep in sync with package.json "version" (a test enforces it). Bump on every release. */
-const APP_VERSION="2.0.2";
+const APP_VERSION="2.0.3";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
 
@@ -3714,6 +3714,11 @@ function renderTimeline(){
       g.style.left=(origin+memoRec.startSec*PX_PER_SEC)+"px"; g.style.width="4px"; g.textContent="● rec";
       lane.appendChild(g);
     }
+    if (recording && recTrack===track){
+      const g=document.createElement("div"); g.className="tl-recghost"; g.id="voiceRecGhost";
+      g.style.left=(origin+recStartSec*PX_PER_SEC)+"px"; g.style.width="4px"; g.textContent="● rec";
+      lane.appendChild(g);
+    }
     tlLanes.appendChild(lane);
   });
   if (typeof renderInstVizAll==="function") renderInstVizAll();    // keep the Synth/MIDI section previews in sync
@@ -4556,7 +4561,7 @@ function attachPinch(el, getZ, setZ, onTwo){
 attachPinch(tlScroll, ()=>PX_PER_SEC, (z,cx)=>setTimelineZoom(z,cx), ()=>{ drag=null; loopDrag=null; });
 
 /* ---------- Voice recording (MediaRecorder -> Blob) ---------- */
-let mediaRec=null, recChunks=[], recording=false, recStream=null, recTrack=null;
+let mediaRec=null, recChunks=[], recording=false, recStream=null, recTrack=null, recT0=0, recStartSec=0, recRaf=null;
 function toggleVoiceRec(track){ recording ? stopVoiceRec() : startVoiceRec(track); }
 async function startVoiceRec(track){
   if (recording) return;
@@ -4566,11 +4571,23 @@ async function startVoiceRec(track){
   try { mediaRec = new MediaRecorder(recStream); } catch(e){ alert("Recording isn't supported in this browser."); return; }
   mediaRec.ondataavailable=(e)=>{ if (e.data && e.data.size) recChunks.push(e.data); };
   mediaRec.onstop=async()=>{ const blob=new Blob(recChunks,{type:(mediaRec&&mediaRec.mimeType)||"audio/webm"}); await addVoiceClipFromBlob(blob); };
+  let startSec=0; if (track) for (const c of track.clips){ const end=c.start+clipDuration(track,c); if (end>startSec) startSec=end; }
+  recStartSec=snapSec(startSec); recT0=getCtx().currentTime;
   mediaRec.start(); recording=true; recTrack=track||null; renderTimeline();
+  const tick=()=>{
+    if (!recording) return;
+    const el=getCtx().currentTime-recT0;
+    if (recStartSec+el+barSec() > project.lengthSec) setLength(Math.ceil((recStartSec+el+2*barSec())/barSec())*barSec());   // session follows the take
+    const g=document.getElementById("voiceRecGhost");
+    if (g){ g.style.width=Math.max(4, el*PX_PER_SEC)+"px"; g.textContent="● rec "+fmtTime(el); }
+    recRaf=requestAnimationFrame(tick);
+  };
+  recRaf=requestAnimationFrame(tick);
 }
 function stopVoiceRec(){
   if (!mediaRec || !recording) return;
   mediaRec.stop(); recording=false;
+  if (recRaf) cancelAnimationFrame(recRaf); recRaf=null;
   if (recStream && recStream!==micStream) recStream.getTracks().forEach(t=>t.stop());
   renderTimeline();
 }
