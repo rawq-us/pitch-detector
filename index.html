@@ -1688,6 +1688,7 @@
         <div class="group"><label>&nbsp;</label><button id="voicePlayBtn" class="primary"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Play</button></div>
         <div class="group"><label>Gain <span id="voiceGainOut" class="readout"></span></label><input id="voiceGain" type="range" min="0" max="2" step="0.01" value="1" style="width:170px"></div>
         <div class="group"><label>&nbsp;</label><button id="voiceTrimReset" class="mini">Reset trim</button></div>
+        <div class="group"><label>&nbsp;</label><button id="voiceToMemoBtn" class="mini" title="Convert this layer to an annotated memo (chords · notes · tempo · lyrics) — enables Flex time"><svg class="svi" aria-hidden="true"><use href="#i-wave"/></svg> Convert to memo</button></div>
         <div class="spacer"></div>
         <div class="group"><label>&nbsp;</label><span id="voiceInfo" class="readout"></span></div>
       </div>
@@ -3378,6 +3379,7 @@ function openVoiceClip(track, clip){
   requestAnimationFrame(()=>{ drawVoiceWave(); syncVoiceTrim(); updateVoiceGainOut(); });
 }
 function closeVoiceModal(){ voiceStopPlay(); document.getElementById("voiceModal").style.display="none"; document.body.classList.remove("modal-locked"); voiceEd=null; }
+document.getElementById("voiceToMemoBtn").addEventListener("click",()=>{ const t=voiceEd&&voiceEd.track; if(!t) return; if(!confirm("Convert the \""+t.name+"\" layer into an annotated memo? This enables Flex time and analyzes chords/notes/tempo/lyrics.")) return; closeVoiceModal(); convertVoiceTrack(t); });
 function drawVoiceWave(){
   const c=voiceEd&&voiceEd.clip; if(!c||!c.buffer) return;
   const cv=document.getElementById("voiceWave"), wrap=document.getElementById("voiceWaveWrap");
