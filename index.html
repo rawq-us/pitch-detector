@@ -968,10 +968,23 @@
 <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="3"/><path d="M10.2 12.8L20 3M17 6l2 2M14 9l2 2"/></symbol>
 <symbol id="i-tuner" viewBox="0 0 24 24"><path d="M12 4a8 8 0 0 0 -8 8 8 8 0 0 0 16 0 8 8 0 0 0 -8 -8zM12 12l4 -3"/></symbol>
 <symbol id="i-metro" viewBox="0 0 24 24"><path d="M8 3h8l3 18H5z"/><path d="M5 16h14M12 19l4 -10"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4l10.5 -10.5a2.1 2.1 0 0 0 -3 -3L5 17z"/><path d="M13.5 6.5l3 3"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2 -2h8"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0M16 5.2a3.2 3.2 0 0 1 0 5.6M20.5 20a5.5 5.5 0 0 0 -4 -5.3"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.8 -7 10 -7 10 7 10 7 -3.8 7 -10 7 -10 -7 -10 -7z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4h11a1 1 0 0 1 1 1v15H6a1 1 0 0 1 -1 -1z"/><path d="M6 17h11"/></symbol>
+<symbol id="i-wand" viewBox="0 0 24 24"><path d="M12 3l1.4 3.6 3.6 1.4 -3.6 1.4L12 13l-1.4 -3.6 -3.6 -1.4 3.6 -1.4z"/><path d="M6 14l-2 6 6 -2"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M9.5 14.5l5 -5M8 12l-2 2a3 3 0 0 0 4 4l2 -2M16 12l2 -2a3 3 0 0 0 -4 -4l-2 2"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></symbol>
+<symbol id="i-import" viewBox="0 0 24 24"><path d="M12 4v11M8 11l4 4 4 -4M5 20h14"/></symbol>
+<symbol id="i-save" viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7M8 20v-6h8v6"/></symbol>
+<symbol id="i-cut" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8 8l12 10M8 16L20 6"/></symbol>
+<symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="16" rx="2"/><rect x="9" y="2.5" width="6" height="3.2" rx="1"/></symbol>
 </defs></svg>
 <div class="wrap">
   <div class="menubar">
-    <span class="mb-brand">🎛️ Pitch Studio</span>
+    <span class="mb-brand"><svg class="svi" aria-hidden="true"><use href="#i-sliders"/></svg> Pitch Studio</span>
     <div class="mb-menu">
       <button class="mb-btn" id="fileMenuBtn">File ▾</button>
       <div class="mb-drop" id="fileMenu">
@@ -994,7 +1007,7 @@
     </div>
     <div class="mb-spacer"></div>
     <button class="mb-current song-meta-btn" id="songMetaBtn" title="Set the song title, genre &amp; take — captured as metadata and written into the export (ID3 tags)"><b id="songMetaDisplay">Untitled song</b></button>
-    <button class="mb-btn" id="collabBtn" title="Live collaborate — connect a second browser peer-to-peer; edits &amp; transport sync live (no server)">👥 Collab</button>
+    <button class="mb-btn" id="collabBtn" title="Live collaborate — connect a second browser peer-to-peer; edits &amp; transport sync live (no server)"><svg class="svi" aria-hidden="true"><use href="#i-users"/></svg> Collab</button>
     <b id="sessionLabel" style="display:none">Untitled session</b>
     <div class="mb-spacer"></div>
     <button class="mb-btn" id="settingsBtn" title="Settings — API keys &amp; privacy"><svg class="svi" aria-hidden="true"><use href="#i-gear"/></svg> Settings</button>
@@ -1061,7 +1074,7 @@
       </div>
       <div class="tl-master-eq"><canvas id="masterEq"></canvas><span class="eq-tag">Master</span></div>
     </div>
-    <div class="hint">Guides are bars &amp; beats. Drag clips to move (snaps to the beat). Drag across the ruler to set a cycle region. Click the ⟳ badge on a clip to set how many beats it loops for — or <b>∞ Fill session</b> to repeat it to the end (a backing track for memo takes). Click a track header to choose where new clips land. The <b>📝 memo</b> layer records and maps the whole take — chords, notes vs. your mode, a tracked tempo map &amp; lyrics; recording a memo grows the session to fit, then sets its length. Double-click a memo clip (or its ✎ badge) to open the editor &amp; export bundle.</div>
+    <div class="hint">Guides are bars &amp; beats. Drag clips to move (snaps to the beat). Drag across the ruler to set a cycle region. Click the ⟳ badge on a clip to set how many beats it loops for — or <b>∞ Fill session</b> to repeat it to the end (a backing track for memo takes). Click a track header to choose where new clips land. The <b>memo</b> layer records and maps the whole take — chords, notes vs. your mode, a tracked tempo map &amp; lyrics; recording a memo grows the session to fit, then sets its length. Double-click a memo clip (or its ✎ badge) to open the editor &amp; export bundle.</div>
   </div>
 
   <!-- ===== Key / mode / tone / mic ===== -->
@@ -1130,9 +1143,9 @@
         <div class="group"><label>Step length</label><span class="readout" id="msReadout">— ms/step</span></div>
         <div class="group"><label>Length</label><span class="readout arp-bars" id="arpBarsOut">— bars</span></div>
         <div class="spacer"></div>
-        <div class="group"><label>&nbsp;</label><button id="recBtn">● Record</button></div>
+        <div class="group"><label>&nbsp;</label><button id="recBtn"><svg class="svi" aria-hidden="true"><use href="#i-record"/></svg> Record</button></div>
         <div class="group"><label>&nbsp;</label><button id="restBtn">+ Rest</button></div>
-        <div class="group"><label>&nbsp;</label><button id="arpPrevBtn">▶ Play</button></div>
+        <div class="group"><label>&nbsp;</label><button id="arpPrevBtn"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Play</button></div>
         <div class="group"><label>&nbsp;</label><button id="arpClearBtn">Clear</button></div>
         <div class="group"><label>Zoom</label><div class="tr-row"><button id="arpZoomOut" class="mini" title="Zoom out">−</button><button id="arpZoomIn" class="mini" title="Zoom in">+</button></div></div>
         <div class="group"><label>&nbsp;</label><button id="arpToMidiBtn" title="Convert this arp into an editable MIDI layer — rates &amp; repeats expand into notes (the arp stays too)">→ MIDI</button></div>
@@ -1185,7 +1198,7 @@
     </div>
     <div class="kbd-foot">
       <div class="kbd-mode"><span class="sublabel">Keyboard</span><div class="seg"><button id="kbPlayBtn" class="seg-on">▶ Play notes</button><button id="kbTransBtn">⇅ Transpose arp</button></div>
-        <button id="kbScaleLockBtn" class="mini seg-on" title="Mute keys outside the current key &amp; mode — drag across the keys and stay in tune (like an omnichord). Turn off to play every key.">🎵 In-key only</button>
+        <button id="kbScaleLockBtn" class="mini seg-on" title="Mute keys outside the current key &amp; mode — drag across the keys and stay in tune (like an omnichord). Turn off to play every key."><svg class="svi" aria-hidden="true"><use href="#i-music"/></svg> In-key only</button>
         <span class="kb-key-now" title="The key/mode the keyboard is showing. During playback it follows the key-map region under the playhead.">Key: <b id="kbKeyNow">C major</b></span>
         <span id="midiStatus" class="midi-status" title="Web MIDI input — a connected USB/Bluetooth MIDI keyboard plays the synth and triggers record.">MIDI: off</span></div>
       <div class="hint" id="legend"></div>
@@ -1206,7 +1219,7 @@
   <!-- ===== Synth — keys editor (full-screen modal; the section above is its visualizer) ===== -->
   <div id="synthModal" class="modal" style="display:none">
     <div class="modal-box fs-box">
-      <div class="modal-head"><b>🎹 Synth — keys</b>
+      <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-keyboard"/></svg> Synth — keys</b>
         <span class="ed-keysel" title="The song's base key/mode (the default region at the start of the timeline). The keyboard shades &amp; mutes to it; during playback it follows the timeline's key changes."><span class="ed-keysel-lab">Base key</span><select id="synthKeyRoot"></select><select id="synthKeyMode"></select><span id="synthKeyMood" class="midi-keytag"></span></span>
         <button id="synthModalClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
       <div id="synthKeyChips" class="tlkey-chips"></div>
@@ -1232,8 +1245,8 @@
             </select>
           </div>
           <div class="group"><label>Pattern</label><span class="readout" id="beatLenOut">— steps · — s</span></div>
-          <div class="group"><label>&nbsp;</label><button id="liveRecBtn">● Live record</button></div>
-          <div class="group"><label>&nbsp;</label><button id="beatPrevBtn">▶ Preview</button></div>
+          <div class="group"><label>&nbsp;</label><button id="liveRecBtn"><svg class="svi" aria-hidden="true"><use href="#i-record"/></svg> Live record</button></div>
+          <div class="group"><label>&nbsp;</label><button id="beatPrevBtn"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Preview</button></div>
           <div class="group"><label>&nbsp;</label><button id="beatClearBtn">Clear grid</button></div>
           <div class="spacer"></div>
           <div class="group"><label>&nbsp;</label><button id="beatAddBtn" class="primary">＋ Timeline</button></div>
@@ -1252,7 +1265,7 @@
         <div class="tr-row"><button id="sampSizeMinus" class="mini" title="Fewer pads">−</button><span class="readout" id="sampSizeOut" style="min-width:42px;text-align:center">2×2</span><button id="sampSizePlus" class="mini" title="More pads">＋</button></div>
       </div>
       <div class="group"><label>Mode</label>
-        <div class="tr-row"><button id="sampModePlay" class="mini seg-on" title="Tap pads to play">▶ Play</button><button id="sampModeEdit" class="mini" title="Load, rename, group & drag pads">✎ Edit</button></div>
+        <div class="tr-row"><button id="sampModePlay" class="mini seg-on" title="Tap pads to play"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Play</button><button id="sampModeEdit" class="mini" title="Load, rename, group & drag pads"><svg class="svi" aria-hidden="true"><use href="#i-edit"/></svg> Edit</button></div>
       </div>
       <div class="group"><label for="sampBarsSel">Length</label>
         <select id="sampBarsSel"><option value="1">1 bar</option><option value="2">2 bars</option><option value="4">4 bars</option></select>
@@ -1266,8 +1279,8 @@
       </div>
       <div class="gridside">
         <div class="row" style="margin-bottom:10px">
-          <div class="group"><label>&nbsp;</label><button id="sampPrevBtn">▶ Preview</button></div>
-          <div class="group"><label>&nbsp;</label><button id="sampLiveRecBtn" title="In Play mode, tap pads while this is on to record hits at the playhead">● Live record</button></div>
+          <div class="group"><label>&nbsp;</label><button id="sampPrevBtn"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Preview</button></div>
+          <div class="group"><label>&nbsp;</label><button id="sampLiveRecBtn" title="In Play mode, tap pads while this is on to record hits at the playhead"><svg class="svi" aria-hidden="true"><use href="#i-record"/></svg> Live record</button></div>
           <div class="group"><label>&nbsp;</label><button id="sampClearBtn">Clear grid</button></div>
           <div class="spacer"></div>
           <div class="group"><label>&nbsp;</label><button id="sampAddBtn" class="primary">＋ Timeline</button></div>
@@ -1284,7 +1297,7 @@
     <div class="hint" style="margin-top:0">Write in the bracket/paren format — <code>[Singer: C2–G5 style]</code> defines a voice, <code>[Verse 1 - Singer]</code> heads a section, <code>[B2]word</code> sets a note, <code>(parens)</code> = background vocal, <code>[guitar solo]</code> = instrumental. <b>Time is never typed</b> — add it by <b>syncing</b>. The backbone holds time + notes + singers and exports to Apple Music (TTML), karaoke (LRC/SRT), Musixmatch and AI generators.</div>
     <div class="hint" style="margin-top:4px"><b>Section header rule:</b> <code>[Structure - label]</code> — the keyword <i>before</i> the <code> - </code> (space‑dash‑space) is the <b>hard structure</b> (Intro · Verse · Pre‑chorus · Chorus · Bridge · Solo · Outro, optionally numbered); everything <i>after</i> is a <b>freeform label</b> (a singer like <code>Lead</code> / <code>Rapper A</code>, or directions). Singer <i>definitions</i> use a colon: <code>[Lead: C3–A4]</code>. These headers drive the <b>Song structure</b> lane above ↑ (and it drives them back).</div>
     <details id="lyrStyleBox" class="lyr-style">
-      <summary>🎚 Style tags <span class="dim">— session-level, sent with every AI export</span></summary>
+      <summary>Style tags <span class="dim">— session-level, sent with every AI export</span></summary>
       <div class="hint" style="margin:8px 0">Describe the <b>sound</b> with tags a generator can reproduce — genre, mood, instruments, vocal type, production texture. <b>Don't use artist, song, or album names</b> — they're trademarked and most services reject them; reverse-engineer the vibe into descriptors instead. Tempo (<span id="styBpmHint">90</span>bpm) is added automatically from the transport.</div>
       <div class="sty-field-head"><span class="sty-field-lab">Style</span><span class="sty-count" id="styCount">0/1000</span></div>
       <textarea id="styText" class="sty-text" spellcheck="false" placeholder="Male Vocal, boom-bap, dusty, sub-heavy, reverb, fender rhodes, spooky choir, detuned…  — type any tags (comma-separated) or click the buttons below"></textarea>
@@ -1430,22 +1443,22 @@
     <div class="welcome-mission">Catch a song the moment it strikes — hum it, play it, type it — then shape it with real music theory and hand it off clean. No account. No subscription. No one watching. Just you and the idea. We built this because making music shouldn't cost your privacy, your wallet, or your data.</div>
     <div class="welcome-grid">
       <div class="wp" style="--wp-c:#34d399">
-        <div class="wp-head"><span class="wp-ico">🆓</span><span class="wp-title">Free &amp; yours, forever</span></div>
+        <div class="wp-head"><span class="wp-ico"><svg class="svi" aria-hidden="true"><use href="#i-wand"/></svg></span><span class="wp-title">Free &amp; yours, forever</span></div>
         <div class="wp-desc">Completely free with nothing held back. Open source, so it's yours to keep — and your sessions never leave your device.</div>
         <div class="wp-pills"><span class="wp-pill">Free</span><span class="wp-pill">No ads</span><span class="wp-pill">No tracking</span><span class="wp-pill">No sign-up</span><span class="wp-pill">No paywalls</span><span class="wp-pill">Open source</span></div>
       </div>
       <div class="wp" style="--wp-c:#38bdf8">
-        <div class="wp-head"><span class="wp-ico">🎚️</span><span class="wp-title">A studio, fully in the browser</span></div>
+        <div class="wp-head"><span class="wp-ico"><svg class="svi" aria-hidden="true"><use href="#i-sliders"/></svg></span><span class="wp-title">A studio, fully in the browser</span></div>
         <div class="wp-desc">A serverless DAW that runs entirely on your machine. Plug in a MIDI instrument, tune up with the built-in tuner, and pop panels out to their own windows.</div>
         <div class="wp-pills"><span class="wp-pill">In-browser DAW</span><span class="wp-pill">MIDI instrument input</span><span class="wp-pill">Instrument tuner</span><span class="wp-pill">Multi-window</span></div>
       </div>
       <div class="wp" style="--wp-c:#a855f7">
-        <div class="wp-head"><span class="wp-ico">🎤</span><span class="wp-title">From a hum to a song</span></div>
+        <div class="wp-head"><span class="wp-ico"><svg class="svi" aria-hidden="true"><use href="#i-mic"/></svg></span><span class="wp-title">From a hum to a song</span></div>
         <div class="wp-desc">Pitch detection turns a hummed melody into notes. A smart lyrics editor and AI that transcribes your audio into timed lyrics get the words down fast.</div>
         <div class="wp-pills"><span class="wp-pill">Pitch detection</span><span class="wp-pill">Smart lyrics editor</span><span class="wp-pill">AI audio → lyrics</span></div>
       </div>
       <div class="wp" style="--wp-c:#fbbf24">
-        <div class="wp-head"><span class="wp-ico">🤝</span><span class="wp-title">Made together — and portable</span></div>
+        <div class="wp-head"><span class="wp-ico"><svg class="svi" aria-hidden="true"><use href="#i-users"/></svg></span><span class="wp-title">Made together — and portable</span></div>
         <div class="wp-desc">Collaborate live, peer-to-peer over WebRTC — no server, no middleman. Bring your own AI via OpenRouter. Everything exports to formats you can take anywhere.</div>
         <div class="wp-pills"><span class="wp-pill">Live WebRTC collab</span><span class="wp-pill">BYO AI · OpenRouter</span><span class="wp-pill">Export MIDI</span><span class="wp-pill">Audio stems</span><span class="wp-pill">Portable lyrics</span></div>
       </div>
@@ -1465,7 +1478,7 @@
 
 <div id="addLayerModal" class="modal" style="display:none">
   <div class="modal-box" style="max-width:640px">
-    <div class="modal-head"><b>＋ Add a layer</b><button id="addLayerClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-plus"/></svg> Add a layer</b><button id="addLayerClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" style="margin-top:0">Pick a layer type — each lands as its own editable, transposable track on the timeline.</div>
     <div class="layer-grid" id="layerGrid"></div>
   </div>
@@ -1473,7 +1486,7 @@
 
 <div id="collabModal" class="modal" style="display:none">
   <div class="modal-box collab-box" style="max-width:620px">
-    <div class="modal-head"><b>👥 Collaborate live</b><button id="collabClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-users"/></svg> Collaborate live</b><button id="collabClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="collab-status-row"><span id="collabStatus" class="dim">Not connected.</span><span id="collabPeers" class="dim"></span></div>
 
     <!-- STEP: start — the only way to begin is to host; joining happens by opening a link -->
@@ -1490,7 +1503,7 @@
         <div class="collab-stepnum">Step 1 · Send the invite</div>
         <p class="collab-explain">Copy this link and send it to whoever you want to jam with — text, email, chat, anywhere.</p>
         <textarea id="collabOffer" rows="2" readonly placeholder="generating your invite link…"></textarea>
-        <button id="collabOfferCopy" class="primary collab-bigbtn" style="margin-top:9px">📋 Copy invite link</button>
+        <button id="collabOfferCopy" class="primary collab-bigbtn" style="margin-top:9px"><svg class="svi" aria-hidden="true"><use href="#i-copy"/></svg> Copy invite link</button>
         <button type="button" id="collabOfferQRtoggle" class="collab-qrtoggle">⊞ Show QR code</button>
         <div class="collab-qr collab-qrbox" id="collabOfferQR" style="display:none"></div>
       </div>
@@ -1499,7 +1512,7 @@
         <div class="collab-stepnum">Step 2 · Paste their reply</div>
         <p class="collab-explain">They'll open your link and get a <b>reply link</b> of their own. Paste it below and you're connected.</p>
         <textarea id="collabAnswerIn" class="collab-bigpaste" rows="4" placeholder="⬇  Paste the reply link your collaborator sends back  ⬇"></textarea>
-        <button id="collabAnswerInBtn" class="primary collab-bigbtn" style="display:none;margin-top:9px">🔗 Connect</button>
+        <button id="collabAnswerInBtn" class="primary collab-bigbtn" style="display:none;margin-top:9px"><svg class="svi" aria-hidden="true"><use href="#i-link"/></svg> Connect</button>
       </div>
     </div>
 
@@ -1508,7 +1521,7 @@
       <div class="collab-stepnum">Last step · Send this back</div>
       <p class="collab-explain">You're joining <b id="collabJoinHost">your host</b>'s session. Copy this reply link and send it back to them — you'll connect the moment they paste it in.</p>
       <textarea id="collabReply" rows="2" readonly placeholder="preparing your reply link…"></textarea>
-      <button id="collabReplyCopy" class="primary collab-bigbtn" style="margin-top:9px">📋 Copy reply link</button>
+      <button id="collabReplyCopy" class="primary collab-bigbtn" style="margin-top:9px"><svg class="svi" aria-hidden="true"><use href="#i-copy"/></svg> Copy reply link</button>
       <button type="button" id="collabReplyQRtoggle" class="collab-qrtoggle">⊞ Show QR code</button>
       <div class="collab-qr collab-qrbox" id="collabReplyQR" style="display:none"></div>
     </div>
@@ -1526,7 +1539,7 @@
 
 <div id="backingModal" class="modal" style="display:none">
   <div class="modal-box back-box">
-    <div class="modal-head"><b>🎸 Generate backing</b><button id="backingClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-pick"/></svg> Generate backing</b><button id="backingClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="back-intro">A chord progression → editable <b>pad · bass · arp · drum</b> layers, each on its own track and in key.</div>
 
     <div class="back-sec">
@@ -1541,8 +1554,8 @@
         <summary>Other sources · type chords directly</summary>
         <div class="back-adv-body">
           <div class="tr-row" style="gap:8px;flex-wrap:wrap;margin-bottom:8px">
-            <button id="backFromMemo" class="mini" title="Use chords detected from a recorded memo">🎤 From a memo</button>
-            <button id="backFromAi" class="mini" title="Ask the AI for a progression in your key">🤖 AI suggest</button>
+            <button id="backFromMemo" class="mini" title="Use chords detected from a recorded memo"><svg class="svi" aria-hidden="true"><use href="#i-mic"/></svg> From a memo</button>
+            <button id="backFromAi" class="mini" title="Ask the AI for a progression in your key"><svg class="svi" aria-hidden="true"><use href="#i-robot"/></svg> AI suggest</button>
           </div>
           <label class="back-adv-lab" for="backProg">Type chords — e.g. <code>C G Am F</code> · <code>Cmaj7 | Dm7 | G7</code></label>
           <input id="backProg" type="text" placeholder="C G Am F" style="width:100%">
@@ -1571,7 +1584,7 @@
     </div>
 
     <div class="back-sec back-fill">
-      <label class="back-fill-toggle"><input type="checkbox" id="backFillKeys"> 🎼 <b>Fill the whole song by its key changes</b></label>
+      <label class="back-fill-toggle"><input type="checkbox" id="backFillKeys"> <b>Fill the whole song by its key changes</b></label>
       <div class="dim" id="backFillInfo" style="font-size:11px;margin-top:6px;line-height:1.55"></div>
     </div>
 
@@ -1580,7 +1593,7 @@
       <div class="group"><label for="backBars">Chords / bar</label><input id="backBars" type="number" min="1" max="4" value="1" title="How many chords per bar (1 = one each bar, 2 = two, …)"></div>
     </div>
     <div class="back-actions">
-      <button id="backingRun" class="primary">🎸 Generate layers</button>
+      <button id="backingRun" class="primary"><svg class="svi" aria-hidden="true"><use href="#i-pick"/></svg> Generate layers</button>
       <span class="readout" id="backingStatus"></span>
     </div>
   </div>
@@ -1589,7 +1602,7 @@
 
 <div id="aiModal" class="modal" style="display:none">
   <div class="modal-box" style="max-width:680px">
-    <div class="modal-head"><b>🤖 AI Composer</b><button id="aiModalClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-robot"/></svg> AI Composer</b><button id="aiModalClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" style="margin-top:0">Describe what you want — start a new idea, or <b>edit what you already have</b> ("make the beat busier", "add a bassline in the key", "use my Kick &amp; Snare pads for a trap pattern", "switch to D minor"). The model is sent a summary of your <b>current project</b> (tempo, key, tracks, loaded sampler pad names, lyrics) and replies with edit operations the app applies — building isolated stems with this app's own synth, drum & sampler engine. Bring your own API key — stored only in this browser. The LLM composes/edits; it does not synthesize audio (your recorded/sampled audio is summarized, never uploaded). Optional: an audio-generation endpoint can import a generated stem.</div>
     <div class="ai-cfg-line">
       <span id="aiCfgSummary" class="dim">No API key set — add one in Settings.</span>
@@ -1613,7 +1626,7 @@
   <div class="modal-box" style="max-width:640px">
     <div class="modal-head"><b>⚙ Settings — API keys</b><button id="settingsClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="settings-privacy">
-      <b>🔒 Your keys stay in your browser.</b> Everything below is saved only in this browser's
+      <b>Your keys stay in your browser.</b> Everything below is saved only in this browser's
       local storage and sent only to the vendor you pick (e.g. OpenRouter) to fulfil the requests
       you trigger. This app has <b>no server of its own</b> — it does not track, collect, transmit,
       or store your keys, prompts, or projects anywhere else. Clearing your browser data (or the
@@ -1638,12 +1651,12 @@
       <span class="readout" id="settingsStatus" style="flex:1"></span>
     </div>
     <div class="settings-privacy" style="margin-top:14px">
-      <b>🎨 Color theme.</b> Re-skin the whole app. Your choice is remembered on this device.
+      <b>Color theme.</b> Re-skin the whole app. Your choice is remembered on this device.
       <div class="group" style="margin-top:8px;max-width:240px"><label for="themeSel">Theme</label>
         <select id="themeSel"><option value="rack">Rack (default)</option><option value="classic">Classic</option><option value="midnight">Midnight</option></select></div>
     </div>
     <div class="settings-privacy" style="margin-top:14px">
-      <b>🧹 App layout &amp; preferences.</b> Reset the panel order, minimized/expanded (minified) state,
+      <b>App layout &amp; preferences.</b> Reset the panel order, minimized/expanded (minified) state,
       track-name column width, and keyboard view back to <b>first-open defaults</b> — handy for seeing the
       app the way a brand-new user does. This does <b>not</b> touch your saved sessions or your API keys.
       <div style="margin-top:8px"><button id="settingsResetLayout" title="Reset section order, collapse state &amp; UI prefs to defaults (reloads the page)">↺ Reset app layout to defaults</button></div>
@@ -1665,12 +1678,12 @@
 <!-- ===== Voice clip editor — trim & gain ===== -->
 <div id="voiceModal" class="modal" style="display:none">
   <div class="modal-box fs-box">
-    <div class="modal-head"><b>🎙 <span id="voiceTitle">Voice clip</span></b>
+    <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-mic"/></svg> <span id="voiceTitle">Voice clip</span></b>
       <input id="voiceClipName" class="clip-name-in" placeholder="clip name…" title="Name this clip — shows on the timeline">
       <button id="voiceClose">✕ Done</button></div>
     <div class="fs-body">
       <div class="row" style="margin-bottom:12px;align-items:flex-end;gap:14px">
-        <div class="group"><label>&nbsp;</label><button id="voicePlayBtn" class="primary">▶ Play</button></div>
+        <div class="group"><label>&nbsp;</label><button id="voicePlayBtn" class="primary"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Play</button></div>
         <div class="group"><label>Gain <span id="voiceGainOut" class="readout"></span></label><input id="voiceGain" type="range" min="0" max="2" step="0.01" value="1" style="width:170px"></div>
         <div class="group"><label>&nbsp;</label><button id="voiceTrimReset" class="mini">Reset trim</button></div>
         <div class="spacer"></div>
@@ -1691,29 +1704,29 @@
 
 <div id="midiModal" class="modal" style="display:none">
   <div class="modal-box midi-box">
-    <div class="modal-head"><b>🎹 <span id="midiTitle">MIDI editor</span></b>
+    <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-keyboard"/></svg> <span id="midiTitle">MIDI editor</span></b>
       <input id="midiClipName" class="clip-name-in" placeholder="clip name…" title="Name this clip — shows on the timeline">
       <span class="ed-keysel" title="The key/mode at this clip's spot on the timeline. Changing it edits the timeline's key here — not a global setting."><span class="ed-keysel-lab">Key at this clip</span><select id="midiKeyRoot"></select><select id="midiKeyMode"></select><span id="midiKeyTag" class="midi-keytag"></span></span>
       <button id="midiClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="row midi-toolbar">
       <label class="midi-tl-field">Bars <select id="midiBars" class="midi-in"></select></label>
       <label class="midi-tl-field">Snap <select id="midiSnap" class="midi-in"><option value="1">1/4</option><option value="0.5" selected>1/8</option><option value="0.25">1/16</option><option value="0.3333">1/8 trip</option><option value="0">off</option></select></label>
-      <button id="midiPlay" class="mini" title="Audition this clip (loops)">▶ Play</button>
-      <button id="midiRecBtn" class="mini" title="Arm recording — play the keyboard below (QWERTY / on-screen / hardware MIDI) and notes land on the grid at the playhead">● Record</button>
+      <button id="midiPlay" class="mini" title="Audition this clip (loops)"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Play</button>
+      <button id="midiRecBtn" class="mini" title="Arm recording — play the keyboard below (QWERTY / on-screen / hardware MIDI) and notes land on the grid at the playhead"><svg class="svi" aria-hidden="true"><use href="#i-record"/></svg> Record</button>
       <button id="midiQuant" class="mini" title="Snap selected notes (or all) to the grid">Quantize</button>
       <button id="midiClear" class="mini" title="Remove all notes">Clear</button>
-      <button id="midiFxBtn" class="mini" title="This layer's FX & level — phaser, chorus, delay, reverb, drive, compressor (per-layer)">🎛 FX</button>
-      <button id="midiInKeyBtn" class="mini" title="In-key only — snap new/moved notes to the key at each note's beat (toggle off for chromatic freedom)">🎵 In-key only</button>
-      <button id="midiScaleFocusBtn" class="mini" title="Scale focus — dim the off-key rows so only in-key lanes show (notes stay put; out-of-key notes go red so you can fix them)">👁 Scale focus</button>
+      <button id="midiFxBtn" class="mini" title="This layer's FX & level — phaser, chorus, delay, reverb, drive, compressor (per-layer)"><svg class="svi" aria-hidden="true"><use href="#i-sliders"/></svg> FX</button>
+      <button id="midiInKeyBtn" class="mini" title="In-key only — snap new/moved notes to the key at each note's beat (toggle off for chromatic freedom)"><svg class="svi" aria-hidden="true"><use href="#i-music"/></svg> In-key only</button>
+      <button id="midiScaleFocusBtn" class="mini" title="Scale focus — dim the off-key rows so only in-key lanes show (notes stay put; out-of-key notes go red so you can fix them)"><svg class="svi" aria-hidden="true"><use href="#i-eye"/></svg> Scale focus</button>
       <button id="midiAddKeyBtn" class="mini" title="Add a key/mode change inside this clip (e.g. a different key for the chorus) — give your loop a verse and a chorus in different keys"><svg class="svi" aria-hidden="true"><use href="#i-plus"/></svg> Key change</button>
-      <button id="midiLibBtn" class="mini" title="Drop in a common chord progression or arp for your genre — rendered in the current key">📚 Patterns</button>
+      <button id="midiLibBtn" class="mini" title="Drop in a common chord progression or arp for your genre — rendered in the current key"><svg class="svi" aria-hidden="true"><use href="#i-book"/></svg> Patterns</button>
       <label class="midi-tl-field">Zoom <button id="midiZoomOut" class="mini" title="Zoom out (⌃-scroll / pinch)">−</button><button id="midiZoomIn" class="mini" title="Zoom in (⌃-scroll / pinch)">+</button></label>
       <span class="hint" style="margin-left:auto;max-width:260px">Click = add · drag = move · edge = resize · ⌃-scroll/pinch = zoom · <b>Del</b></span>
     </div>
     <div id="midiKeyChips" class="tlkey-chips"></div>
     <div id="midiRollWrap"><div id="midiKeyRuler"></div><div id="midiRoll"></div></div>
     <div id="midiLib" class="midi-lib" style="display:none">
-      <div class="midi-lib-head"><b>📚 Pattern library</b><button id="midiLibClose" class="mini"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+      <div class="midi-lib-head"><b><svg class="svi" aria-hidden="true"><use href="#i-book"/></svg> Pattern library</b><button id="midiLibClose" class="mini"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
       <div class="row" style="gap:8px;align-items:flex-end;margin:6px 0"><div class="group" style="flex:1"><label for="midiLibGenre">Genre</label><select id="midiLibGenre" style="width:100%"></select></div></div>
       <div class="hint" style="margin:0 0 6px">Rendered in <b id="midiLibKey">C major</b>. ▶ preview · ＋ adds to this clip after the last note.</div>
       <div id="midiLibList" class="midi-lib-list"></div>
@@ -1729,7 +1742,7 @@
 </div>
 <div id="tunerModal" class="modal" style="display:none">
   <div class="modal-box" style="max-width:680px">
-    <div class="modal-head"><b>🎸 Instrument tuner</b><button id="tunerClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-tuner"/></svg> Instrument tuner</b><button id="tunerClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" style="margin-top:0">Pick an instrument &amp; tuning, then <b>enable the mic and pluck a string</b> — the meter shows how many cents sharp/flat you are and snaps to the nearest string. Click a string to hear its reference pitch.</div>
     <div class="row ctl-row" style="gap:16px;align-items:flex-end;margin:14px 0">
       <div class="group"><label for="tunerInst">Instrument</label><select id="tunerInst"></select></div>
@@ -1737,7 +1750,7 @@
     </div>
     <div class="tuner-meter" id="tunerMeter">
       <div class="tm-top">
-        <button id="tunerMicBtn" class="mini">🎤 Enable mic</button>
+        <button id="tunerMicBtn" class="mini"><svg class="svi" aria-hidden="true"><use href="#i-mic"/></svg> Enable mic</button>
         <div class="tm-note" id="tmNote">—</div>
         <div class="tm-target" id="tmTarget">enable the mic, then pluck a string</div>
       </div>
@@ -1754,7 +1767,7 @@
 <!-- Lyrics generation wizard -->
 <div id="lyrWizModal" class="modal" style="display:none">
   <div class="modal-box"><div class="modal-inner">
-    <div class="modal-head"><b>✨ Generate lyrics</b><button id="lyrWizClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-wand"/></svg> Generate lyrics</b><button id="lyrWizClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" style="margin-top:0">Configure the song; the AI (your Settings model — e.g. Gemini via OpenRouter) writes a structured lyric sheet in Pitch Studio's format (key, mode, tempo, sections, singers) that you can tweak, sync and reword. <b>Artist/song references are only used to infer a style — their names never appear in the output.</b></div>
     <div class="lyrwiz-grid">
       <label class="lw-full">What's the song about?<textarea id="lwTheme" rows="2" placeholder="e.g. shaking off a bad week and going out anyway"></textarea></label>
@@ -1790,7 +1803,7 @@
 <!-- Lyrics mulligan (reword selection → 6 variations) -->
 <div id="lyrMullModal" class="modal" style="display:none">
   <div class="modal-box"><div class="modal-inner">
-    <div class="modal-head"><b>✨ Reword selection</b><button id="lyrMullClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-wand"/></svg> Reword selection</b><button id="lyrMullClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" style="margin-top:0">The AI rewrites just your selected lines in the context of the whole song and returns 6 options. Pick one to drop in, edit it first, or reprompt.</div>
     <label class="lw-full lm-lab">Selected<textarea id="lmSel" rows="3" readonly></textarea></label>
     <label class="lw-full lm-lab">What do you want changed? <span class="dim">(optional)</span><textarea id="lmComments" rows="2" placeholder="e.g. punchier, keep the rhyme, less cheesy"></textarea></label>
@@ -1809,7 +1822,7 @@
     <div class="hint" id="pitchHint" style="margin-top:0">Click a step at a pitch to place a hit; click it again to remove it. Drag a hit up/down to retune it (it re-triggers as you move). One hit per step.</div>
     <div class="row" style="margin-bottom:8px">
       <div class="group" id="pitchModeGroup"><label>Scale lock</label><button id="pitchModeLock" class="mini" title="Snap drags to the current musical mode">Off</button></div>
-      <div class="group"><label>&nbsp;</label><button id="pitchPrevBtn">▶ Preview</button></div>
+      <div class="group"><label>&nbsp;</label><button id="pitchPrevBtn"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Preview</button></div>
       <div class="group"><label>&nbsp;</label><button id="pitchResetBtn">Reset pitches</button></div>
       <div class="spacer"></div>
     </div>
@@ -1833,9 +1846,9 @@
     <div class="memo-sum" id="memoSummary"></div>
     <div class="row" style="margin-bottom:12px">
       <div class="group"><label for="memoKeySel">Analysis key</label><select id="memoKeySel"></select></div>
-      <div class="group"><label>&nbsp;</label><button id="memoReanalyze">↻ Re-analyze</button></div>
+      <div class="group"><label>&nbsp;</label><button id="memoReanalyze"><svg class="svi" aria-hidden="true"><use href="#i-rotate"/></svg> Re-analyze</button></div>
       <div class="group"><label>Downbeat</label><div class="tr-row"><button id="memoDbL" class="mini">◀</button><button id="memoDbR" class="mini">▶</button></div></div>
-      <div class="group"><label>&nbsp;</label><button id="memoPlayBtn">▶ Play memo</button></div>
+      <div class="group"><label>&nbsp;</label><button id="memoPlayBtn"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Play memo</button></div>
       <div class="group"><label>Zoom <span class="dim">— pinch or ctrl+scroll works too</span></label><div class="tr-row"><button id="memoZoomOut" class="mini">−</button><button id="memoZoomReset" class="mini" title="Back to 100% (fit)">100%</button><button id="memoZoomIn" class="mini">＋</button></div></div>
       <div class="spacer"></div>
       <div class="group"><label>&nbsp;</label><button id="memoUseKey" title="Set the project key & mode to this memo's key">Use key in project</button></div>
@@ -1859,7 +1872,7 @@
     <div class="memo-chips" id="memoChips"></div>
     <h2 class="subhead">Lyrics</h2>
     <div class="row" style="margin-bottom:8px; align-items:flex-end">
-      <div class="group"><label>&nbsp;</label><button id="memoTranscribe" title="AI speech-to-text, run locally in your browser — nothing is uploaded">📝 Transcribe lyrics</button></div>
+      <div class="group"><label>&nbsp;</label><button id="memoTranscribe" title="AI speech-to-text, run locally in your browser — nothing is uploaded"><svg class="svi" aria-hidden="true"><use href="#i-file"/></svg> Transcribe lyrics</button></div>
       <div class="group"><label for="memoLangSel">Language</label><select id="memoLangSel" title="The language being sung/spoken. Forcing one language avoids garbled multilingual guesses — pick Auto only for mixed-language songs (e.g. Spanglish)"></select></div>
       <div class="group"><label for="memoModelSel">Model</label>
         <select id="memoModelSel" style="max-width:240px" title="Speech-to-text model. Recommended tiers are A/B-tested on real vocals (bigger = more accurate, one-time cached download). Experimental and custom entries let you trial other transformers.js-compatible models."></select>
@@ -1889,7 +1902,7 @@
   <label>Key / mode change <span id="keyPopupAt" class="dim" style="font-weight:400"></span></label>
   <div class="row" style="gap:6px;flex-wrap:nowrap"><select id="keyPopRoot"></select><select id="keyPopMode"></select></div>
   <div class="ksug-mood-now" id="keyPopMood"></div>
-  <div class="row" style="gap:6px;margin-top:8px"><button id="keyPopSave" class="primary mini">✓ Save</button><button id="keyPopDel" class="mini" title="Remove this key change">🗑 Delete</button></div>
+  <div class="row" style="gap:6px;margin-top:8px"><button id="keyPopSave" class="primary mini">✓ Save</button><button id="keyPopDel" class="mini" title="Remove this key change"><svg class="svi" aria-hidden="true"><use href="#i-trash"/></svg> Delete</button></div>
   <div class="key-sugg-head">Smooth changes from <b id="keySuggFrom">—</b> <span class="dim">· click to apply</span></div>
   <div id="keySugg" class="key-sugg"></div>
 </div>
@@ -1925,7 +1938,7 @@
 <div id="structPopup" class="popup" style="display:none; z-index:140">
   <label>Song section <span id="structPopAt" class="dim" style="font-weight:400"></span></label>
   <div class="row" style="gap:6px;flex-wrap:nowrap;align-items:center"><select id="structType"></select><input id="structBars" type="number" min="1" max="128" style="width:60px"><span class="dim" style="font-size:11px">bars</span></div>
-  <div class="row" style="gap:6px;margin-top:8px"><button id="structSave" class="primary mini">✓ Save</button><button id="structDel" class="mini" title="Remove this section">🗑 Delete</button></div>
+  <div class="row" style="gap:6px;margin-top:8px"><button id="structSave" class="primary mini">✓ Save</button><button id="structDel" class="mini" title="Remove this section"><svg class="svi" aria-hidden="true"><use href="#i-trash"/></svg> Delete</button></div>
 </div>
 
 <!-- Sessions modal -->
@@ -1935,7 +1948,7 @@
     <div class="modal-save">
       <input id="sessLabel" type="text" placeholder="Session label" />
       <input id="sessDesc" type="text" placeholder="Description (optional)" />
-      <button id="sessSaveBtn" class="primary">💾 Save current</button>
+      <button id="sessSaveBtn" class="primary"><svg class="svi" aria-hidden="true"><use href="#i-save"/></svg> Save current</button>
     </div>
     <div class="modal-list" id="sessList"></div>
   </div>
@@ -3126,7 +3139,7 @@ function openBeatClip(track, clip){
   beatPitch={}; if(clip.pitch) Object.keys(clip.pitch).forEach(k=>beatPitch[k]=clip.pitch[k]);
   renderGrid(); updateBeatLen(); selectedTrackId=track.id; setBeatEditTarget(track, clip);
   document.getElementById("cemName").value=clip.name||"";
-  openSectionModal("beat", "🥁 Beat clip — "+(clip.name||track.name));
+  openSectionModal("beat", "Beat clip — "+(clip.name||track.name));
 }
 beatAddBtn.addEventListener("click",()=>{
   if (!beatGrid.some(row=>row.some(Boolean))){ flash(beatAddBtn,"Program some hits first"); return; }
@@ -3152,14 +3165,14 @@ let editingSampler=null;   // when set, the sampler editor saves back to this cl
 function setSamplerEditTarget(t,c){ editingSampler=(t&&c)?{track:t,clip:c}:null; const b=document.getElementById("sampAddBtn"); if(b){ b.textContent=editingSampler?"✓ Update clip":"＋ Timeline"; b.title=editingSampler?"Save this pattern back to this clip":"Add this pattern to a Sampler lane"; } }
 function openSamplerClip(track, clip){
   document.getElementById("cemName").value=clip.name||"";
-  if(clip.kind==="loop"){ setSamplerEditTarget(null); selectedTrackId=track.id; openSectionModal("sampler", "🔁 Sampler loop — "+(clip.name||track.name)); return; }
+  if(clip.kind==="loop"){ setSamplerEditTarget(null); selectedTrackId=track.id; openSectionModal("sampler", "Sampler loop — "+(clip.name||track.name)); return; }
   const cols=(clip.grid&&clip.grid[0])?clip.grid[0].length:sampStepsCount();
   samplerEdit.bars=Math.max(1, Math.round(cols/stepsPerBar())); if(sampBarsSel) sampBarsSel.value=String(samplerEdit.bars);
   sampEnsureGrid();
   samplerEdit.grid=samplerEdit.grid.map((row,r)=>{ const out=new Array(sampStepsCount()).fill(false); const src=clip.grid&&clip.grid[r]; if(src) for(let s=0;s<Math.min(src.length,out.length);s++) out[s]=!!src[s]; return out; });
   samplerEdit.pitch={}; if(clip.pitch) Object.keys(clip.pitch).forEach(k=>samplerEdit.pitch[k]=clip.pitch[k]);
   renderSampGrid(); updateSampLen(); selectedTrackId=track.id; setSamplerEditTarget(track, clip);
-  openSectionModal("sampler", "🎛 Sampler clip — "+(clip.name||track.name));
+  openSectionModal("sampler", "Sampler clip — "+(clip.name||track.name));
 }
 let sampPrev={ playing:false, step:0, timer:null };
 let sampDragIdx=-1, sampLoadIdx=-1;
@@ -3629,7 +3642,7 @@ function renderTimeline(){
     met.addEventListener("click",(e)=>e.stopPropagation());
     met.addEventListener("change",(e)=>{ e.stopPropagation(); if(met.value){ const [n,d]=met.value.split("/").map(Number); track.meter={num:n,den:d}; } else delete track.meter; renderTimeline(); scheduleAutosave(); });
     tname.appendChild(met);
-    // every action is a consistent chip button; icon-only only where the icon is unambiguous (🗑)
+    // every action is a consistent chip button; icon-only where the icon is unambiguous (trash, sliders)
     const mkBtn=(html,title,cls,fn)=>{ const b=document.createElement("button"); b.className="thd-btn"+(cls?" "+cls:""); b.innerHTML=html; b.title=title; b.addEventListener("click",(e)=>{ e.stopPropagation(); fn(); }); acts.appendChild(b); return b; };
     mkBtn("FX","Track FX & level","",()=>openFxModal(track));
     mkBtn(icon("sliders")+(track._autoParam?(" "+AUTO_PARAMS[track._autoParam].label):""), "Automation lane — click to cycle off → volume → pan → cutoff, then click the lane to add points (drag to shape, right-click to delete)", track._autoParam?"on":"", ()=>{ const order=[null,"volume","pan","cutoff"]; track._autoParam=order[(order.indexOf(track._autoParam)+1)%order.length]; renderTimeline(); });
@@ -3794,13 +3807,13 @@ bindClipNameInput(document.getElementById("cemName"), ()=>(editingBeat&&editingB
 function openClipMenu(track, clip, x, y, atSec){
   closeClipMenu();
   const m=document.createElement("div"); m.className="clip-menu"; clipMenuEl=m;
-  const add=(label,fn)=>{ const b=document.createElement("button"); b.textContent=label; b.addEventListener("click",(e)=>{ e.stopPropagation(); closeClipMenu(); fn(); }); m.appendChild(b); };
-  add(clip.name?"✎ Rename…":"✎ Add label…", ()=>renameClip(track, clip));
-  if(track.type==="midi"||track.type==="voice"||track.type==="memo") add("✂ Split here", ()=>splitClipAt(track, clip, atSec));
-  add("⧉ Duplicate", ()=>duplicateClip(track, clip));
-  add("📋 Copy", ()=>copyClip(track, clip));
-  if(clipboard && clipboard.type===track.type) add("📎 Paste here", ()=>pasteClipAt(track, atSec));
-  add("🗑 Delete", ()=>commit("delete clip",()=>{ track.clips=track.clips.filter(c=>c.id!==clip.id); renderTimeline(); }));
+  const add=(label,fn)=>{ const b=document.createElement("button"); b.innerHTML=label; b.addEventListener("click",(e)=>{ e.stopPropagation(); closeClipMenu(); fn(); }); m.appendChild(b); };
+  add(clip.name?(icon("edit")+" Rename…"):(icon("edit")+" Add label…"), ()=>renameClip(track, clip));
+  if(track.type==="midi"||track.type==="voice"||track.type==="memo") add(icon("cut")+" Split here", ()=>splitClipAt(track, clip, atSec));
+  add(icon("copy")+" Duplicate", ()=>duplicateClip(track, clip));
+  add(icon("copy")+" Copy", ()=>copyClip(track, clip));
+  if(clipboard && clipboard.type===track.type) add(icon("clipboard")+" Paste here", ()=>pasteClipAt(track, atSec));
+  add(icon("trash")+" Delete", ()=>commit("delete clip",()=>{ track.clips=track.clips.filter(c=>c.id!==clip.id); renderTimeline(); }));
   document.body.appendChild(m);
   m.style.left=Math.min(x, window.innerWidth-170)+"px"; m.style.top=Math.min(y, window.innerHeight-m.offsetHeight-8)+"px";
 }
@@ -4010,7 +4023,7 @@ function updateCollabUI(){
   const open=rtcOpenPeers().length, live=open>0;
   const people=collab.roster.length ? collab.roster.slice() : [{id:collab.selfId,name:collab.selfName||"You",self:true}].concat(rtcOpenPeers().map(p=>({id:p.id,name:p.name||"peer"})));
   const btn=document.getElementById("collabBtn");
-  if(btn){ btn.classList.toggle("connected", live); btn.innerHTML = live ? ('<span class="collab-dot"></span> Live · '+people.length) : "👥 Collab"; btn.title = live ? "Live session ("+people.length+") — click to manage or invite more" : "Live collaborate — connect peers, no server"; }
+  if(btn){ btn.classList.toggle("connected", live); btn.innerHTML = live ? ('<span class="collab-dot"></span> Live · '+people.length) : (icon("users")+" Collab"); btn.title = live ? "Live session ("+people.length+") — click to manage or invite more" : "Live collaborate — connect peers, no server"; }
   const list=document.getElementById("collabRoster");
   if(list) list.innerHTML = people.map(p=>'<span class="collab-peer"><span class="collab-dot"></span>'+escapeHtml(p.name||"peer")+(p.self?" (you)":"")+'</span>').join("");
 }
@@ -4207,7 +4220,7 @@ async function rtcJoin(input){
     const url=buildSignalUrl(signalBaseUrl(),"reply", await packSignal(peer.pc.localDescription));
     showSignalOut("reply", url); collabStep("join");
     let copied=false; try{ await navigator.clipboard.writeText(url); copied=true; }catch(e){}
-    rtcStatus(copied?"📋 Reply copied — send it to your host.":"Send your reply link back to your host."); }
+    rtcStatus(copied?"Reply copied — send it to your host.":"Send your reply link back to your host."); }
   catch(e){ rtcStatus("Couldn't join: "+(e.message||e)); }
 }
 // clicked an invite link → auto-open collab in join mode and generate the reply
@@ -4218,7 +4231,7 @@ function checkInviteUrl(){
   collab.joinedViaLink=true;
   m.style.display="flex";
   collabStep("join");   // we already have the invite — go straight to "send your reply back", no chooser/paste
-  rtcStatus("🔗 Joining — preparing your reply…");
+  rtcStatus("Joining — preparing your reply…");
   rtcJoin(location.href);
   try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){}   // don't re-trigger on refresh
 }
@@ -4468,7 +4481,7 @@ function addLayer(type){
 (function wireAddLayer(){
   const modal=document.getElementById("addLayerModal"), grid=document.getElementById("layerGrid");
   LAYER_TYPES.forEach(L=>{ const card=document.createElement("button"); card.className="layer-card"; card.dataset.type=L.type;
-    card.innerHTML='<span class="lc-ico">'+L.icon+'</span><span class="lc-body"><span class="lc-name">'+L.name+'</span><span class="lc-desc">'+L.desc+'</span></span>';
+    card.innerHTML='<span class="lc-ico" style="color:var(--type-'+L.type+')">'+icon(TYPE_ICON[L.type]||"music")+'</span><span class="lc-body"><span class="lc-name">'+L.name+'</span><span class="lc-desc">'+L.desc+'</span></span>';
     card.addEventListener("click",()=>{ modal.style.display="none"; addLayer(L.type); });
     grid.appendChild(card);
   });
@@ -4800,7 +4813,7 @@ function drawClipPreview(canvas, track, clip, durSec){
   }
 }
 function buildMemoClipEl(el, track, clip, dur){
-  el.innerHTML='<div class="m-chords"></div><canvas height="56"></canvas><div class="m-lyrics"></div><div class="m-edit" title="Open the memo editor">✎ memo</div><div class="cdel">✕</div>'+(clip.analyzing?'<div class="m-busy">analyzing…</div>':'');
+  el.innerHTML='<div class="m-chords"></div><canvas height="56"></canvas><div class="m-lyrics"></div><div class="m-edit" title="Open the memo editor"><svg class="svi" aria-hidden="true"><use href="#i-edit"/></svg> memo</div><div class="cdel">✕</div>'+(clip.analyzing?'<div class="m-busy">analyzing…</div>':'');
   const wPx=Math.max(16, Math.round(dur*PX_PER_SEC-2));
   const cv=el.querySelector("canvas"); cv.width=Math.min(16000,wPx); cv.height=56; cv.style.width=wPx+"px";
   if (clip.buffer) drawMemoWave(cv, clip);
@@ -8161,8 +8174,8 @@ kbTransBtn.addEventListener("click",()=>setKbMode("transpose"));
 (function wireScaleLock(){
   const b=document.getElementById("kbScaleLockBtn"); if(!b) return;
   try { if (localStorage.getItem("ps_kb_scalelock")==="0") kbScaleLock=false; } catch(_){}
-  b.classList.toggle("seg-on", kbScaleLock); b.textContent = kbScaleLock ? "🎵 In-key only" : "🎹 All keys";
-  b.addEventListener("click",()=>{ kbScaleLock=!kbScaleLock; try { localStorage.setItem("ps_kb_scalelock", kbScaleLock?"1":"0"); } catch(_){} if(typeof syncInKeyBtns==="function") syncInKeyBtns(); else { b.classList.toggle("seg-on",kbScaleLock); b.textContent=kbScaleLock?"🎵 In-key only":"🎹 All keys"; } });
+  b.classList.toggle("seg-on", kbScaleLock); b.innerHTML = kbScaleLock ? (icon("music")+" In-key only") : (icon("keyboard")+" All keys");
+  b.addEventListener("click",()=>{ kbScaleLock=!kbScaleLock; try { localStorage.setItem("ps_kb_scalelock", kbScaleLock?"1":"0"); } catch(_){} if(typeof syncInKeyBtns==="function") syncInKeyBtns(); else { b.classList.toggle("seg-on",kbScaleLock); b.innerHTML=kbScaleLock?(icon("music")+" In-key only"):(icon("keyboard")+" All keys"); } });
 })();
 document.getElementById("trMinusOct").addEventListener("click",()=>nudgeTranspose(-12));
 document.getElementById("trMinusW").addEventListener("click",()=>nudgeTranspose(-2));
@@ -8307,7 +8320,7 @@ function startTunerDrone(midi){
   g.connect(ctx.destination);   // straight to output so the reference is always audible regardless of master level
   tunerDrone={ctx,oscs,g,midi};
 }
-function syncTunerMic(){ const b=document.getElementById("tunerMicBtn"); if(!b) return; const on=!!(micStream&&micStream.active); b.textContent=on?"⏹ Stop mic":"🎤 Enable mic"; b.classList.toggle("on",on); }
+function syncTunerMic(){ const b=document.getElementById("tunerMicBtn"); if(!b) return; const on=!!(micStream&&micStream.active); b.innerHTML=on?(icon("stop")+" Stop mic"):(icon("mic")+" Enable mic"); b.classList.toggle("on",on); }
 function tunerLiveUpdate(midiFloat, held){
   if(!tunerOpen) return; const meter=document.getElementById("tunerMeter"); if(!meter) return;
   const note=document.getElementById("tmNote"), tgt=document.getElementById("tmTarget"), needle=document.getElementById("tmNeedle"), centsEl=document.getElementById("tmCents");
@@ -8686,7 +8699,7 @@ function renderInstViz(containerId, type){
       lane.appendChild(blk);
     });
     row.appendChild(lane);
-    const del=document.createElement("button"); del.className="inst-viz-del"; del.textContent="🗑"; del.title="Delete this layer";
+    const del=document.createElement("button"); del.className="inst-viz-del"; del.innerHTML=icon("trash"); del.title="Delete this layer";
     del.addEventListener("click",(e)=>{ e.stopPropagation();
       if(!confirm('Delete the "'+t.name+'" layer'+(t.clips.length?(" and its "+t.clips.length+" clip(s)"):"")+"?")) return;
       project.tracks=project.tracks.filter(x=>x.id!==t.id);
@@ -8841,7 +8854,7 @@ function midiAddKeyChange(){
   openKeyPopup(reg, blk||document.getElementById("midiAddKeyBtn"));
 }
 function midiZoom(factor){ MR.BEAT_PX=clamp(Math.round(MR.BEAT_PX*factor), 22, 200); if(midiEd){ renderMidiRoll(); renderMidiCtrl(); } }
-function syncInKeyBtns(){ const v=!!kbScaleLock; const mb=document.getElementById("midiInKeyBtn"); if(mb){ mb.classList.toggle("on",v); mb.textContent=v?"🎵 In-key only":"🎹 All keys"; } const fb=document.getElementById("kbScaleLockBtn"); if(fb){ fb.classList.toggle("seg-on",v); fb.textContent=v?"🎵 In-key only":"🎹 All keys"; } }
+function syncInKeyBtns(){ const v=!!kbScaleLock; const mb=document.getElementById("midiInKeyBtn"); if(mb){ mb.classList.toggle("on",v); mb.innerHTML=v?(icon("music")+" In-key only"):(icon("keyboard")+" All keys"); } const fb=document.getElementById("kbScaleLockBtn"); if(fb){ fb.classList.toggle("seg-on",v); fb.innerHTML=v?(icon("music")+" In-key only"):(icon("keyboard")+" All keys"); } }
 (function wireMidiInKey(){ const b=document.getElementById("midiInKeyBtn"); if(b) b.addEventListener("click",()=>{ kbScaleLock=!kbScaleLock; try{localStorage.setItem("ps_kb_scalelock",kbScaleLock?"1":"0");}catch(_){} syncInKeyBtns(); if(midiEd) renderMidiRoll(); }); })();
 (function wireEditorKeySelectors(){
   const mr=document.getElementById("midiKeyRoot"), mm=document.getElementById("midiKeyMode");
