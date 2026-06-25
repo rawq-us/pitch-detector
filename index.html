@@ -3379,8 +3379,9 @@ document.getElementById("clipEditorModal").addEventListener("mousedown",(e)=>{ i
 /* ---- voice clip editor: waveform + in/out trim + gain ---- */
 let voiceEd=null;   // { track, clip, src, raf }
 function voiceDur(){ const c=voiceEd&&voiceEd.clip; return c ? (c.audioDur || (c.buffer?c.buffer.duration:1)) : 1; }
-function openVoiceClip(track, clip){
-  if(!clip.buffer){ alert("This clip's audio is still decoding — try again in a moment."); return; }
+async function openVoiceClip(track, clip){
+  if(!clip.buffer && clip.blob){ try { clip.buffer=await decodeBlob(clip.blob, getCtx()); if(clip.buffer){ clip.audioDur=clip.buffer.duration; renderTimeline(); } } catch(e){} }
+  if(!clip.buffer){ alert("This clip's audio could not be decoded. If you just reloaded, try again in a moment; otherwise the stored audio may be unavailable."); return; }
   voiceEd={ track, clip, src:null, raf:null };
   setText("voiceTitle", clip.name||track.name);
   document.getElementById("voiceClipName").value=clip.name||"";
@@ -6645,10 +6646,26 @@ function exportMIDI(){
 
 /* ============================== Sessions (IndexedDB) ============================== */
 const DB_NAME="pitchStudioDB", DB_VER=2, STORE="sessions", AUTO_STORE="autosave";
+// Safari/WebKit drops the backing store of Blobs persisted in IndexedDB — after a reload, reading a
+// stored Blob fails with "WebKitBlobResource error 1", so audio clips never decode. Persist audio as
+// ArrayBuffers instead (structured clone copies them BY VALUE, so they always read back intact).
+// On-disk record: { __ab:true, type, buf:ArrayBuffer }. Old saves keep raw Blobs; unpack passes those through.
+async function blobToStore(b){ try { return { __ab:true, type:(b&&b.type)||"application/octet-stream", buf:await b.arrayBuffer() }; } catch(e){ return null; } }
+function storeToBlob(v){ return (v && v.__ab && v.buf) ? new Blob([v.buf], { type:v.type||"application/octet-stream" }) : v; }
+async function packAudioForStore(data){ if(!data) return data;
+  for(const t of (data.tracks||[])) for(const c of (t.clips||[])){ if(c && c.blob instanceof Blob) c.blob=await blobToStore(c.blob); }
+  for(const p of (data.samplerKit||[])){ if(p && p.blob instanceof Blob) p.blob=await blobToStore(p.blob); }
+  if(data.meta && data.meta.coverBlob instanceof Blob) data.meta.coverBlob=await blobToStore(data.meta.coverBlob);
+  return data; }
+function unpackAudioFromStore(data){ if(!data) return data;
+  for(const t of (data.tracks||[])) for(const c of (t.clips||[])){ if(c && c.blob) c.blob=storeToBlob(c.blob); }
+  for(const p of (data.samplerKit||[])){ if(p && p.blob) p.blob=storeToBlob(p.blob); }
+  if(data.meta && data.meta.coverBlob) data.meta.coverBlob=storeToBlob(data.meta.coverBlob);
+  return data; }
 function openDB(){ return new Promise((res,rej)=>{ const r=indexedDB.open(DB_NAME,DB_VER); r.onupgradeneeded=e=>{ const db=e.target.result; if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE,{keyPath:"id",autoIncrement:true}); if (!db.objectStoreNames.contains(AUTO_STORE)) db.createObjectStore(AUTO_STORE); }; r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
 // Autosave: the live working session (tracks, audio blobs, sampler kit, meta) is mirrored
 // to IndexedDB so a page reload restores exactly where you left off — clips and all.
-async function saveAutosave(){ try { const db=await openDB(); const data=serializeProject(); await new Promise((res)=>{ const tx=db.transaction(AUTO_STORE,"readwrite"); tx.objectStore(AUTO_STORE).put({ label:currentLabel, sessionId:currentSessionId, savedAt:Date.now(), data }, "current"); tx.oncomplete=res; tx.onerror=res; }); } catch(e){} }
+async function saveAutosave(){ try { const db=await openDB(); const data=await packAudioForStore(serializeProject()); await new Promise((res)=>{ const tx=db.transaction(AUTO_STORE,"readwrite"); tx.objectStore(AUTO_STORE).put({ label:currentLabel, sessionId:currentSessionId, savedAt:Date.now(), data }, "current"); tx.oncomplete=res; tx.onerror=res; }); } catch(e){} }
 async function loadAutosave(){ try { const db=await openDB(); return await new Promise((res)=>{ const tx=db.transaction(AUTO_STORE,"readonly"); const req=tx.objectStore(AUTO_STORE).get("current"); req.onsuccess=()=>res(req.result); req.onerror=()=>res(null); }); } catch(e){ return null; } }
 let autosaveTimer=null, autosaveReady=false;
 function scheduleAutosave(){ if (!autosaveReady) return; if (autosaveTimer) clearTimeout(autosaveTimer); autosaveTimer=setTimeout(()=>{ autosaveTimer=null; saveAutosave(); }, 1500); }
@@ -6683,6 +6700,7 @@ function serializeProject(){
   };
 }
 function loadProject(data){
+  unpackAudioFromStore(data);
   if(typeof editHistory!=="undefined"){ editHistory.clear(); if(typeof updateUndoUI==="function") updateUndoUI(); }   // undo doesn't cross a session load
   project.sessionId = data.sessionId || uuid();   // a loaded song keeps its identity across machines (mint if pre-v4)
   project.syncBase = data.syncBase || null;
@@ -6887,7 +6905,7 @@ function splitClipData(type, c, atBeat, lenBeats){
 }
 
 // id given → overwrite that session (Save); id null → create a new one (Save As). Resolves the id.
-async function saveSession(label, desc, data, id){ const db=await openDB(); const rec={ label, description:desc||"", version:FORMAT_VERSION, savedAt:Date.now(), data: data||serializeProject() }; if(id!=null) rec.id=id; return new Promise((res,rej)=>{ const tx=db.transaction(STORE,"readwrite"); const st=tx.objectStore(STORE); const req=(id!=null)?st.put(rec):st.add(rec); req.onsuccess=()=>res(req.result); tx.onerror=()=>rej(tx.error); }); }
+async function saveSession(label, desc, data, id){ const db=await openDB(); const rec={ label, description:desc||"", version:FORMAT_VERSION, savedAt:Date.now(), data: await packAudioForStore(data||serializeProject()) }; if(id!=null) rec.id=id; return new Promise((res,rej)=>{ const tx=db.transaction(STORE,"readwrite"); const st=tx.objectStore(STORE); const req=(id!=null)?st.put(rec):st.add(rec); req.onsuccess=()=>res(req.result); tx.onerror=()=>rej(tx.error); }); }
 
 /* ====== Built-in demo: Bach Prelude in C (BWV 846) over a trap beat ====== */
 const DEMO_BPM = 80, DEMO_LABEL = "Bach Prelude in C — Trap (demo)";
