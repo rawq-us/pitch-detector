@@ -628,6 +628,9 @@
   .iconbtn { font-size: var(--fs-val); padding: 7px 12px; line-height: 1; display: inline-flex; align-items: center; gap: 6px; }
   /* collapsible + draggable sections */
   .csec { position: relative; margin-bottom: 0; }
+  .app-footer { text-align: center; padding: 28px 0 10px; }
+  .app-footer a { color: var(--faint); font-size: 12px; text-decoration: none; border-bottom: 1px dotted var(--border); }
+  .app-footer a:hover { color: var(--muted); }
   .csec.dragging { opacity: 0.45; outline: 2px dashed var(--accent-2); outline-offset: 2px; }
   .sec-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: grab; }
   .sec-head:active { cursor: grabbing; }
@@ -1024,7 +1027,6 @@
   </div>
   <input type="file" id="midiFileInput" accept=".mid,.midi,audio/midi" style="display:none">
   <h1 style="display:none">Pitch Studio</h1>
-  <div class="sub">Arrange arps &amp; beats on a beat-aligned timeline · play in-tune tones · detect pitch · record annotated memos (chords · notes · tempo · lyrics) · export MIDI &amp; save sessions. <a id="appVersion" href="https://github.com/rawq-us/pitch-detector/releases" target="_blank" rel="noopener" style="color:var(--muted);text-decoration:none;border-bottom:1px dotted var(--border)" title="Release notes — if this number is older than the latest release, hard-refresh (Cmd/Ctrl+Shift+R)"></a></div>
 
   <!-- ===== Timeline (top) ===== -->
   <div class="panel csec" data-key="timeline">
@@ -1351,6 +1353,7 @@
     </div>
     <div class="hint">The master bus is <b>EQ-only</b> (low shelf ~220 Hz · mid peak ~1 kHz · high shelf ~3.8 kHz). Per-layer effects — <b>level, drive, chorus, phaser, delay, reverb, compressor</b> — live on each track: click <b>FX</b> on a track header to open its rack.</div>
   </div>
+  <div class="app-footer"><a id="appVersion" href="https://github.com/rawq-us/pitch-detector/releases" target="_blank" rel="noopener" title="Release notes — if this number is older than the latest release, hard-refresh (Cmd/Ctrl+Shift+R)"></a></div>
 </div>
 
 <!-- Per-track FX modal -->
