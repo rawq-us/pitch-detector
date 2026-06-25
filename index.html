@@ -4453,7 +4453,7 @@ const bpmInput=document.getElementById("bpmInput"), tsSel=document.getElementByI
 function updateLoopButtons(){ loopBtn.classList.toggle("on",project.loopEnabled); loopBtn.innerHTML=icon("loop"); loopBtn.title="Loop "+(project.loopEnabled?"on — click to turn off":"off — click to turn on"); }
 // changing tempo / meter keeps the song the same number of BARS (seconds are derived) — the
 // bar-centric model: you compose in bars, not seconds
-bpmInput.addEventListener("input",()=>{ const bars=projectBars(); project.bpm=clamp(parseFloat(bpmInput.value)||90,20,400); updateMsReadout(); updateBeatLen(); applyDelaySync(); setLength(bars*barSec()); if (transport.playing){ transportStop(); transportPlay(); } });
+bpmInput.addEventListener("input",()=>{ const bars=projectBars(); project.bpm=clamp(parseFloat(bpmInput.value)||90,20,400); updateMsReadout(); updateBeatLen(); applyDelaySync(); setLength(bars*barSec()); if (transport.playing){ transportStop(); transportPlay(); } scheduleRewarp(); });
 tsSel.addEventListener("change",()=>{ const bars=projectBars(); const [n,d]=tsSel.value.split("/").map(Number); project.timeSig={num:n,den:d}; setBeatBars(beatBars); setLength(bars*barSec()); if (transport.playing){ transportStop(); transportPlay(); } });
 lenInput.addEventListener("input",()=>{ lenInput.value = lenInput.value.replace(/[^0-9]/g,""); });
 lenInput.addEventListener("change",()=>{ setLengthBars(parseInt(lenInput.value||"0",10)||8); });
@@ -5032,7 +5032,7 @@ document.getElementById("memoUseKey").addEventListener("click",()=>{
 });
 document.getElementById("memoUseBpm").addEventListener("click",()=>{
   const a=memoModalClip&&memoModalClip.analysis; if (!a||!a.bpm) return;
-  project.bpm=clamp(Math.round(a.bpm),20,400); bpmInput.value=project.bpm;
+  project.bpm=clamp(Math.round(a.bpm),20,400); bpmInput.value=project.bpm; scheduleRewarp();
   updateMsReadout(); updateBeatLen(); renderTimeline();
   flash(document.getElementById("memoUseBpm"),"✓ "+project.bpm+" BPM");
 });
@@ -5924,6 +5924,21 @@ function bakeWarp(clip){
   clip.warpedBuffer = applyWarpToBuffer(getCtx(), clip.buffer, clip.warp);
   clip.warpDur = clip.warpedBuffer ? clip.warpedBuffer.length / clip.warpedBuffer.sampleRate : null;
 }
+// When the project tempo changes, re-warp every flexed clip onto the NEW grid so the audio
+// keeps following the beat. Needs the detected beats (memo clips). Debounced — re-baking is heavy.
+let _rewarpTimer=null;
+function rewarpFlexedToTempo(){
+  let any=false;
+  (project.tracks||[]).forEach(t=>{ (t.clips||[]).forEach(c=>{
+    if (c.warp && c.buffer && c.analysis && c.analysis.beats && c.analysis.beats.length>=2 && Math.abs((c.warp.bpm||0)-project.bpm)>0.1){
+      const strength = c.warp.strength!=null ? c.warp.strength : 1;
+      c.warp = { anchors: flexAnchorsToGrid(c.analysis.beats.map(Number), { bpm:project.bpm, dur:c.buffer.duration, strength }), strength, bpm:project.bpm };
+      bakeWarp(c); any=true;
+    }
+  }); });
+  if (any){ if(typeof renderTimeline==="function") renderTimeline(); if (transport.playing){ transportStop(); transportPlay(); } if(typeof scheduleAutosave==="function") scheduleAutosave(); }
+}
+function scheduleRewarp(){ if(_rewarpTimer) clearTimeout(_rewarpTimer); _rewarpTimer=setTimeout(rewarpFlexedToTempo, 350); }
 
 /* ---- the DSP analysis worker (runs as a Blob worker; everything below is self-contained) ---- */
 function memoWorkerMain(){
@@ -7309,7 +7324,7 @@ async function aiChat(cfg, idea){
 function firstDrumVoice(group){ const norm={clap:"snare",openhat:"hat",closedhat:"hat",hihat:"hat",hats:"hat",cymbal:"hat",percussion:"perc"}; const g=norm[group]||group; const i=DRUM_GROUPS.indexOf(g); return i>=0?i:DRUM_GROUPS.indexOf("snare"); }
 function applyProjectSpec(spec){
   if (!spec||typeof spec!=="object") throw new Error("No spec");
-  if (spec.bpm){ project.bpm=clamp(Math.round(spec.bpm),20,300); bpmInput.value=project.bpm; }
+  if (spec.bpm){ project.bpm=clamp(Math.round(spec.bpm),20,300); bpmInput.value=project.bpm; scheduleRewarp(); }
   if (spec.key && spec.key.root!=null){ const r=NOTE_NAMES.indexOf(String(spec.key.root).replace("b","#").trim()); if (r>=0) rootSel.value=String(r); if (spec.key.mode && SCALES[spec.key.mode]) modeSel.value=spec.key.mode; applyScaleHighlight(); }
   if (spec.lengthBars){ setLength(Math.max(barSec(), Math.round(spec.lengthBars)*barSec())); }
   const made=[];
@@ -7328,7 +7343,7 @@ function applyProjectOps(ops){
   const WAVES=["sine","triangle","square","sawtooth"];
   ops.forEach(op=>{
     try { switch(op&&op.op){
-      case "setTempo": if(op.bpm){ project.bpm=clamp(Math.round(op.bpm),20,300); bpmInput.value=project.bpm; n++; } break;
+      case "setTempo": if(op.bpm){ project.bpm=clamp(Math.round(op.bpm),20,300); bpmInput.value=project.bpm; scheduleRewarp(); n++; } break;
       case "setKey": { const r=NOTE_NAMES.indexOf(String(op.root||"").replace("b","#").trim()); if(r>=0) rootSel.value=String(r); if(op.mode&&SCALES[op.mode]) modeSel.value=op.mode; applyScaleHighlight(); n++; } break;
       case "setLength": if(op.bars){ setLength(Math.max(barSec(), Math.round(op.bars)*barSec())); n++; } break;
       case "clearType": if(op.type){ project.tracks=project.tracks.filter(t=>t.type!==op.type); n++; } break;
