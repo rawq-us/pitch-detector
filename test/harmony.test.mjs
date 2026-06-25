@@ -20,7 +20,11 @@ const harness =
   extractFunction(src, "voiceLead") + "\n" +
   extractFunction(src, "chordSuffix") + "\n" +
   extractFunction(src, "progressionToText") + "\n" +
-  "; return { diatonicChords, suggestChords, suggestProgression, voiceLead, progressionToText };";
+  extractFunction(src, "degreesToProg") + "\n" +
+  extractFunction(src, "voiceProgression") + "\n" +
+  extractFunction(src, "backingDrumPattern") + "\n" +
+  extractFunction(src, "buildBacking") + "\n" +
+  "; return { diatonicChords, suggestChords, suggestProgression, voiceLead, progressionToText, degreesToProg, buildBacking };";
 const M = new Function(harness)();
 
 const pcOf = (m) => ((m % 12) + 12) % 12;
@@ -83,3 +87,21 @@ test("voiceLead places target tones in the octave nearest the previous voicing (
   // every note lands within a tritone of the previous chord's centre (~64) → no octave leaps
   assert.ok(to.every((m) => Math.abs(m - 64) <= 6), "tones stay near the register, minimizing travel");
 });
+
+// The AI Composer's addProgression op leans on this exact chain: scale DEGREES -> degreesToProg (voiced
+// in the current key) -> buildBacking (one voiced MIDI layer per role). Guard that the harmony stays in key.
+test("AI addProgression path: degrees I-V-vi-IV voice in-key with correct roots", () => {
+  const prog = M.degreesToProg([0, 4, 5, 3], 0, "ionian");          // C major
+  assert.deepEqual(prog.map(c => c.root), [0, 7, 9, 5]);            // C G Am F
+  assert.deepEqual(prog.map(c => c.quality), ["maj", "maj", "min", "maj"]);
+  const layers = M.buildBacking(prog, { bpb: 4, roles: ["pad", "bass"] });
+  const pad = layers.find(l => l.role === "pad"), bass = layers.find(l => l.role === "bass");
+  assert.equal(pad.type, "midi"); assert.equal(bass.type, "midi");
+  // bass roots land on each chord root pitch-class, in order
+  const bassDownbeats = bass.notes.filter(n => Math.abs((n.beat % 4)) < 1e-6).map(n => ((n.midi % 12) + 12) % 12);
+  assert.deepEqual(bassDownbeats, [0, 7, 9, 5]);
+  // every pad note belongs to its chord's triad (in key — no out-of-scale pitches)
+  const triad = { 0:[0,4,7], 7:[7,11,2], 9:[9,0,4], 5:[5,9,0] };
+  pad.notes.forEach(n => { const chordIdx = Math.floor(n.beat / 4), root = prog[chordIdx].root; assert.ok(triad[root].includes(((n.midi % 12) + 12) % 12), `pad pc in ${root} triad`); });
+});
+

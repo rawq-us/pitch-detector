@@ -7391,6 +7391,7 @@ function aiProjectSummary(){
     tracks: project.tracks.map(t=>{
       const o={ name:t.name, type:t.type, clips:t.clips.length };
       if (t.type==="arp" && t.clips[0]) o.notes=(t.clips[0].steps||[]).filter(s=>!s.rest).map(s=>s.midi);
+      else if (t.type==="midi" && t.clips[0]) o.notes=(t.clips[0].notes||[]).slice(0,48).map(n=>[n.midi, +(+n.beat||0).toFixed(2), +(+n.dur||1).toFixed(2)]);
       else if (t.type==="beat" && t.clips[0]){ const hit=new Set(); t.clips.forEach(c=>(c.grid||[]).forEach((row,r)=>{ if(row.some(Boolean)) hit.add(DRUMS[r].name); })); o.drums=[...hit]; }
       else if (t.type==="sampler") o.clipKinds=t.clips.map(c=>c.kind);
       return o;
@@ -7398,7 +7399,9 @@ function aiProjectSummary(){
     samplerPads: (project.samplerKit||[]).map((p,i)=> p?{ index:i, name:p.name, loop:!!p.loop }:null).filter(Boolean),
     styleTags: (typeof styleTagsList==="function" ? styleTagsList() : undefined),
     keyChanges: (typeof keyChangeSummary==="function" ? keyChangeSummary() : undefined),
-    lyrics: (typeof lyricsState!=="undefined" && lyricsState.doc && (lyricsState.doc.sections||[]).length) ? lyricsToAIPrompt(lyricsState.doc) : ((project.meta&&project.meta.lyrics)||"")
+    lyrics: (typeof lyricsState!=="undefined" && lyricsState.doc && (lyricsState.doc.sections||[]).length) ? lyricsToAIPrompt(lyricsState.doc) : ((project.meta&&project.meta.lyrics)||""),
+    structure: (project.structure||[]).map(s=>({ type:s.type, bar:Math.round((s.beat||0)/beatsPerBar())+1, bars:s.bars })),
+    diatonic: (function(){ const r=parseInt(rootSel.value,10)||0, m=modeSel.value; return (typeof diatonicChords==="function"?diatonicChords(r,m):[]).map((c,i)=>i+"="+c.roman); })()
   };
 }
 const AI_EDIT_PROMPT = "You are the editing engine for Pitch Studio, a browser DAW. The user message contains a request AND the current project as JSON. Reply with ONLY a JSON object (no prose, no code fences):\n"+
@@ -7413,6 +7416,9 @@ const AI_EDIT_PROMPT = "You are the editing engine for Pitch Studio, a browser D
   "{\"op\":\"clearType\",\"type\":\"<arp|beat|sampler>\"}\n"+
   "{\"op\":\"removeTrack\",\"name\":\"<exact track name>\"}\n"+
   "{\"op\":\"setLyrics\",\"text\":\"<lines, \\n separated>\"}\n"+
+  "{\"op\":\"addProgression\",\"degrees\":[<scale degrees 0-6, e.g. 0,4,5,3 = I-V-vi-IV>],\"roles\":[<any of \"pad\",\"bass\",\"arp\",\"drums\">],\"feel\":\"<straight|swung>\"}\n"+
+  "{\"op\":\"addMidi\",\"name\":\"<short layer name>\",\"notes\":[{\"midi\":<24-96>,\"beat\":<start, in notated beats from clip start>,\"dur\":<length in beats>,\"vel\":<1-127>}],\"loop\":<true|false>}\n"+
+  "Harmony: addProgression voices chords IN THE CURRENT KEY for you — pass scale DEGREES (0=tonic; see the project JSON \"diatonic\" map for the degree->Roman-numeral of this key), NOT absolute pitches. It builds one track per role (pad/bass/arp = MIDI synth layers, drums = a beat). Use it for chord beds, bass, and arps. Use addMidi for a melody or a line you want placed at exact beats. Build a song by the layer: progression first, then a melody on top.\n"+
   "Rules: rate 2 = 1/8 notes; 16 steps per bar; notes in the chosen key. Only change what the user asked — leave everything else. To REPLACE a part, emit clearType for that type, then the add op. addSampler may only use pad names listed in samplerPads. Output JSON only.";
 
 function aiParseSpec(text){
@@ -7469,6 +7475,8 @@ function applyProjectOps(ops){
       case "addBeat": { const grid=DRUMS.map(()=>new Array(16).fill(false)); const pat=op.pattern||{}; Object.keys(pat).forEach(name=>{ const v=firstDrumVoice(String(name).toLowerCase()); (pat[name]||[]).forEach(s=>{ s=Math.round(s); if(v>=0&&s>=0&&s<16) grid[v][s]=true; }); }); if(grid.some(r=>r.some(Boolean))){ const t=addTrack("beat"); addClip(t,{ id:++clipSeq, grid, loopFill:true }); n++; } } break;
       case "addSampler": { const K=project.samplerKit||[]; const grid=Array.from({length:MAX_SAMP_PADS},()=>new Array(16).fill(false)); const pat=op.pattern||{}; let any=false; Object.keys(pat).forEach(name=>{ const idx=K.findIndex(p=>p&&String(p.name||"").toLowerCase()===String(name).toLowerCase()); if(idx<0) return; (pat[name]||[]).forEach(s=>{ s=Math.round(s); if(s>=0&&s<16){ grid[idx][s]=true; any=true; } }); }); if(any){ const t=ensureTrack("sampler"); addClip(t,{ id:++clipSeq, kind:"grid", grid }); n++; } } break;
       case "setLyrics": project.meta=project.meta||{}; project.meta.lyrics=String(op.text||""); n++; break;
+      case "addProgression": { const deg=(op.degrees||[]).map(d=>Math.round(d)).filter(d=>d>=0&&d<=6); if(deg.length){ const r=parseInt(rootSel.value,10)||0, m=modeSel.value; const prog=degreesToProg(deg, r, m); const roles=(Array.isArray(op.roles)&&op.roles.length?op.roles:["pad","bass"]).filter(x=>["pad","bass","arp","drums"].includes(x)); const layers=buildBacking(prog, { bpb:beatsPerBar(), roles, feel:op.feel }); layers.forEach(L=>{ if(L.type==="beat"){ const grid=DRUMS.map(()=>new Array(16).fill(false)); const pat=L.pattern||{}; Object.keys(pat).forEach(name=>{ const v=firstDrumVoice(String(name).toLowerCase()); (pat[name]||[]).forEach(st=>{ st=Math.round(st); if(v>=0&&st>=0&&st<16) grid[v][st]=true; }); }); const t=addTrack("beat"); addClip(t,{ id:++clipSeq, grid, loopFill:true }); } else { const t=addTrack("midi"); t.name=L.role.charAt(0).toUpperCase()+L.role.slice(1); addClip(t,{ id:++clipSeq, start:0, lengthBeats:L.lengthBeats, notes:(L.notes||[]).map(nt=>({...nt})), loopFill:true }); } }); n++; } } break;
+      case "addMidi": { const notes=(op.notes||[]).filter(nt=>nt&&typeof nt.midi==="number").map(nt=>({ midi:clamp(Math.round(nt.midi),24,96), beat:Math.max(0,+nt.beat||0), dur:Math.max(0.1,+nt.dur||1), vel:clamp(Math.round(nt.vel||90),1,127) })); if(notes.length){ const t=addTrack("midi"); if(op.name) t.name=String(op.name).slice(0,24); const lb=op.lengthBeats||Math.ceil(Math.max(...notes.map(nt=>nt.beat+nt.dur))); addClip(t,{ id:++clipSeq, start:0, lengthBeats:lb, notes, loopFill:op.loop!==false }); n++; } } break;
     } } catch(e){ console.warn("AI op failed:", op, e); }
   });
   selectedTrackId=project.tracks[0]?.id||selectedTrackId;
