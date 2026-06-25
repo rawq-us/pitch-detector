@@ -1624,6 +1624,7 @@
       <summary class="dim" style="cursor:pointer;font-size:12px">Advanced — audio-generation endpoint (optional)</summary>
       <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-top:8px"><input type="checkbox" id="aiGenAudio"> also request an audio stem (set the endpoint URL in ⚙ Settings)</label>
     </details>
+    <label style="font-size:12px;color:var(--muted);display:flex;align-items:flex-start;gap:6px;margin-top:10px"><input type="checkbox" id="aiLayered" style="margin-top:2px"> <span>Compose by layer — build the arrangement in passes (harmony \u2192 drums \u2192 melody), each aware of the last. More coherent for full songs; uses a few more API calls.</span></label>
     <div style="display:flex;align-items:center;gap:14px;margin-top:12px">
       <button id="aiComposeRun" class="primary">✨ Generate / Edit</button>
       <span class="readout" id="aiStatus" style="flex:1"></span>
@@ -7441,6 +7442,31 @@ async function aiComplete(cfg, system, user, opts){
   const data=await res.json();
   return data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
 }
+// Multi-pass "compose by layer": harmony first, then drums, then melody — re-reading the
+// (mutated) project between passes so each layer is aware of the ones already laid down.
+const AI_LAYER_PASSES=[
+  { label:"harmony", guide:"PASS 1/3 \u2014 FOUNDATION. Set tempo, key and length to fit the request, then lay a chord progression with addProgression using roles [\"pad\",\"bass\"]. Choose scale degrees from the project\u2019s diatonic map. Do NOT add drums or melody yet." },
+  { label:"drums", guide:"PASS 2/3 \u2014 RHYTHM. The harmony already exists in the project. Add a drum groove that fits the style with addBeat (or addProgression roles [\"drums\"]). Leave the existing harmony layers untouched." },
+  { label:"melody", guide:"PASS 3/3 \u2014 MELODY. The harmony and drums exist (the project JSON shows the chord notes). Write one singable lead line with addMidi that follows the progression and stays in key. Place notes on the beat grid. Do not duplicate the pad voicing." }
+];
+async function aiComposeLayered(cfg, idea, onStep){
+  let applied=0; const notes=[];
+  for (let i=0;i<AI_LAYER_PASSES.length;i++){
+    const p=AI_LAYER_PASSES[i]; if(onStep) onStep(i, p.label);
+    const sys=AI_EDIT_PROMPT+"\n\nThis is a multi-pass build. "+p.guide;
+    const content=await aiComplete(cfg, sys, "User request:\n"+idea+"\n\nCurrent project:\n"+JSON.stringify(aiProjectSummary()), {temperature:0.7});
+    const spec=aiParseSpec(content);
+    if(spec && Array.isArray(spec.ops)){ applied+=applyProjectOps(spec.ops); if(spec.note) notes.push(spec.note); }
+  }
+  return { applied, note:notes.join(" \u00b7 ") };
+}
+// Single-shot ops with one strict retry if the first reply will not parse.
+async function aiChatSpec(cfg, idea){
+  let spec=aiParseSpec(await aiChat(cfg, idea));
+  if(spec) return spec;
+  const content=await aiComplete(cfg, AI_EDIT_PROMPT, "Return ONLY the JSON object \u2014 no prose, no code fences.\nUser request:\n"+idea+"\n\nCurrent project:\n"+JSON.stringify(aiProjectSummary()), {temperature:0.2});
+  return aiParseSpec(content);
+}
 async function aiChat(cfg, idea){
   return aiComplete(cfg, AI_EDIT_PROMPT, "User request:\n"+idea+"\n\nCurrent project:\n"+JSON.stringify(aiProjectSummary()), {temperature:0.7});
 }
@@ -7498,15 +7524,20 @@ document.getElementById("aiComposeRun").addEventListener("click",async()=>{
   if (!cfg.key){ status.textContent="Add your API key in ⚙ Settings first."; openSettings(); return; }
   if (!cfg.model){ status.textContent="Set a model id in ⚙ Settings."; openSettings(); return; }
   if (!idea){ status.textContent="Describe the song first."; return; }
-  btn.disabled=true; status.textContent="Reading your project & generating edits…";
+  const layered=document.getElementById("aiLayered") && document.getElementById("aiLayered").checked;
+  btn.disabled=true; status.textContent=layered?"Composing layer by layer…":"Reading your project & generating edits…";
   try {
-    const content=await aiChat(cfg, idea);
-    const spec=aiParseSpec(content);
-    if (!spec) throw new Error("Could not parse JSON from the model reply.");
     let applied=0, note="";
-    if (Array.isArray(spec.ops)){ applied=applyProjectOps(spec.ops); note=spec.note||""; }
-    else if (spec.tracks){ applied=(applyProjectSpec(spec)||[]).length; }   // legacy full-spec fallback
-    else throw new Error("Model reply had no edit ops.");
+    if (layered){
+      const r=await aiComposeLayered(cfg, idea, (i,label)=>{ status.textContent="Layer "+(i+1)+"/"+AI_LAYER_PASSES.length+" — "+label+"…"; });
+      applied=r.applied; note=r.note;
+    } else {
+      const spec=await aiChatSpec(cfg, idea);
+      if (!spec) throw new Error("Could not parse JSON from the model reply.");
+      if (Array.isArray(spec.ops)){ applied=applyProjectOps(spec.ops); note=spec.note||""; }
+      else if (spec.tracks){ applied=(applyProjectSpec(spec)||[]).length; }   // legacy full-spec fallback
+      else throw new Error("Model reply had no edit ops.");
+    }
     status.textContent="✓ Applied "+applied+" edit"+(applied===1?"":"s")+(note?" — "+note:".");
     if (document.getElementById("aiGenAudio").checked && cfg.audioUrl){
       status.textContent+=" Requesting audio stem…";
