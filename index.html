@@ -1620,10 +1620,10 @@
     </div>
     <div class="group"><label for="aiIdea">Describe the song</label>
       <textarea id="aiIdea" rows="3" style="width:100%;resize:vertical" placeholder="e.g. dreamy lo-fi hip hop in A minor, ~80 bpm, 16 bars, wistful late-night vibe with a simple arp and a laid-back beat"></textarea></div>
-    <details style="margin:6px 0">
-      <summary class="dim" style="cursor:pointer;font-size:12px">Advanced — audio-generation endpoint (optional)</summary>
-      <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-top:8px"><input type="checkbox" id="aiGenAudio"> also request an audio stem (set the endpoint URL in ⚙ Settings)</label>
-    </details>
+    <div style="margin:8px 0">
+      <div class="dim" style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Advanced — audio-generation endpoint (optional)</div>
+      <label style="font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;margin-top:6px"><input type="checkbox" id="aiGenAudio"> also request an audio stem (set the endpoint URL in ⚙ Settings)</label>
+    </div>
     <label style="font-size:12px;color:var(--muted);display:flex;align-items:flex-start;gap:6px;margin-top:10px"><input type="checkbox" id="aiLayered" style="margin-top:2px"> <span>Compose by layer — build the arrangement in passes (harmony \u2192 drums \u2192 melody), each aware of the last. More coherent for full songs; uses a few more API calls.</span></label>
     <div style="display:flex;align-items:center;gap:14px;margin-top:12px">
       <button id="aiComposeRun" class="primary">✨ Generate / Edit</button>
@@ -1650,10 +1650,10 @@
     </div>
     <div class="group" id="aiBaseRow" style="display:none"><label for="aiBaseUrl">Base URL (chat completions)</label><input id="aiBaseUrl" type="text" placeholder="https://your-host/v1/chat/completions" style="width:100%"></div>
     <div class="group"><label for="aiKey">API key <span class="dim">— stored in this browser only</span></label><input id="aiKey" type="password" placeholder="sk-…" style="width:100%" autocomplete="off"></div>
-    <details style="margin:6px 0">
-      <summary class="dim" style="cursor:pointer;font-size:12px">Advanced — audio-generation endpoint (optional)</summary>
-      <div class="group" style="margin-top:8px"><label for="aiAudioUrl">Audio endpoint URL <span class="dim">— POSTs the prompt, expects audio back; imported as a stem</span></label><input id="aiAudioUrl" type="text" placeholder="https://…  (must allow browser CORS)" style="width:100%"></div>
-    </details>
+    <div style="margin:8px 0">
+      <div class="dim" style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px">Advanced — audio-generation endpoint (optional)</div>
+      <div class="group" style="margin-top:6px"><label for="aiAudioUrl">Audio endpoint URL <span class="dim">— POSTs the prompt, expects audio back; imported as a stem</span></label><input id="aiAudioUrl" type="text" placeholder="https://…  (must allow browser CORS)" style="width:100%"></div>
+    </div>
     <div class="settings-links dim">Get an OpenRouter key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">openrouter.ai/keys</a> · browse model ids at <a href="https://openrouter.ai/models" target="_blank" rel="noopener">openrouter.ai/models</a>.</div>
     <div style="display:flex;align-items:center;gap:10px;margin-top:14px;flex-wrap:wrap">
       <button id="settingsSave" class="primary">Save</button>
