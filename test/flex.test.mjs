@@ -92,6 +92,14 @@ test("flexAnchorsToGrid: retargeting to a slower grid stretches monotonically", 
   for (let i = 1; i < anchors.length; i++) assert.ok(anchors[i].dst > anchors[i-1].dst, "dst strictly increasing");
 });
 
+test("tempo re-warp: a faster target tempo shortens the warped timeline", () => {
+  const beats = [0.5, 1.0, 1.5, 2.0];
+  const slow = flexAnchorsToGrid(beats, { bpm: 90, dur: 2.2, strength: 1 });
+  const fast = flexAnchorsToGrid(beats, { bpm: 180, dur: 2.2, strength: 1 });
+  const lastSlow = slow[slow.length-1].dst, lastFast = fast[fast.length-1].dst;
+  assert.ok(lastFast < lastSlow, `180bpm grid (${lastFast.toFixed(2)}s) should be shorter than 90bpm (${lastSlow.toFixed(2)}s)`);
+});
+
 test("flexAnchorsToGrid: strength 0 is identity", () => {
   const beats = [0.5, 1.0, 1.5];
   const anchors = flexAnchorsToGrid(beats, { bpm: 80, dur: 2.0, strength: 0 });

@@ -5,15 +5,57 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Pitch Studio — Detector · Keyboard · Beats · Timeline</title>
 <style>
+  /* ===== Design tokens — palette → semantic → legacy aliases. Swap a theme block to re-skin the app. ===== */
   :root {
-    --bg: #0f1117; --panel: #1a1d27; --panel-2: #232735; --text: #e6e9ef; --muted: #9aa3b2;
-    --accent: #4ade80; --accent-2: #38bdf8; --flat: #f87171; --inscale: #2dd4bf;
-    --white-key: #f4f6fb; --white-key-active: #bdf0d0; --black-key: #1b1e27; --black-key-active: #2f7d52;
-    --border: #2c3140; --arp-clip: #6366f1; --beat-clip: #f59e0b; --sampler-clip: #a855f7;
+    /* raw palette (the only place literal colors live) */
+    --pal-black:#000; --pal-ink:#070708; --pal-coal:#0c0c0d; --pal-slate:#121214;
+    --pal-graphite:#1c1c1f; --pal-graphite2:#28282c; --pal-well:#050506;
+    --pal-line:#202024; --pal-line2:#34343b;
+    --pal-fog:#f2f2f5; --pal-mist:#9c9ca6; --pal-faint:#5c5c66;
+    --pal-green:#10e072; --pal-cyan:#06b6ef; --pal-amber:#ff9500; --pal-red:#ff3b46;
+    --pal-indigo:#6e3cff; --pal-violet:#9a6dff; --pal-purple:#b026ff; --pal-pink:#ff2d92; --pal-blue:#0a8eff; --pal-teal:#10d9c0;
+
+    /* semantic roles (themes override THESE) */
+    --bg:var(--pal-black); --bg-glow:#121219; --rail:var(--pal-ink); --surface-1:var(--pal-coal); --surface-2:var(--pal-slate);
+    --control:var(--pal-graphite); --control-hover:var(--pal-graphite2); --well:var(--pal-well);
+    --line:var(--pal-line); --line-strong:var(--pal-line2);
+    --text:var(--pal-fog); --muted:var(--pal-mist); --faint:var(--pal-faint);
+    --brand:var(--pal-green); --info:var(--pal-cyan); --warn:var(--pal-amber); --danger:var(--pal-red);
+    --in-tune:var(--pal-green); --near:var(--pal-amber); --off:var(--pal-red);
+    /* layer / clip type hues — icon ⇄ waveform ⇄ clip share one */
+    --type-arp:var(--pal-indigo); --type-beat:var(--pal-amber); --type-midi:var(--pal-cyan);
+    --type-sampler:var(--pal-purple); --type-voice:var(--pal-pink); --type-memo:var(--pal-green);
+    --type-key:var(--pal-blue); --type-song:var(--pal-violet);
+
+    /* legacy aliases — existing CSS re-skins through these with no edits */
+    --panel:var(--surface-1); --panel-2:var(--surface-2); --border:var(--line);
+    --accent:var(--brand); --accent-2:var(--info); --flat:var(--danger); --inscale:var(--brand); --dim:var(--faint);
+    --arp-clip:var(--type-arp); --beat-clip:var(--type-beat); --sampler-clip:var(--type-sampler);
+    --white-key:#e8eaf0; --white-key-active:#bdf0d0; --black-key:#0b0b0c; --black-key-active:#1f7d52;
+
+    /* spacing · radius · type scales */
+    --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+    --r-sm:5px; --r-md:7px; --r-lg:10px; --r-pill:999px;
+    --fs-label:11px; --fs-ctrl:12px; --fs-val:13px; --fs-name:13px; --fs-head:15px;
+  }
+  /* ===== Alternate themes — set <html data-theme="…"> (persisted by setTheme()) ===== */
+  html[data-theme="classic"] {            /* the original v1 blue-charcoal look */
+    --bg:#0f1117; --bg-glow:#1c2030; --rail:#0c0e14; --surface-1:#1a1d27; --surface-2:#232735;
+    --control:#232735; --control-hover:#2c3242; --well:#11141b;
+    --line:#2c3140; --line-strong:#3a4150; --text:#e6e9ef; --muted:#9aa3b2; --faint:#69707e;
+    --brand:#4ade80; --info:#38bdf8; --warn:#f59e0b; --danger:#f87171;
+    --type-arp:#6366f1; --type-beat:#f59e0b; --type-midi:#38bdf8; --type-sampler:#a855f7; --type-voice:#db2777; --type-memo:#2dd4bf;
+  }
+  html[data-theme="midnight"] {           /* deep blue, cooler accents */
+    --bg:#04060e; --bg-glow:#0c1730; --rail:#070b16; --surface-1:#0b1120; --surface-2:#111a2e;
+    --control:#16203a; --control-hover:#1e2c4c; --well:#05080f;
+    --line:#1c2942; --line-strong:#2c3d5e; --text:#eaf0fb; --muted:#8ea0bd; --faint:#566580;
+    --brand:#5eead4; --info:#60a5fa; --warn:#fbbf24; --danger:#fb7185;
+    --type-arp:#818cf8; --type-beat:#fbbf24; --type-midi:#60a5fa; --type-sampler:#c084fc; --type-voice:#f472b6; --type-memo:#5eead4;
   }
   * { box-sizing: border-box; }
   body { margin: 0; -webkit-user-select: none; -moz-user-select: none; user-select: none; -webkit-touch-callout: none; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: radial-gradient(1200px 600px at 50% -10%, #1c2030, var(--bg)); color: var(--text); min-height: 100vh; padding: 22px 16px 80px; }
+    background: radial-gradient(1200px 600px at 50% -10%, var(--bg-glow), var(--bg)); color: var(--text); min-height: 100vh; padding: 0 0 80px; }
   input, textarea { -webkit-user-select: text; user-select: text; }
   h1 { font-size: 21px; margin: 0 0 4px; letter-spacing: 0.3px; }
   .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -47,19 +89,37 @@
   h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); margin: 0 0 12px; }
   .sub { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
   .wrap { width: 100%; margin: 0 auto; }
-  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; margin-bottom: 18px; }
+  .panel { background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; padding: 16px; margin: 0; }   /* flush rack units — no side borders/margins/radius, page bg, hairline seam */
   .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
   .group { display: flex; flex-direction: column; gap: 4px; }
   .group label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: var(--muted); }
-  select, button, input[type=number], input[type=text] { background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
-    border-radius: 9px; padding: 8px 12px; font-size: 14px; cursor: pointer; transition: background 0.15s, border-color 0.15s, transform 0.05s; }
+  select, button, input[type=number], input[type=text] { background: var(--control); color: var(--text); border: 1px solid transparent;
+    border-radius: var(--r-md); padding: 7px 12px; font-size: var(--fs-val); cursor: pointer; transition: background 0.15s, border-color 0.15s, transform 0.05s; }
+  select, input[type=number], input[type=text] { background: var(--well); border-color: var(--line-strong); }   /* inputs & selects read as recessed wells */
+  select { appearance: none; -webkit-appearance: none; padding-right: 28px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='none' stroke='%239c9ca6' stroke-width='1.6'%3E%3Cpath d='M2 3.5 5 6.5 8 3.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; }
   input[type=number], input[type=text] { cursor: text; width: 92px; }
-  select:hover, button:hover { border-color: var(--accent-2); }
+  input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { opacity: 0.35; }
+  button:hover { background: var(--control-hover); }
+  select:hover { border-color: var(--info); }
+  input[type=number]:focus, input[type=text]:focus, select:focus { outline: none; border-color: var(--info); }
   button:active { transform: translateY(1px); }
-  button.primary { background: var(--accent); color: #06301a; font-weight: 600; border-color: transparent; }
-  button.danger { background: var(--flat); color: #3a0d0d; font-weight: 600; border-color: transparent; }
-  button.rec-on { background: var(--flat); color: #3a0d0d; font-weight: 600; border-color: transparent; }
-  button.on { background: var(--accent-2); color: #042233; font-weight: 600; border-color: transparent; }
+  button.primary { background: var(--brand); color: #04130b; font-weight: 600; border-color: transparent; }
+  button.primary:hover { filter: brightness(1.08); background: var(--brand); }
+  button.danger { background: var(--danger); color: #2a0a08; font-weight: 600; border-color: transparent; }
+  button.rec-on { background: var(--danger); color: #2a0a08; font-weight: 600; border-color: transparent; }
+  button.on { background: var(--info); color: #03222f; font-weight: 600; border-color: transparent; }
+  /* ===== v2 components — fused segmented group, LCD readout, type-icon chip, inline icon ===== */
+  .seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: var(--r-md); overflow: hidden; background: var(--control); vertical-align: middle; }
+  .seg > button { border: 0; border-radius: 0; background: transparent; color: var(--muted); padding: 6px 11px; font-size: var(--fs-ctrl); box-shadow: none; }
+  .seg > button:hover { background: var(--control-hover); color: var(--text); transform: none; }
+  .seg > button.on { background: var(--brand); color: #04130b; font-weight: 600; }
+  .seg > button.on-mute { background: var(--warn); color: #241500; font-weight: 600; }
+  .seg > button.on-solo { background: var(--info); color: #03222f; font-weight: 600; }
+  .lcd { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: var(--well); border: 1px solid var(--line); border-radius: var(--r-md); padding: 4px 9px; color: var(--brand); font-size: var(--fs-val); display: inline-flex; align-items: center; gap: 6px; }
+  .tico { width: 22px; height: 22px; border-radius: var(--r-md); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+  .svi { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.14em; }
+  .svi.fill { fill: currentColor; stroke: none; }
   .spacer { flex: 1; }
   .readout { font-size: 13px; color: var(--muted); white-space: nowrap; }
 
@@ -80,6 +140,8 @@
   .meter .needle { position: absolute; top: 6px; bottom: 6px; width: 4px; border-radius: 3px; background: #fff; left: 50%; transform: translateX(-2px); box-shadow: 0 0 12px rgba(255,255,255,0.6); transition: left 0.06s linear, background 0.1s; }
   .meter-scale { display:flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top:6px; }
   .status { font-size: 13px; color: var(--muted); margin-top: 10px; min-height: 18px; }
+  .detector .status { text-align: center; color: var(--danger); font-weight: 700; }   /* prominent "Mic off" */
+  .detector.mic-live .status { display: none; }                                        /* only show when the mic is off */
   .in-tune .needle { background: var(--accent); }
 
   .keyboard-shell { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 16px; overflow: hidden; }
@@ -116,7 +178,7 @@
   /* arp pitch×time roll */
   .arp-rollbox { display: flex; align-items: flex-start; gap: 0; margin-top: 14px; background: #0c0e13; border: 1px solid var(--border); border-radius: 10px; padding: 8px; overflow: hidden; }
   .arp-rollbox .seq-empty { color: var(--muted); font-size: 13px; padding: 16px 10px; }
-  .arp-axis { flex: none; display: flex; flex-direction: column; width: 40px; border-right: 1px solid #20242f; }
+  .arp-axis { flex: none; display: flex; flex-direction: column; width: 40px; border-right: 1px solid var(--line); }
   .arp-axis-lab { font-size: 8px; color: var(--muted); display: flex; align-items: center; justify-content: flex-end; padding-right: 5px; box-sizing: border-box; line-height: 1; }
   .arp-axis-lab.oct { color: var(--text); font-weight: 700; }
   .arp-scroll { flex: 1; overflow-x: auto; overflow-y: hidden; }
@@ -255,7 +317,11 @@
   .struct-seg { position: absolute; top: 3px; height: 24px; border-radius: 5px; display: flex; align-items: center; gap: 5px; padding: 0 7px; font-size: 11px; font-weight: 700; color: #0b0e16; cursor: grab; overflow: hidden; white-space: nowrap; box-sizing: border-box; border: 1px solid rgba(0,0,0,0.3); }
   .struct-seg:hover { filter: brightness(1.1); }
   .struct-seg .ss-bars { font-size: 9px; opacity: 0.7; font-weight: 600; }
-  .struct-summary { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; max-width: 460px; font-size: 11px; }
+  .struct-summary { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; font-size: 11px; }
+  .ss-lab { font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); font-weight: 500; margin-right: 1px; }
+  .struct-summary .ss-dot { width: 10px; height: 10px; min-width: 10px; max-width: 10px; min-height: 10px; max-height: 10px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; flex: none; align-self: center; transition: transform 0.1s; }
+  .struct-summary .ss-dot:hover { transform: scale(1.4); }
+  .ss-bars-count { font-size: 10px; color: var(--faint); margin-left: 2px; white-space: nowrap; }
   .ss-sum-lab { text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-size: 10px; margin-right: 2px; }
   .ss-sum-chip { padding: 1px 6px; border-radius: 5px; font-size: 10px; font-weight: 700; color: #0b0e16; }
   .struct-act-btn { font-size: 10px; padding: 2px 8px; border: 1px solid var(--accent-2); color: var(--accent-2); background: none; border-radius: 6px; cursor: pointer; white-space: nowrap; }
@@ -316,7 +382,7 @@
   .fx-name { font-weight: 700; font-size: 13px; flex: 1; }
   .fx-toggle { font-weight: 700; font-size: 11px; padding: 3px 12px; border-radius: 999px; background: var(--panel); color: var(--muted); border: 1px solid var(--border); min-width: 44px; }
   .fx.on .fx-toggle { background: var(--accent); color: #06301a; border-color: transparent; }
-  .mini { font-size: 11px; padding: 4px 8px; }
+  .mini { font-size: var(--fs-val); padding: 5px 10px; }   /* same text size as every other button — only padding is "mini" */
   .mini.on { background: var(--accent); color: #06301a; border-color: transparent; }
   .help { display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%; background: var(--panel-2); border: 1px solid var(--border); color: var(--accent-2); font-size: 10px; cursor: help; vertical-align: middle; }
   .help:hover { background: var(--accent-2); color: #042233; }
@@ -362,7 +428,7 @@
   .samp-loopbtn.on { background: var(--sampler-clip); color: #fff; border-color: transparent; }
   /* synth-keys structure */
   .divider { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
-  .divider.subtle { border-top-color: #20242f; margin: 14px 0; }
+  .divider.subtle { border-top-color: var(--line); margin: 14px 0; }
   .subcard { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
   .kb-perf { display: flex; align-items: stretch; gap: 16px; flex-wrap: wrap; }
   .perf-col { display: flex; flex-direction: column; gap: 8px; }
@@ -384,18 +450,27 @@
   .tl-row1 .tl-center { justify-self: center; }
   .tl-row1 .tl-right { justify-self: end; min-width: 0; display: flex; justify-content: flex-end; }
   .tl-row1 .struct-summary { justify-content: flex-end; }
+  .song-meta { display: inline-flex; align-items: stretch; gap: 0; background: var(--well); border: 1px solid var(--line-strong); border-radius: var(--r-md); padding: 2px; }
+  .sm-field { display: flex; flex-direction: column; gap: 0; padding: 2px 9px; }
+  .sm-field + .sm-field { border-left: 1px solid var(--line); }
+  .sm-field > span { font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); font-weight: 500; }
+  .song-meta .tl-in { background: transparent !important; border: 0; padding: 0; height: 20px; width: 50px; font-size: 14px; font-family: ui-monospace, Menlo, monospace; border-radius: 0; }
+  .song-meta select.tl-in { width: 58px; padding-right: 15px; background-position: right 1px center; }
+  .song-meta .tl-in:focus { outline: none; border: 0; }
+  .countin-ctl { display: inline-flex; align-items: center; gap: 7px; }
+  .countin-ico { font-size: 16px; color: var(--muted); flex: none; }
   /* per-layer meter (polymeter) */
-  select.trk-meter { font-size: 10px; padding: 2px 3px; width: 56px; min-width: 0; flex: none; margin-left: auto; }
+  select.trk-meter { font-size: 11px; padding: 3px 24px 3px 8px; width: 84px; min-width: 0; flex: none; margin-left: auto; }
   /* MIDI piano-roll editor */
   #midiRollWrap { position: relative; overflow: auto; max-height: 60vh; border: 1px solid var(--border); border-radius: 8px; margin-top: 8px; background: #0d0f16; }
   #midiRoll { position: relative; }
   .mr-row { position: absolute; pointer-events: none; }
   .mr-row.black { background: #14161f; }
-  .mr-gkey { position: absolute; left: 0; width: 46px; background: #e9edf5; border-bottom: 1px solid #20242f; box-sizing: border-box; z-index: 1; }
+  .mr-gkey { position: absolute; left: 0; width: 46px; background: #e9edf5; border-bottom: 1px solid var(--line); box-sizing: border-box; z-index: 1; }
   .mr-gkey.black { background: #2a2f3c; }
   .mr-key { position: absolute; left: 5px; font-size: 9px; color: #66708a; pointer-events: none; z-index: 2; }
   .mr-vel { position: absolute; bottom: 0; width: 5px; background: #f0a23b; border-radius: 2px 2px 0 0; cursor: ns-resize; }
-  .mr-vline { position: absolute; top: 0; width: 1px; background: #20242f; pointer-events: none; }
+  .mr-vline { position: absolute; top: 0; width: 1px; background: var(--line); pointer-events: none; }
   .mr-vline.bar { background: #3a4254; }
   .mr-note { position: absolute; background: #6ea8fe; border: 1px solid rgba(0,0,0,0.45); border-radius: 3px; box-sizing: border-box; cursor: grab; z-index: 3; }
   .mr-note.sel { outline: 2px solid #fff; outline-offset: -1px; z-index: 4; }
@@ -447,7 +522,7 @@
   .midi-kb-host .kbd-foot { margin-top: 8px; }
   .midi-box #midiRollWrap { flex: 1 1 auto; min-height: 120px; }
   .midi-keytag { font-size: 12px; color: var(--accent-2, #8ab4ff); font-weight: 600; margin-left: 8px; }
-  .ed-keysel { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; }
+  .ed-keysel { display: none; }   /* key/mode lives on the timeline + the in-editor chips/ruler — redundant here */
   .ed-keysel-lab { text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
   .ed-keysel select { font-size: 12px; padding: 3px 5px; width: auto; min-width: 0; }
   .ed-keysel .midi-keytag { font-weight: 400; color: var(--muted); white-space: nowrap; max-width: 360px; overflow: hidden; text-overflow: ellipsis; }
@@ -489,7 +564,7 @@
   .mr-cc-zero { position: absolute; height: 1px; background: #3a4254; pointer-events: none; }
   .mr-cc-pt { position: absolute; width: 9px; height: 9px; border-radius: 50%; background: #f0a23b; border: 1px solid #1a1c24; cursor: grab; z-index: 3; }
   /* per-region key/mode INSIDE the clip — ruler pins to top, scrolls horizontally with the grid */
-  #midiKeyRuler { position: sticky; top: 0; left: 0; height: 22px; z-index: 8; background: #0d0f16; border-bottom: 1px solid #20242f; }
+  #midiKeyRuler { position: sticky; top: 0; left: 0; height: 22px; z-index: 8; background: #0d0f16; border-bottom: 1px solid var(--line); }
   .mkr-glab { position: absolute; left: 0; top: 0; width: 46px; height: 100%; display: flex; align-items: center; padding-left: 6px; font-size: 9px; letter-spacing: 0.5px; color: var(--muted); background: #0d0f16; z-index: 2; }
   .mkr-seg { position: absolute; top: 2px; height: 18px; border-radius: 4px; display: flex; align-items: center; padding: 0 6px; font-size: 10px; font-weight: 700; color: #0b0e16; cursor: pointer; overflow: hidden; white-space: nowrap; box-sizing: border-box; border: 1px solid rgba(0,0,0,0.3); }
   .mkr-seg:hover { filter: brightness(1.12); outline: 1px solid #fff; }
@@ -552,15 +627,18 @@
   .midi-status { font-size: 11px; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 2px 7px; }
   .midi-status.on { color: #04222e; background: var(--accent-2); border-color: var(--accent-2); font-weight: 600; }
   .key.tpos { outline: 3px solid var(--accent-2); outline-offset: -3px; }
-  .iconbtn { font-size: 17px; padding: 7px 12px; line-height: 1; }
+  .iconbtn { font-size: var(--fs-val); padding: 7px 12px; line-height: 1; display: inline-flex; align-items: center; gap: 6px; }
   /* collapsible + draggable sections */
-  .csec { position: relative; margin-bottom: 18px; }
+  .csec { position: relative; margin-bottom: 0; }
+  .app-footer { text-align: center; padding: 28px 0 10px; }
+  .app-footer a { color: var(--faint); font-size: 12px; text-decoration: none; border-bottom: 1px dotted var(--border); }
+  .app-footer a:hover { color: var(--muted); }
   .csec.dragging { opacity: 0.45; outline: 2px dashed var(--accent-2); outline-offset: 2px; }
   .sec-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: grab; }
   .sec-head:active { cursor: grabbing; }
   .sec-grip { color: var(--muted); font-size: 14px; user-select: none; }
   .sec-title { flex: 1; font-size: 13px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted); font-weight: 600; }
-  .sec-toggle { flex: none; width: 28px; height: 24px; padding: 0; font-size: 15px; line-height: 1; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); border-radius: 6px; cursor: pointer; }
+  .sec-toggle { flex: none; width: 28px; height: 24px; padding: 0; font-size: 15px; line-height: 1; background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
   .sec-toggle:hover { border-color: var(--accent-2); color: var(--text); }
   .sec-pop { display: inline-flex; align-items: center; justify-content: center; }
   .sec-pop svg { display: block; }
@@ -588,25 +666,25 @@
   .tl-content { position: relative; }
   .tl-ruler { position: relative; height: 46px; border-bottom: 1px solid var(--border); background: var(--panel); cursor: crosshair; }
   .tl-rrow { position: absolute; left: 0; height: 23px; }
-  .tl-rrow.sec { top: 0; border-bottom: 1px solid #20242f; }
+  .tl-rrow.sec { top: 0; border-bottom: 1px solid var(--line); }
   .tl-rrow.beat { top: 23px; }
-  .tl-tick { position: absolute; top: 0; bottom: 0; border-left: 1px solid #20242f; font-size: 9px; color: var(--muted); padding-left: 3px; }
-  .tl-tick.bar { border-left-color: #3a4254; color: var(--text); font-weight: 700; }
+  .tl-tick { position: absolute; top: 0; bottom: 0; border-left: 1px solid var(--line); font-size: 9px; color: var(--muted); padding-left: 3px; }
+  .tl-tick.bar { border-left-color: var(--line-strong); color: var(--text); font-weight: 700; }
   .tl-tick.sec { border-left-color: #2a3242; }
   .tl-tick.countin { color: var(--accent); border-left-color: #5a4a1a; font-weight: 700; }
   .tl-preroll { position: absolute; top: 0; bottom: 0; left: 0; z-index: 1; pointer-events: none; display: none;
     background: repeating-linear-gradient(45deg, rgba(245,158,11,0.05), rgba(245,158,11,0.05) 7px, rgba(245,158,11,0.11) 7px, rgba(245,158,11,0.11) 14px);
     border-right: 1px solid var(--accent); }
   .preroll-lbl { position: absolute; top: 50px; left: 5px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--accent); }
-  .tl-loopband { position: absolute; top: 0; bottom: 0; background: rgba(74,222,128,0.10); border-left: 2px solid var(--accent); border-right: 2px solid var(--accent); z-index: 1; pointer-events: none; }
+  .tl-loopband { position: absolute; top: 0; height: 46px; background: rgba(31,217,114,0.18); border-left: 2px solid var(--accent); border-right: 2px solid var(--accent); z-index: 4; pointer-events: none; }
   .tl-lanes { position: relative; }
-  .tl-lane { position: relative; height: 58px; border-bottom: 1px solid #20242f; }
+  .tl-lane { position: relative; height: 58px; border-bottom: 1px solid var(--line); }
   .tl-lane.beat { background: rgba(245,158,11,0.04); }
   .tl-lane.selected { background: rgba(56,189,248,0.07); }
-  .tl-head { height: 58px; border-bottom: 1px solid #20242f; padding: 6px 9px; display: flex; flex-direction: column; justify-content: center; gap: 4px; cursor: pointer; overflow: hidden; }
+  .tl-head { height: 58px; border-bottom: 1px solid var(--line); padding: 6px 9px; display: flex; flex-direction: column; justify-content: center; gap: 4px; cursor: pointer; overflow: hidden; }
   .tl-head.rulerspace { height: 46px; border-bottom: 1px solid var(--border); padding: 0; display: block; }
   .rr-lab { height: 23px; display: flex; align-items: center; padding-left: 10px; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
-  .rr-lab.sec { border-bottom: 1px solid #20242f; }
+  .rr-lab.sec { border-bottom: 1px solid var(--line); }
   .tl-head.selected { background: rgba(56,189,248,0.10); }
   .tl-head .tname { font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; min-width: 0; }
   .tl-head .badge { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; padding: 1px 5px; border-radius: 4px; }
@@ -626,14 +704,24 @@
   .tl-head.muted .tname { opacity: 0.5; }
   .thd-btn.rec { color: #f9a8b4; }
   .thd-btn.rec.recording { color: #fff; background: var(--flat); border-color: transparent; }
+  .thd-btn.on { background: var(--brand); color: #04130b; border-color: transparent; }
+  .thd-btn.icon-only { padding: 0; min-width: 21px; font-size: 13px; }
+  .thd-btn.danger.icon-only { background: var(--control); color: var(--off); border-color: var(--border); }
+  .thd-btn.danger.icon-only:hover { background: rgba(255,77,82,0.16); color: var(--off); border-color: transparent; }
+  .tl-head-acts .seg.ms-seg { height: 21px; border-radius: 6px; }
+  .tl-head-acts .seg.ms-seg > button { height: 19px; min-width: 22px; padding: 0 9px; font-size: 11px; color: var(--muted); }
+  .tl-head-acts .seg.ms-seg > button:hover { background: var(--control-hover); color: var(--text); }
+  .tl-head-acts .seg.ms-seg > button.on-mute { background: var(--warn); color: #241500; font-weight: 600; }
+  .tl-head-acts .seg.ms-seg > button.on-solo { background: var(--info); color: #03222f; font-weight: 600; }
   .tl-head .fxbtn { color: var(--accent-2); }
   .tl-head .fxbtn:hover { color: #7dd3fc; }
   .tl-clip { position: absolute; top: 6px; height: 46px; border-radius: 7px; cursor: grab; overflow: hidden; color: #fff; font-size: 11px; padding: 5px 7px; user-select: none; box-shadow: 0 2px 6px rgba(0,0,0,0.35); z-index: 2; }
-  .tl-clip.arp { background: linear-gradient(180deg, #7c83f7, var(--arp-clip)); }
-  .tl-clip.beat { background: linear-gradient(180deg, #f7b34d, var(--beat-clip)); color: #3a2400; }
-  .tl-clip.sampler { background: linear-gradient(180deg, #c084fc, var(--sampler-clip)); }
+  .tl-clip.arp { background: var(--arp-clip); }
+  .tl-clip.beat { background: var(--beat-clip); color: #3a2400; }
+  .tl-clip.sampler { background: var(--sampler-clip); }
   .tl-lane.sampler { background: rgba(168,85,247,0.05); }
-  .tl-clip.voice { background: linear-gradient(180deg, #f472b6, #db2777); }
+  .tl-clip.voice { background: var(--type-voice); }
+  .tl-clip.midi { background: var(--type-midi); color: #042430; }   /* clip hue matches the MIDI type icon */
   .tl-lane.voice { background: rgba(236,72,153,0.05); }
   .badge.voice { background: #db2777; color: #fff; }
   /* Memo (annotated) layer */
@@ -772,7 +860,8 @@
   @media (max-width: 640px){ .welcome-grid { grid-template-columns: 1fr; } .welcome-box { padding: 34px 22px; } }
   .tl-clip .cloop { position: absolute; bottom: 3px; right: 4px; font-size: 10px; background: rgba(0,0,0,0.4); border-radius: 5px; padding: 1px 5px; cursor: pointer; }
   .tl-clip .cloop:hover { background: rgba(0,0,0,0.7); }
-  .tl-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.7); z-index: 5; pointer-events: none; display: none; }
+  .tl-playhead { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.55); z-index: 6; pointer-events: none; display: none; }
+  .tl-playhead::before { content: ""; position: absolute; top: 0; left: -5px; width: 12px; height: 9px; background: #fff; clip-path: polygon(0 0, 100% 0, 50% 100%); }
 
   .popup { position: absolute; z-index: 60; background: var(--panel); border: 1px solid var(--accent-2); border-radius: 8px; padding: 8px; display: flex; flex-direction: column; gap: 5px; box-shadow: 0 6px 20px rgba(0,0,0,0.5); }
   .popup label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
@@ -834,8 +923,13 @@
   .modal-box .modal-inner { max-width: 1100px; margin: 0 auto; }   /* keep form-style modals readable inside the wide box */
   .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
   .modal-head button { background: none; border: none; color: var(--muted); font-size: 18px; cursor: pointer; }
-  .clip-name-in { background: #11141c; border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 4px 9px; font-size: 12px; min-width: 130px; max-width: 240px; }
-  .clip-name-in:focus { border-color: var(--accent-2); outline: none; }
+  .clip-name-in { background: var(--well); border: 1px solid var(--line-strong); color: var(--text); border-radius: var(--r-md); padding: 6px 14px; font-size: 13px; text-align: center; width: 240px; max-width: 38vw; }
+  .clip-name-in::placeholder { color: var(--faint); }
+  .clip-name-in:focus { border-color: var(--info); outline: none; }
+  .modal-head.editor-head { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; }
+  .modal-head.editor-head > b { justify-self: start; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .modal-head.editor-head > .clip-name-in { justify-self: center; }
+  .modal-head.editor-head > button { justify-self: end; }
   .modal-save { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
   .modal-save input { flex: 1; min-width: 150px; }
   .cem-host > .sec-body { display: block; }
@@ -856,9 +950,62 @@
 </style>
 </head>
 <body>
+<!-- ===== Icon sprite (Tabler-style, MIT) — use via icon("name") or <svg class="svi"><use href="#i-name"/></svg> ===== -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13 -8z" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-record" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6l-12 12"/></symbol>
+<symbol id="i-chev-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6 -6"/></symbol>
+<symbol id="i-chev-right" viewBox="0 0 24 24"><path d="M9 6l6 6 -6 6"/></symbol>
+<symbol id="i-chev-up" viewBox="0 0 24 24"><path d="M6 15l6 -6 6 6"/></symbol>
+<symbol id="i-arrow-up" viewBox="0 0 24 24"><path d="M12 20V5M6 11l6 -6 6 6"/></symbol>
+<symbol id="i-grip" viewBox="0 0 24 24"><path d="M9 5h0M9 12h0M9 19h0M15 5h0M15 12h0M15 19h0" stroke-width="2.6"/></symbol>
+<symbol id="i-dots" viewBox="0 0 24 24"><path d="M12 5h0M12 12h0M12 19h0" stroke-width="2.6"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1 -13"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 8h16M4 16h16"/><circle cx="9" cy="8" r="2.3" fill="var(--well)"/><circle cx="15" cy="16" r="2.3" fill="var(--well)"/></symbol>
+<symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+<symbol id="i-music" viewBox="0 0 24 24"><circle cx="7" cy="18" r="2.4"/><circle cx="17" cy="16" r="2.4"/><path d="M9.4 18V6l10 -2v10"/></symbol>
+<symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5"/><path d="M7 11h0M10.5 11h0M14 11h0M17 11h0M8 14h8" stroke-width="1.8"/></symbol>
+<symbol id="i-beat" viewBox="0 0 24 24"><path d="M6 6h0M12 6h0M18 6h0M6 12h0M12 12h0M18 12h0M6 18h0M12 18h0M18 18h0" stroke-width="2.6"/></symbol>
+<symbol id="i-wave" viewBox="0 0 24 24"><path d="M3 12h2l2 -7 3 15 3 -18 3 14 2 -4h3"/></symbol>
+<symbol id="i-loop" viewBox="0 0 24 24"><path d="M4 9l3 -3v2h9a4 4 0 0 1 4 4M20 15l-3 3v-2H8a4 4 0 0 1 -4 -4"/></symbol>
+<symbol id="i-flex" viewBox="0 0 24 24"><path d="M7 8l-4 4 4 4M17 8l4 4 -4 4M3 12h18"/></symbol>
+<symbol id="i-rotate" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0 -2 6M20 5v5h-5"/></symbol>
+<symbol id="i-popout" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><rect x="12" y="11" width="7" height="5" rx="1" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3l1.4 2.6 2.9 -.6 .6 2.9L20 12l-2.6 1.4 .6 2.9 -2.9 .6L12 21l-1.4 -2.6 -2.9 .6 -.6 -2.9L4 12l2.6 -1.4 -.6 -2.9 2.9 -.6z"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4v11M8 11l4 4 4 -4M5 20h14"/></symbol>
+<symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 7L4 12l5 5M4 12h11a5 5 0 0 1 0 10h-1"/></symbol>
+<symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 7l5 5 -5 5M20 12H9a5 5 0 0 0 0 10h1"/></symbol>
+<symbol id="i-robot" viewBox="0 0 24 24"><rect x="5" y="8" width="14" height="11" rx="2"/><path d="M12 5v3M9 13h0M15 13h0M9 19v2M15 19v2" stroke-width="2"/></symbol>
+<symbol id="i-pick" viewBox="0 0 24 24"><path d="M12 4c4 0 6 3 6 6 0 4 -4 10 -6 10s-6 -6 -6 -10c0 -3 2 -6 6 -6z"/></symbol>
+<symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 4l8 4 -8 4 -8 -4 8 -4zM4 12l8 4 8 -4M4 16l8 4 8 -4"/></symbol>
+<symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c3 3 3 13 0 16c-3 -3 -3 -13 0 -16z"/></symbol>
+<symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-file" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6zM14 3v4h4M9 13h6M9 17h6"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="3"/><path d="M10.2 12.8L20 3M17 6l2 2M14 9l2 2"/></symbol>
+<symbol id="i-tuner" viewBox="0 0 24 24"><path d="M12 4a8 8 0 0 0 -8 8 8 8 0 0 0 16 0 8 8 0 0 0 -8 -8zM12 12l4 -3"/></symbol>
+<symbol id="i-metro" viewBox="0 0 24 24"><path d="M8 3h8l3 18H5z"/><path d="M5 16h14M12 19l4 -10"/></symbol>
+<symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4l10.5 -10.5a2.1 2.1 0 0 0 -3 -3L5 17z"/><path d="M13.5 6.5l3 3"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2 -2h8"/></symbol>
+<symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0M16 5.2a3.2 3.2 0 0 1 0 5.6M20.5 20a5.5 5.5 0 0 0 -4 -5.3"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12s3.8 -7 10 -7 10 7 10 7 -3.8 7 -10 7 -10 -7 -10 -7z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-book" viewBox="0 0 24 24"><path d="M5 4h11a1 1 0 0 1 1 1v15H6a1 1 0 0 1 -1 -1z"/><path d="M6 17h11"/></symbol>
+<symbol id="i-wand" viewBox="0 0 24 24"><path d="M12 3l1.4 3.6 3.6 1.4 -3.6 1.4L12 13l-1.4 -3.6 -3.6 -1.4 3.6 -1.4z"/><path d="M6 14l-2 6 6 -2"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M9.5 14.5l5 -5M8 12l-2 2a3 3 0 0 0 4 4l2 -2M16 12l2 -2a3 3 0 0 0 -4 -4l-2 2"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></symbol>
+<symbol id="i-import" viewBox="0 0 24 24"><path d="M12 4v11M8 11l4 4 4 -4M5 20h14"/></symbol>
+<symbol id="i-save" viewBox="0 0 24 24"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7M8 20v-6h8v6"/></symbol>
+<symbol id="i-cut" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.5"/><circle cx="6" cy="18" r="2.5"/><path d="M8 8l12 10M8 16L20 6"/></symbol>
+<symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="6" y="4" width="12" height="16" rx="2"/><rect x="9" y="2.5" width="6" height="3.2" rx="1"/></symbol>
+</defs></svg>
 <div class="wrap">
   <div class="menubar">
-    <span class="mb-brand">🎛️ Pitch Studio</span>
+    <span class="mb-brand"><svg class="svi" aria-hidden="true"><use href="#i-sliders"/></svg> Pitch Studio</span>
     <div class="mb-menu">
       <button class="mb-btn" id="fileMenuBtn">File ▾</button>
       <div class="mb-drop" id="fileMenu">
@@ -881,45 +1028,30 @@
     </div>
     <div class="mb-spacer"></div>
     <button class="mb-current song-meta-btn" id="songMetaBtn" title="Set the song title, genre &amp; take — captured as metadata and written into the export (ID3 tags)"><b id="songMetaDisplay">Untitled song</b></button>
-    <button class="mb-btn" id="collabBtn" title="Live collaborate — connect a second browser peer-to-peer; edits &amp; transport sync live (no server)">👥 Collab</button>
+    <button class="mb-btn" id="collabBtn" title="Live collaborate — connect a second browser peer-to-peer; edits &amp; transport sync live (no server)"><svg class="svi" aria-hidden="true"><use href="#i-users"/></svg> Collab</button>
     <b id="sessionLabel" style="display:none">Untitled session</b>
     <div class="mb-spacer"></div>
-    <button class="mb-btn" id="settingsBtn" title="Settings — API keys &amp; privacy">⚙ Settings</button>
+    <button class="mb-btn" id="settingsBtn" title="Settings — API keys &amp; privacy"><svg class="svi" aria-hidden="true"><use href="#i-gear"/></svg> Settings</button>
   </div>
   <input type="file" id="midiFileInput" accept=".mid,.midi,audio/midi" style="display:none">
   <h1 style="display:none">Pitch Studio</h1>
-  <div class="sub">Arrange arps &amp; beats on a beat-aligned timeline · play in-tune tones · detect pitch · record annotated memos (chords · notes · tempo · lyrics) · export MIDI &amp; save sessions. <a id="appVersion" href="https://github.com/rawq-us/pitch-detector/releases" target="_blank" rel="noopener" style="color:var(--muted);text-decoration:none;border-bottom:1px dotted var(--border)" title="Release notes — if this number is older than the latest release, hard-refresh (Cmd/Ctrl+Shift+R)"></a></div>
 
   <!-- ===== Timeline (top) ===== -->
   <div class="panel csec" data-key="timeline">
     <h2>Timeline / arrangement</h2>
     <div class="row tl-controls tl-row1" style="margin-bottom:10px">
       <div class="tl-left">
-        <div class="group"><label for="bpmInput">Project BPM</label><input id="bpmInput" class="tl-in" type="number" min="20" max="400" step="1" value="90" /></div>
-        <div class="group"><label for="tsSel">Time signature</label>
-          <select id="tsSel" class="tl-in">
-            <option value="4/4">4/4</option>
-            <option value="3/4">3/4</option>
-            <option value="2/4">2/4</option>
-            <option value="6/8">6/8</option>
-            <option value="5/4">5/4</option>
-            <option value="7/8">7/8</option>
-            <option value="12/8">12/8</option>
-          </select>
+        <div class="song-meta">
+          <label class="sm-field" for="bpmInput"><span>BPM</span><input id="bpmInput" class="tl-in" type="number" min="20" max="400" step="1" value="90" /></label>
+          <label class="sm-field" for="tsSel"><span>Time</span><select id="tsSel" class="tl-in"><option value="4/4">4/4</option><option value="3/4">3/4</option><option value="2/4">2/4</option><option value="6/8">6/8</option><option value="5/4">5/4</option><option value="7/8">7/8</option><option value="12/8">12/8</option></select></label>
+          <label class="sm-field" for="lenInput"><span>Bars</span><input id="lenInput" class="tl-in" type="text" inputmode="numeric" value="8" /></label>
         </div>
-        <div class="group"><label for="lenInput">Length (bars)</label><input id="lenInput" class="tl-in" type="text" inputmode="numeric" value="8" /></div>
       </div>
       <div class="tl-center tr-row tl-transport">
-        <div class="group"><label>&nbsp;</label><div class="tr-row" style="gap:3px"><button id="undoBtn" class="mini" title="Nothing to undo" disabled>↩</button><button id="redoBtn" class="mini" title="Nothing to redo" disabled>↪</button></div></div>
-        <div class="group"><label>&nbsp;</label><button id="playBtn" class="primary">▶ Play</button></div>
-        <div class="group"><label>&nbsp;</label><div class="tr-row" style="gap:0"><button id="loopBtn" class="on">🔁 Loop: on</button><button id="loopMenuBtn" class="mini" title="Loop options" style="padding:6px 7px">▾</button></div></div>
-        <div class="group"><label for="countInSel">Count-in</label>
-          <select id="countInSel" class="tl-in">
-            <option value="0">Off</option>
-            <option value="1" selected>1 bar</option>
-            <option value="2">2 bars</option>
-          </select>
-        </div>
+        <div class="group"><label>&nbsp;</label><div class="seg"><button id="undoBtn" title="Nothing to undo" disabled><svg class="svi" aria-hidden="true"><use href="#i-undo"/></svg></button><button id="redoBtn" title="Nothing to redo" disabled><svg class="svi" aria-hidden="true"><use href="#i-redo"/></svg></button></div></div>
+        <div class="group"><label>&nbsp;</label><button id="playBtn" class="primary play-btn" title="Play / Stop"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg></button></div>
+        <div class="group"><label>&nbsp;</label><div class="seg"><button id="loopBtn" class="on" title="Loop on/off"><svg class="svi" aria-hidden="true"><use href="#i-loop"/></svg></button><button id="loopMenuBtn" title="Loop options"><svg class="svi" aria-hidden="true"><use href="#i-chev-down"/></svg></button></div></div>
+        <div class="group"><label>&nbsp;</label><div class="countin-ctl" title="Count-in metronome — bars counted in before recording"><svg class="svi countin-ico" aria-hidden="true"><use href="#i-metro"/></svg><select id="countInSel" class="tl-in" title="Count-in metronome bars"><option value="0">Off</option><option value="1" selected>1 bar</option><option value="2">2 bars</option></select></div></div>
       </div>
       <div class="tl-right">
         <span id="loopReadout" style="display:none"></span>
@@ -927,10 +1059,9 @@
       </div>
     </div>
     <div class="row tl-controls" style="margin-bottom:12px">
-      <div class="group"><label>&nbsp;</label><button id="addLayerBtn" class="iconbtn primary" title="Add a layer — choose a type">＋ Add layer</button></div>
-      <div class="group"><label>&nbsp;</label><button id="backingBtn" class="iconbtn" title="Generate backing — turn a chord progression into in-key pad / bass / arp / drum layers, each its own editable, transposable stem">🎸 Backing</button></div>
-      <div class="group"><label>&nbsp;</label><button id="aiComposeBtn" class="iconbtn" title="AI Composer — generate arrangement &amp; lyrics into isolated stems">🤖 AI</button></div>
-      <div class="group"><label>&nbsp;</label><span class="dim" style="font-size:11px">Save / Open / Export &amp; New are in the <b>File</b> menu ↑</span></div>
+      <div class="group"><label>&nbsp;</label><button id="addLayerBtn" class="iconbtn primary" title="Add a layer — choose a type"><svg class="svi" aria-hidden="true"><use href="#i-plus"/></svg> Add layer</button></div>
+      <div class="group"><label>&nbsp;</label><button id="backingBtn" class="iconbtn" title="Generate backing — turn a chord progression into in-key pad / bass / arp / drum layers, each its own editable, transposable stem"><svg class="svi" aria-hidden="true"><use href="#i-layers"/></svg> Backing</button></div>
+      <div class="group"><label>&nbsp;</label><button id="aiComposeBtn" class="iconbtn" title="AI Composer — generate arrangement &amp; lyrics into isolated stems"><svg class="svi" aria-hidden="true"><use href="#i-robot"/></svg> AI</button></div>
       <div class="spacer"></div>
       <div class="group"><label>Master</label><div id="masterMeter" class="tl-meter h" title="Master output level"><i id="masterMeterFill"></i></div></div>
       <div class="group"><label>Zoom</label><div class="tr-row"><button id="tlZoomOut" class="mini" title="Zoom out">−</button><button id="tlZoomReset" class="mini" title="Back to 100%">100%</button><button id="tlZoomIn" class="mini" title="Zoom in">＋</button></div></div>
@@ -949,7 +1080,7 @@
       </div>
       <div class="tl-master-eq"><canvas id="masterEq"></canvas><span class="eq-tag">Master</span></div>
     </div>
-    <div class="hint">Guides are bars &amp; beats. Drag clips to move (snaps to the beat). Drag across the ruler to set a cycle region. Click the ⟳ badge on a clip to set how many beats it loops for — or <b>∞ Fill session</b> to repeat it to the end (a backing track for memo takes). Click a track header to choose where new clips land. The <b>📝 memo</b> layer records and maps the whole take — chords, notes vs. your mode, a tracked tempo map &amp; lyrics; recording a memo grows the session to fit, then sets its length. Double-click a memo clip (or its ✎ badge) to open the editor &amp; export bundle.</div>
+    <div class="hint">Guides are bars &amp; beats. Drag clips to move (snaps to the beat). Drag across the ruler to set a cycle region. Click the ⟳ badge on a clip to set how many beats it loops for — or <b>∞ Fill session</b> to repeat it to the end (a backing track for memo takes). Click a track header to choose where new clips land. The <b>memo</b> layer records and maps the whole take — chords, notes vs. your mode, a tracked tempo map &amp; lyrics; recording a memo grows the session to fit, then sets its length. Double-click a memo clip (or its ✎ badge) to open the editor &amp; export bundle.</div>
   </div>
 
   <!-- ===== Key / mode / tone / mic ===== -->
@@ -968,11 +1099,10 @@
           <option value="locrian">Locrian</option>
         </select>
       </div>
-      <div class="group" style="flex:1;min-width:140px"><label>Feel / genres</label><span class="readout" id="modeMoodOut" style="font-size:11px;line-height:1.3">—</span></div>
-      <div class="group"><label>&nbsp;</label><button id="micBtn" class="primary">🎤 Enable mic</button></div>
-      <div class="group"><label>&nbsp;</label><button id="tunerBtn" class="mini" title="Instrument tuners — guitar, bass, mandolin, ukulele, guitalele, in common tunings">🎸 Tuner</button></div>
+      <span class="readout" id="modeMoodOut" hidden></span>
       <div class="spacer"></div>
-      <div class="group" style="flex:1;min-width:200px"><label>&nbsp;</label><span class="hint" style="margin:0">The detector's reference scale, and the song's <b>default</b> key — change it per-section on the timeline's <b>Key / mode</b> lane (top of the timeline).</span></div>
+      <div class="group"><label>&nbsp;</label><button id="micBtn" class="primary" title="Enable mic — detect pitch"><svg class="svi" aria-hidden="true"><use href="#i-mic"/></svg></button></div>
+      <div class="group"><label>&nbsp;</label><button id="tunerBtn" class="mini" title="Instrument tuners — guitar, bass, mandolin, ukulele, guitalele, in common tunings"><svg class="svi" aria-hidden="true"><use href="#i-tuner"/></svg> Tuner</button></div>
     </div>
     <div class="det-grid">
     <div class="pitch-readout">
@@ -985,7 +1115,7 @@
     <div class="tuner" id="tuner">
       <div class="meter"><div class="center-line"></div><div class="needle" id="needle"></div></div>
       <div class="meter-scale"><span>-50¢</span><span>flat ◁  in tune  ▷ sharp</span><span>+50¢</span></div>
-      <div class="status" id="status">Mic off. Click “Enable mic” and allow access to detect pitch.</div>
+      <div class="status" id="status">Mic off</div>
     </div>
     </div><!-- /det-grid -->
   </div>
@@ -998,7 +1128,7 @@
     </details>
     <div id="synthLayerViz" class="inst-viz"></div>
     <div class="inst-actions">
-      <button id="synthEditBtn" class="inst-edit-btn">🎹 Open Synth Keys — play &amp; edit</button>
+      <button id="synthEditBtn" class="inst-edit-btn"><svg class="svi" aria-hidden="true"><use href="#i-keyboard"/></svg> Open Synth Keys — play &amp; edit</button>
       <span class="dim" style="font-size:11px">keyboard · arpeggiator · filter &amp; oscillators open in a full-screen editor</span>
     </div>
     <div id="synthControls">
@@ -1018,13 +1148,13 @@
         <div class="group"><label>Step length</label><span class="readout" id="msReadout">— ms/step</span></div>
         <div class="group"><label>Length</label><span class="readout arp-bars" id="arpBarsOut">— bars</span></div>
         <div class="spacer"></div>
-        <div class="group"><label>&nbsp;</label><button id="recBtn">● Record</button></div>
+        <div class="group"><label>&nbsp;</label><button id="recBtn"><svg class="svi" aria-hidden="true"><use href="#i-record"/></svg> Record</button></div>
         <div class="group"><label>&nbsp;</label><button id="restBtn">+ Rest</button></div>
-        <div class="group"><label>&nbsp;</label><button id="arpPrevBtn">▶ Play</button></div>
+        <div class="group"><label>&nbsp;</label><button id="arpPrevBtn"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Play</button></div>
         <div class="group"><label>&nbsp;</label><button id="arpClearBtn">Clear</button></div>
         <div class="group"><label>Zoom</label><div class="tr-row"><button id="arpZoomOut" class="mini" title="Zoom out">−</button><button id="arpZoomIn" class="mini" title="Zoom in">+</button></div></div>
         <div class="group"><label>&nbsp;</label><button id="arpToMidiBtn" title="Convert this arp into an editable MIDI layer — rates &amp; repeats expand into notes (the arp stays too)">→ MIDI</button></div>
-        <div class="group"><label>&nbsp;</label><button id="arpAddBtn" class="primary">＋ Timeline</button></div>
+        <div class="group"><label>&nbsp;</label><button id="arpAddBtn" class="primary"><svg class="svi" aria-hidden="true"><use href="#i-plus"/></svg> Timeline</button></div>
       </div>
       <div class="seq" id="seq"></div>
       <div class="arp-stepctl" id="arpStepCtl"></div>
@@ -1073,7 +1203,7 @@
     </div>
     <div class="kbd-foot">
       <div class="kbd-mode"><span class="sublabel">Keyboard</span><div class="seg"><button id="kbPlayBtn" class="seg-on">▶ Play notes</button><button id="kbTransBtn">⇅ Transpose arp</button></div>
-        <button id="kbScaleLockBtn" class="mini seg-on" title="Mute keys outside the current key &amp; mode — drag across the keys and stay in tune (like an omnichord). Turn off to play every key.">🎵 In-key only</button>
+        <button id="kbScaleLockBtn" class="mini seg-on" title="Mute keys outside the current key &amp; mode — drag across the keys and stay in tune (like an omnichord). Turn off to play every key."><svg class="svi" aria-hidden="true"><use href="#i-music"/></svg> In-key only</button>
         <span class="kb-key-now" title="The key/mode the keyboard is showing. During playback it follows the key-map region under the playhead.">Key: <b id="kbKeyNow">C major</b></span>
         <span id="midiStatus" class="midi-status" title="Web MIDI input — a connected USB/Bluetooth MIDI keyboard plays the synth and triggers record.">MIDI: off</span></div>
       <div class="hint" id="legend"></div>
@@ -1086,7 +1216,7 @@
     <div id="midiLayerViz" class="inst-viz"></div>
     <div class="inst-actions">
       <button id="midiNewBtn" class="inst-edit-btn">＋ New MIDI layer</button>
-      <button id="midiEditBtn" class="inst-edit-btn ghost">✎ Edit a MIDI layer</button>
+      <button id="midiEditBtn" class="inst-edit-btn ghost"><svg class="svi" aria-hidden="true"><use href="#i-music"/></svg> Edit a MIDI layer</button>
       <span class="dim" style="font-size:11px">click a layer above to open it in the full-screen piano-roll editor</span>
     </div>
   </div>
@@ -1094,9 +1224,9 @@
   <!-- ===== Synth — keys editor (full-screen modal; the section above is its visualizer) ===== -->
   <div id="synthModal" class="modal" style="display:none">
     <div class="modal-box fs-box">
-      <div class="modal-head"><b>🎹 Synth — keys</b>
+      <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-keyboard"/></svg> Synth — keys</b>
         <span class="ed-keysel" title="The song's base key/mode (the default region at the start of the timeline). The keyboard shades &amp; mutes to it; during playback it follows the timeline's key changes."><span class="ed-keysel-lab">Base key</span><select id="synthKeyRoot"></select><select id="synthKeyMode"></select><span id="synthKeyMood" class="midi-keytag"></span></span>
-        <button id="synthModalClose">✕</button></div>
+        <button id="synthModalClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
       <div id="synthKeyChips" class="tlkey-chips"></div>
       <div class="fs-body" id="synthModalHost"></div>
     </div>
@@ -1105,27 +1235,23 @@
   <!-- ===== Beat machine ===== -->
   <div class="panel csec" data-key="beat">
     <h2>Synth beat</h2>
+    <div class="row beat-toolbar" style="margin-bottom:12px">
+      <div class="group"><label for="beatBarsSel">Length <span class="help" id="beatHelp" tabindex="0">?</span></label>
+        <select id="beatBarsSel"><option value="1">1 bar</option><option value="2">2 bars</option><option value="4">4 bars</option></select>
+      </div>
+      <div class="group"><label>Pattern</label><span class="readout" id="beatLenOut">— steps · — s</span></div>
+      <div class="group"><label>&nbsp;</label><button id="liveRecBtn"><svg class="svi" aria-hidden="true"><use href="#i-record"/></svg> Live record</button></div>
+      <div class="group"><label>&nbsp;</label><button id="beatPrevBtn"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Preview</button></div>
+      <div class="group"><label>&nbsp;</label><button id="beatClearBtn">Clear grid</button></div>
+      <div class="spacer"></div>
+      <div class="group"><label>&nbsp;</label><button id="beatAddBtn" class="primary"><svg class="svi" aria-hidden="true"><use href="#i-plus"/></svg> Timeline</button></div>
+    </div>
     <div class="padlayout">
       <div class="padside">
         <div class="pads" id="pads"></div>
         <div class="pad-legend" id="padLegend"></div>
       </div>
       <div class="gridside">
-        <div class="row" style="margin-bottom:12px">
-          <div class="group"><label for="beatBarsSel">Length <span class="help" id="beatHelp" tabindex="0">?</span></label>
-            <select id="beatBarsSel">
-              <option value="1">1 bar</option>
-              <option value="2">2 bars</option>
-              <option value="4">4 bars</option>
-            </select>
-          </div>
-          <div class="group"><label>Pattern</label><span class="readout" id="beatLenOut">— steps · — s</span></div>
-          <div class="group"><label>&nbsp;</label><button id="liveRecBtn">● Live record</button></div>
-          <div class="group"><label>&nbsp;</label><button id="beatPrevBtn">▶ Preview</button></div>
-          <div class="group"><label>&nbsp;</label><button id="beatClearBtn">Clear grid</button></div>
-          <div class="spacer"></div>
-          <div class="group"><label>&nbsp;</label><button id="beatAddBtn" class="primary">＋ Timeline</button></div>
-        </div>
         <div class="grid-wrap"><table class="gridtable"><tbody id="gridBody"></tbody></table></div>
       </div>
     </div>
@@ -1140,12 +1266,19 @@
         <div class="tr-row"><button id="sampSizeMinus" class="mini" title="Fewer pads">−</button><span class="readout" id="sampSizeOut" style="min-width:42px;text-align:center">2×2</span><button id="sampSizePlus" class="mini" title="More pads">＋</button></div>
       </div>
       <div class="group"><label>Mode</label>
-        <div class="tr-row"><button id="sampModePlay" class="mini seg-on" title="Tap pads to play">▶ Play</button><button id="sampModeEdit" class="mini" title="Load, rename, group & drag pads">✎ Edit</button></div>
+        <div class="tr-row"><button id="sampModePlay" class="mini seg-on" title="Tap pads to play"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Play</button><button id="sampModeEdit" class="mini" title="Load, rename, group & drag pads"><svg class="svi" aria-hidden="true"><use href="#i-edit"/></svg> Edit</button></div>
       </div>
       <div class="group"><label for="sampBarsSel">Length</label>
         <select id="sampBarsSel"><option value="1">1 bar</option><option value="2">2 bars</option><option value="4">4 bars</option></select>
       </div>
       <div class="group"><label>Grid</label><span class="readout" id="sampLenOut">— steps</span></div>
+    </div>
+    <div class="row beat-toolbar" style="margin-bottom:10px">
+      <div class="group"><label>&nbsp;</label><button id="sampPrevBtn"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Preview</button></div>
+      <div class="group"><label>&nbsp;</label><button id="sampLiveRecBtn" title="In Play mode, tap pads while this is on to record hits at the playhead"><svg class="svi" aria-hidden="true"><use href="#i-record"/></svg> Live record</button></div>
+      <div class="group"><label>&nbsp;</label><button id="sampClearBtn">Clear grid</button></div>
+      <div class="spacer"></div>
+      <div class="group"><label>&nbsp;</label><button id="sampAddBtn" class="primary"><svg class="svi" aria-hidden="true"><use href="#i-plus"/></svg> Timeline</button></div>
     </div>
     <div class="padlayout">
       <div class="padside">
@@ -1153,13 +1286,6 @@
         <div class="samp-detail" id="sampPadDetail"></div>
       </div>
       <div class="gridside">
-        <div class="row" style="margin-bottom:10px">
-          <div class="group"><label>&nbsp;</label><button id="sampPrevBtn">▶ Preview</button></div>
-          <div class="group"><label>&nbsp;</label><button id="sampLiveRecBtn" title="In Play mode, tap pads while this is on to record hits at the playhead">● Live record</button></div>
-          <div class="group"><label>&nbsp;</label><button id="sampClearBtn">Clear grid</button></div>
-          <div class="spacer"></div>
-          <div class="group"><label>&nbsp;</label><button id="sampAddBtn" class="primary">＋ Timeline</button></div>
-        </div>
         <div class="grid-wrap"><table class="gridtable"><tbody id="sampGridBody"></tbody></table></div>
       </div>
     </div>
@@ -1172,7 +1298,7 @@
     <div class="hint" style="margin-top:0">Write in the bracket/paren format — <code>[Singer: C2–G5 style]</code> defines a voice, <code>[Verse 1 - Singer]</code> heads a section, <code>[B2]word</code> sets a note, <code>(parens)</code> = background vocal, <code>[guitar solo]</code> = instrumental. <b>Time is never typed</b> — add it by <b>syncing</b>. The backbone holds time + notes + singers and exports to Apple Music (TTML), karaoke (LRC/SRT), Musixmatch and AI generators.</div>
     <div class="hint" style="margin-top:4px"><b>Section header rule:</b> <code>[Structure - label]</code> — the keyword <i>before</i> the <code> - </code> (space‑dash‑space) is the <b>hard structure</b> (Intro · Verse · Pre‑chorus · Chorus · Bridge · Solo · Outro, optionally numbered); everything <i>after</i> is a <b>freeform label</b> (a singer like <code>Lead</code> / <code>Rapper A</code>, or directions). Singer <i>definitions</i> use a colon: <code>[Lead: C3–A4]</code>. These headers drive the <b>Song structure</b> lane above ↑ (and it drives them back).</div>
     <details id="lyrStyleBox" class="lyr-style">
-      <summary>🎚 Style tags <span class="dim">— session-level, sent with every AI export</span></summary>
+      <summary>Style tags <span class="dim">— session-level, sent with every AI export</span></summary>
       <div class="hint" style="margin:8px 0">Describe the <b>sound</b> with tags a generator can reproduce — genre, mood, instruments, vocal type, production texture. <b>Don't use artist, song, or album names</b> — they're trademarked and most services reject them; reverse-engineer the vibe into descriptors instead. Tempo (<span id="styBpmHint">90</span>bpm) is added automatically from the transport.</div>
       <div class="sty-field-head"><span class="sty-field-lab">Style</span><span class="sty-count" id="styCount">0/1000</span></div>
       <textarea id="styText" class="sty-text" spellcheck="false" placeholder="Male Vocal, boom-bap, dusty, sub-heavy, reverb, fender rhodes, spooky choir, detuned…  — type any tags (comma-separated) or click the buttons below"></textarea>
@@ -1234,12 +1360,13 @@
     </div>
     <div class="hint">The master bus is <b>EQ-only</b> (low shelf ~220 Hz · mid peak ~1 kHz · high shelf ~3.8 kHz). Per-layer effects — <b>level, drive, chorus, phaser, delay, reverb, compressor</b> — live on each track: click <b>FX</b> on a track header to open its rack.</div>
   </div>
+  <div class="app-footer"><a id="appVersion" href="https://github.com/rawq-us/pitch-detector/releases" target="_blank" rel="noopener" title="Release notes — if this number is older than the latest release, hard-refresh (Cmd/Ctrl+Shift+R)"></a></div>
 </div>
 
 <!-- Per-track FX modal -->
 <div id="fxModal" class="modal" style="display:none">
   <div class="modal-box">
-    <div class="modal-head"><b id="fxModalTitle">Track FX</b><button id="fxModalClose">✕</button></div>
+    <div class="modal-head"><b id="fxModalTitle">Track FX</b><button id="fxModalClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="knob vert" style="margin-bottom:14px"><label>Track level <span id="lvlOut">100%</span></label><input id="lvlR" type="range" min="0" max="1.5" step="0.01" value="1" /></div>
     <div class="fx-grid">
       <div class="fx" id="fx-drive">
@@ -1283,7 +1410,7 @@
 <!-- Song package export modal -->
 <div id="songModal" class="modal" style="display:none">
   <div class="modal-box" style="max-width:680px">
-    <div class="modal-head"><b>Export song package</b><button id="songModalClose">✕</button></div>
+    <div class="modal-head"><b>Export song package</b><button id="songModalClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" style="margin-top:0">Bounces a finished track with embedded artwork, genre &amp; metadata, a karaoke (instrumental) mix, synced lyrics (LRC/SRT) ready for Musixmatch, isolated stems, and a manifest — all in one zip. Audio is MP3 where the browser can encode it, otherwise a tagged WAV.</div>
     <div class="row knobrow" style="gap:12px">
       <div class="group" style="flex:1"><label for="songTitle">Title</label><input id="songTitle" type="text" placeholder="Song title"></div>
@@ -1310,7 +1437,7 @@
 <!-- AI Composer modal -->
 <div id="welcomeModal" class="modal" style="display:none">
   <div class="welcome-box">
-    <button id="welcomeClose" class="welcome-close" title="Close">✕</button>
+    <button id="welcomeClose" class="welcome-close" title="Close"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button>
     <div class="welcome-scroll">
     <div class="welcome-eyebrow">Free · Open source · 100% in your browser</div>
     <div class="welcome-hero">Pitch Studio</div>
@@ -1318,22 +1445,22 @@
     <div class="welcome-mission">Catch a song the moment it strikes — hum it, play it, type it — then shape it with real music theory and hand it off clean. No account. No subscription. No one watching. Just you and the idea. We built this because making music shouldn't cost your privacy, your wallet, or your data.</div>
     <div class="welcome-grid">
       <div class="wp" style="--wp-c:#34d399">
-        <div class="wp-head"><span class="wp-ico">🆓</span><span class="wp-title">Free &amp; yours, forever</span></div>
+        <div class="wp-head"><span class="wp-ico"><svg class="svi" aria-hidden="true"><use href="#i-wand"/></svg></span><span class="wp-title">Free &amp; yours, forever</span></div>
         <div class="wp-desc">Completely free with nothing held back. Open source, so it's yours to keep — and your sessions never leave your device.</div>
         <div class="wp-pills"><span class="wp-pill">Free</span><span class="wp-pill">No ads</span><span class="wp-pill">No tracking</span><span class="wp-pill">No sign-up</span><span class="wp-pill">No paywalls</span><span class="wp-pill">Open source</span></div>
       </div>
       <div class="wp" style="--wp-c:#38bdf8">
-        <div class="wp-head"><span class="wp-ico">🎚️</span><span class="wp-title">A studio, fully in the browser</span></div>
+        <div class="wp-head"><span class="wp-ico"><svg class="svi" aria-hidden="true"><use href="#i-sliders"/></svg></span><span class="wp-title">A studio, fully in the browser</span></div>
         <div class="wp-desc">A serverless DAW that runs entirely on your machine. Plug in a MIDI instrument, tune up with the built-in tuner, and pop panels out to their own windows.</div>
         <div class="wp-pills"><span class="wp-pill">In-browser DAW</span><span class="wp-pill">MIDI instrument input</span><span class="wp-pill">Instrument tuner</span><span class="wp-pill">Multi-window</span></div>
       </div>
       <div class="wp" style="--wp-c:#a855f7">
-        <div class="wp-head"><span class="wp-ico">🎤</span><span class="wp-title">From a hum to a song</span></div>
+        <div class="wp-head"><span class="wp-ico"><svg class="svi" aria-hidden="true"><use href="#i-mic"/></svg></span><span class="wp-title">From a hum to a song</span></div>
         <div class="wp-desc">Pitch detection turns a hummed melody into notes. A smart lyrics editor and AI that transcribes your audio into timed lyrics get the words down fast.</div>
         <div class="wp-pills"><span class="wp-pill">Pitch detection</span><span class="wp-pill">Smart lyrics editor</span><span class="wp-pill">AI audio → lyrics</span></div>
       </div>
       <div class="wp" style="--wp-c:#fbbf24">
-        <div class="wp-head"><span class="wp-ico">🤝</span><span class="wp-title">Made together — and portable</span></div>
+        <div class="wp-head"><span class="wp-ico"><svg class="svi" aria-hidden="true"><use href="#i-users"/></svg></span><span class="wp-title">Made together — and portable</span></div>
         <div class="wp-desc">Collaborate live, peer-to-peer over WebRTC — no server, no middleman. Bring your own AI via OpenRouter. Everything exports to formats you can take anywhere.</div>
         <div class="wp-pills"><span class="wp-pill">Live WebRTC collab</span><span class="wp-pill">BYO AI · OpenRouter</span><span class="wp-pill">Export MIDI</span><span class="wp-pill">Audio stems</span><span class="wp-pill">Portable lyrics</span></div>
       </div>
@@ -1353,7 +1480,7 @@
 
 <div id="addLayerModal" class="modal" style="display:none">
   <div class="modal-box" style="max-width:640px">
-    <div class="modal-head"><b>＋ Add a layer</b><button id="addLayerClose">✕</button></div>
+    <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-plus"/></svg> Add a layer</b><button id="addLayerClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" style="margin-top:0">Pick a layer type — each lands as its own editable, transposable track on the timeline.</div>
     <div class="layer-grid" id="layerGrid"></div>
   </div>
@@ -1361,7 +1488,7 @@
 
 <div id="collabModal" class="modal" style="display:none">
   <div class="modal-box collab-box" style="max-width:620px">
-    <div class="modal-head"><b>👥 Collaborate live</b><button id="collabClose">✕</button></div>
+    <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-users"/></svg> Collaborate live</b><button id="collabClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="collab-status-row"><span id="collabStatus" class="dim">Not connected.</span><span id="collabPeers" class="dim"></span></div>
 
     <!-- STEP: start — the only way to begin is to host; joining happens by opening a link -->
@@ -1378,7 +1505,7 @@
         <div class="collab-stepnum">Step 1 · Send the invite</div>
         <p class="collab-explain">Copy this link and send it to whoever you want to jam with — text, email, chat, anywhere.</p>
         <textarea id="collabOffer" rows="2" readonly placeholder="generating your invite link…"></textarea>
-        <button id="collabOfferCopy" class="primary collab-bigbtn" style="margin-top:9px">📋 Copy invite link</button>
+        <button id="collabOfferCopy" class="primary collab-bigbtn" style="margin-top:9px"><svg class="svi" aria-hidden="true"><use href="#i-copy"/></svg> Copy invite link</button>
         <button type="button" id="collabOfferQRtoggle" class="collab-qrtoggle">⊞ Show QR code</button>
         <div class="collab-qr collab-qrbox" id="collabOfferQR" style="display:none"></div>
       </div>
@@ -1387,7 +1514,7 @@
         <div class="collab-stepnum">Step 2 · Paste their reply</div>
         <p class="collab-explain">They'll open your link and get a <b>reply link</b> of their own. Paste it below and you're connected.</p>
         <textarea id="collabAnswerIn" class="collab-bigpaste" rows="4" placeholder="⬇  Paste the reply link your collaborator sends back  ⬇"></textarea>
-        <button id="collabAnswerInBtn" class="primary collab-bigbtn" style="display:none;margin-top:9px">🔗 Connect</button>
+        <button id="collabAnswerInBtn" class="primary collab-bigbtn" style="display:none;margin-top:9px"><svg class="svi" aria-hidden="true"><use href="#i-link"/></svg> Connect</button>
       </div>
     </div>
 
@@ -1396,7 +1523,7 @@
       <div class="collab-stepnum">Last step · Send this back</div>
       <p class="collab-explain">You're joining <b id="collabJoinHost">your host</b>'s session. Copy this reply link and send it back to them — you'll connect the moment they paste it in.</p>
       <textarea id="collabReply" rows="2" readonly placeholder="preparing your reply link…"></textarea>
-      <button id="collabReplyCopy" class="primary collab-bigbtn" style="margin-top:9px">📋 Copy reply link</button>
+      <button id="collabReplyCopy" class="primary collab-bigbtn" style="margin-top:9px"><svg class="svi" aria-hidden="true"><use href="#i-copy"/></svg> Copy reply link</button>
       <button type="button" id="collabReplyQRtoggle" class="collab-qrtoggle">⊞ Show QR code</button>
       <div class="collab-qr collab-qrbox" id="collabReplyQR" style="display:none"></div>
     </div>
@@ -1414,7 +1541,7 @@
 
 <div id="backingModal" class="modal" style="display:none">
   <div class="modal-box back-box">
-    <div class="modal-head"><b>🎸 Generate backing</b><button id="backingClose">✕</button></div>
+    <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-pick"/></svg> Generate backing</b><button id="backingClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="back-intro">A chord progression → editable <b>pad · bass · arp · drum</b> layers, each on its own track and in key.</div>
 
     <div class="back-sec">
@@ -1429,8 +1556,8 @@
         <summary>Other sources · type chords directly</summary>
         <div class="back-adv-body">
           <div class="tr-row" style="gap:8px;flex-wrap:wrap;margin-bottom:8px">
-            <button id="backFromMemo" class="mini" title="Use chords detected from a recorded memo">🎤 From a memo</button>
-            <button id="backFromAi" class="mini" title="Ask the AI for a progression in your key">🤖 AI suggest</button>
+            <button id="backFromMemo" class="mini" title="Use chords detected from a recorded memo"><svg class="svi" aria-hidden="true"><use href="#i-mic"/></svg> From a memo</button>
+            <button id="backFromAi" class="mini" title="Ask the AI for a progression in your key"><svg class="svi" aria-hidden="true"><use href="#i-robot"/></svg> AI suggest</button>
           </div>
           <label class="back-adv-lab" for="backProg">Type chords — e.g. <code>C G Am F</code> · <code>Cmaj7 | Dm7 | G7</code></label>
           <input id="backProg" type="text" placeholder="C G Am F" style="width:100%">
@@ -1459,7 +1586,7 @@
     </div>
 
     <div class="back-sec back-fill">
-      <label class="back-fill-toggle"><input type="checkbox" id="backFillKeys"> 🎼 <b>Fill the whole song by its key changes</b></label>
+      <label class="back-fill-toggle"><input type="checkbox" id="backFillKeys"> <b>Fill the whole song by its key changes</b></label>
       <div class="dim" id="backFillInfo" style="font-size:11px;margin-top:6px;line-height:1.55"></div>
     </div>
 
@@ -1468,7 +1595,7 @@
       <div class="group"><label for="backBars">Chords / bar</label><input id="backBars" type="number" min="1" max="4" value="1" title="How many chords per bar (1 = one each bar, 2 = two, …)"></div>
     </div>
     <div class="back-actions">
-      <button id="backingRun" class="primary">🎸 Generate layers</button>
+      <button id="backingRun" class="primary"><svg class="svi" aria-hidden="true"><use href="#i-pick"/></svg> Generate layers</button>
       <span class="readout" id="backingStatus"></span>
     </div>
   </div>
@@ -1477,7 +1604,7 @@
 
 <div id="aiModal" class="modal" style="display:none">
   <div class="modal-box" style="max-width:680px">
-    <div class="modal-head"><b>🤖 AI Composer</b><button id="aiModalClose">✕</button></div>
+    <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-robot"/></svg> AI Composer</b><button id="aiModalClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" style="margin-top:0">Describe what you want — start a new idea, or <b>edit what you already have</b> ("make the beat busier", "add a bassline in the key", "use my Kick &amp; Snare pads for a trap pattern", "switch to D minor"). The model is sent a summary of your <b>current project</b> (tempo, key, tracks, loaded sampler pad names, lyrics) and replies with edit operations the app applies — building isolated stems with this app's own synth, drum & sampler engine. Bring your own API key — stored only in this browser. The LLM composes/edits; it does not synthesize audio (your recorded/sampled audio is summarized, never uploaded). Optional: an audio-generation endpoint can import a generated stem.</div>
     <div class="ai-cfg-line">
       <span id="aiCfgSummary" class="dim">No API key set — add one in Settings.</span>
@@ -1499,9 +1626,9 @@
 <!-- Settings modal — API keys & privacy -->
 <div id="settingsModal" class="modal" style="display:none">
   <div class="modal-box" style="max-width:640px">
-    <div class="modal-head"><b>⚙ Settings — API keys</b><button id="settingsClose">✕</button></div>
+    <div class="modal-head"><b>⚙ Settings — API keys</b><button id="settingsClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="settings-privacy">
-      <b>🔒 Your keys stay in your browser.</b> Everything below is saved only in this browser's
+      <b>Your keys stay in your browser.</b> Everything below is saved only in this browser's
       local storage and sent only to the vendor you pick (e.g. OpenRouter) to fulfil the requests
       you trigger. This app has <b>no server of its own</b> — it does not track, collect, transmit,
       or store your keys, prompts, or projects anywhere else. Clearing your browser data (or the
@@ -1526,7 +1653,12 @@
       <span class="readout" id="settingsStatus" style="flex:1"></span>
     </div>
     <div class="settings-privacy" style="margin-top:14px">
-      <b>🧹 App layout &amp; preferences.</b> Reset the panel order, minimized/expanded (minified) state,
+      <b>Color theme.</b> Re-skin the whole app. Your choice is remembered on this device.
+      <div class="group" style="margin-top:8px;max-width:240px"><label for="themeSel">Theme</label>
+        <select id="themeSel"><option value="rack">Rack (default)</option><option value="classic">Classic</option><option value="midnight">Midnight</option></select></div>
+    </div>
+    <div class="settings-privacy" style="margin-top:14px">
+      <b>App layout &amp; preferences.</b> Reset the panel order, minimized/expanded (minified) state,
       track-name column width, and keyboard view back to <b>first-open defaults</b> — handy for seeing the
       app the way a brand-new user does. This does <b>not</b> touch your saved sessions or your API keys.
       <div style="margin-top:8px"><button id="settingsResetLayout" title="Reset section order, collapse state &amp; UI prefs to defaults (reloads the page)">↺ Reset app layout to defaults</button></div>
@@ -1538,9 +1670,9 @@
 <!-- ===== Generic clip editor — hosts a relocated section body (beat / sampler) ===== -->
 <div id="clipEditorModal" class="modal" style="display:none">
   <div class="modal-box fs-box">
-    <div class="modal-head"><b><span id="cemTitle">Edit clip</span></b>
+    <div class="modal-head editor-head"><b><span id="cemTitle">Edit clip</span></b>
       <input id="cemName" class="clip-name-in" placeholder="clip name…" title="Name this clip — shows on the timeline">
-      <button id="cemClose" title="Close & keep changes">✕ Done</button></div>
+      <button id="cemClose" title="Close — keeps your changes"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="fs-body"><div id="cemHost" class="cem-host"></div></div>
   </div>
 </div>
@@ -1548,12 +1680,12 @@
 <!-- ===== Voice clip editor — trim & gain ===== -->
 <div id="voiceModal" class="modal" style="display:none">
   <div class="modal-box fs-box">
-    <div class="modal-head"><b>🎙 <span id="voiceTitle">Voice clip</span></b>
+    <div class="modal-head editor-head"><b><svg class="svi" aria-hidden="true"><use href="#i-mic"/></svg> <span id="voiceTitle">Voice clip</span></b>
       <input id="voiceClipName" class="clip-name-in" placeholder="clip name…" title="Name this clip — shows on the timeline">
-      <button id="voiceClose">✕ Done</button></div>
+      <button id="voiceClose" title="Close"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="fs-body">
       <div class="row" style="margin-bottom:12px;align-items:flex-end;gap:14px">
-        <div class="group"><label>&nbsp;</label><button id="voicePlayBtn" class="primary">▶ Play</button></div>
+        <div class="group"><label>&nbsp;</label><button id="voicePlayBtn" class="primary"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Play</button></div>
         <div class="group"><label>Gain <span id="voiceGainOut" class="readout"></span></label><input id="voiceGain" type="range" min="0" max="2" step="0.01" value="1" style="width:170px"></div>
         <div class="group"><label>&nbsp;</label><button id="voiceTrimReset" class="mini">Reset trim</button></div>
         <div class="spacer"></div>
@@ -1574,29 +1706,29 @@
 
 <div id="midiModal" class="modal" style="display:none">
   <div class="modal-box midi-box">
-    <div class="modal-head"><b>🎹 <span id="midiTitle">MIDI editor</span></b>
+    <div class="modal-head editor-head"><b><svg class="svi" aria-hidden="true"><use href="#i-keyboard"/></svg> <span id="midiTitle">MIDI editor</span></b>
       <input id="midiClipName" class="clip-name-in" placeholder="clip name…" title="Name this clip — shows on the timeline">
       <span class="ed-keysel" title="The key/mode at this clip's spot on the timeline. Changing it edits the timeline's key here — not a global setting."><span class="ed-keysel-lab">Key at this clip</span><select id="midiKeyRoot"></select><select id="midiKeyMode"></select><span id="midiKeyTag" class="midi-keytag"></span></span>
-      <button id="midiClose">✕</button></div>
+      <button id="midiClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="row midi-toolbar">
       <label class="midi-tl-field">Bars <select id="midiBars" class="midi-in"></select></label>
       <label class="midi-tl-field">Snap <select id="midiSnap" class="midi-in"><option value="1">1/4</option><option value="0.5" selected>1/8</option><option value="0.25">1/16</option><option value="0.3333">1/8 trip</option><option value="0">off</option></select></label>
-      <button id="midiPlay" class="mini" title="Audition this clip (loops)">▶ Play</button>
-      <button id="midiRecBtn" class="mini" title="Arm recording — play the keyboard below (QWERTY / on-screen / hardware MIDI) and notes land on the grid at the playhead">● Record</button>
+      <button id="midiPlay" class="mini" title="Audition this clip (loops)"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Play</button>
+      <button id="midiRecBtn" class="mini" title="Arm recording — play the keyboard below (QWERTY / on-screen / hardware MIDI) and notes land on the grid at the playhead"><svg class="svi" aria-hidden="true"><use href="#i-record"/></svg> Record</button>
       <button id="midiQuant" class="mini" title="Snap selected notes (or all) to the grid">Quantize</button>
       <button id="midiClear" class="mini" title="Remove all notes">Clear</button>
-      <button id="midiFxBtn" class="mini" title="This layer's FX & level — phaser, chorus, delay, reverb, drive, compressor (per-layer)">🎛 FX</button>
-      <button id="midiInKeyBtn" class="mini" title="In-key only — snap new/moved notes to the key at each note's beat (toggle off for chromatic freedom)">🎵 In-key only</button>
-      <button id="midiScaleFocusBtn" class="mini" title="Scale focus — dim the off-key rows so only in-key lanes show (notes stay put; out-of-key notes go red so you can fix them)">👁 Scale focus</button>
-      <button id="midiAddKeyBtn" class="mini" title="Add a key/mode change inside this clip (e.g. a different key for the chorus) — give your loop a verse and a chorus in different keys">✚ Key change</button>
-      <button id="midiLibBtn" class="mini" title="Drop in a common chord progression or arp for your genre — rendered in the current key">📚 Patterns</button>
+      <button id="midiFxBtn" class="mini" title="This layer's FX & level — phaser, chorus, delay, reverb, drive, compressor (per-layer)"><svg class="svi" aria-hidden="true"><use href="#i-sliders"/></svg> FX</button>
+      <button id="midiInKeyBtn" class="mini" title="In-key only — snap new/moved notes to the key at each note's beat (toggle off for chromatic freedom)"><svg class="svi" aria-hidden="true"><use href="#i-music"/></svg> In-key only</button>
+      <button id="midiScaleFocusBtn" class="mini" title="Scale focus — dim the off-key rows so only in-key lanes show (notes stay put; out-of-key notes go red so you can fix them)"><svg class="svi" aria-hidden="true"><use href="#i-eye"/></svg> Scale focus</button>
+      <button id="midiAddKeyBtn" class="mini" title="Add a key/mode change inside this clip (e.g. a different key for the chorus) — give your loop a verse and a chorus in different keys"><svg class="svi" aria-hidden="true"><use href="#i-plus"/></svg> Key change</button>
+      <button id="midiLibBtn" class="mini" title="Drop in a common chord progression or arp for your genre — rendered in the current key"><svg class="svi" aria-hidden="true"><use href="#i-book"/></svg> Patterns</button>
       <label class="midi-tl-field">Zoom <button id="midiZoomOut" class="mini" title="Zoom out (⌃-scroll / pinch)">−</button><button id="midiZoomIn" class="mini" title="Zoom in (⌃-scroll / pinch)">+</button></label>
       <span class="hint" style="margin-left:auto;max-width:260px">Click = add · drag = move · edge = resize · ⌃-scroll/pinch = zoom · <b>Del</b></span>
     </div>
     <div id="midiKeyChips" class="tlkey-chips"></div>
     <div id="midiRollWrap"><div id="midiKeyRuler"></div><div id="midiRoll"></div></div>
     <div id="midiLib" class="midi-lib" style="display:none">
-      <div class="midi-lib-head"><b>📚 Pattern library</b><button id="midiLibClose" class="mini">✕</button></div>
+      <div class="midi-lib-head"><b><svg class="svi" aria-hidden="true"><use href="#i-book"/></svg> Pattern library</b><button id="midiLibClose" class="mini"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
       <div class="row" style="gap:8px;align-items:flex-end;margin:6px 0"><div class="group" style="flex:1"><label for="midiLibGenre">Genre</label><select id="midiLibGenre" style="width:100%"></select></div></div>
       <div class="hint" style="margin:0 0 6px">Rendered in <b id="midiLibKey">C major</b>. ▶ preview · ＋ adds to this clip after the last note.</div>
       <div id="midiLibList" class="midi-lib-list"></div>
@@ -1612,7 +1744,7 @@
 </div>
 <div id="tunerModal" class="modal" style="display:none">
   <div class="modal-box" style="max-width:680px">
-    <div class="modal-head"><b>🎸 Instrument tuner</b><button id="tunerClose">✕</button></div>
+    <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-tuner"/></svg> Instrument tuner</b><button id="tunerClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" style="margin-top:0">Pick an instrument &amp; tuning, then <b>enable the mic and pluck a string</b> — the meter shows how many cents sharp/flat you are and snaps to the nearest string. Click a string to hear its reference pitch.</div>
     <div class="row ctl-row" style="gap:16px;align-items:flex-end;margin:14px 0">
       <div class="group"><label for="tunerInst">Instrument</label><select id="tunerInst"></select></div>
@@ -1620,7 +1752,7 @@
     </div>
     <div class="tuner-meter" id="tunerMeter">
       <div class="tm-top">
-        <button id="tunerMicBtn" class="mini">🎤 Enable mic</button>
+        <button id="tunerMicBtn" class="mini"><svg class="svi" aria-hidden="true"><use href="#i-mic"/></svg> Enable mic</button>
         <div class="tm-note" id="tmNote">—</div>
         <div class="tm-target" id="tmTarget">enable the mic, then pluck a string</div>
       </div>
@@ -1637,7 +1769,7 @@
 <!-- Lyrics generation wizard -->
 <div id="lyrWizModal" class="modal" style="display:none">
   <div class="modal-box"><div class="modal-inner">
-    <div class="modal-head"><b>✨ Generate lyrics</b><button id="lyrWizClose">✕</button></div>
+    <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-wand"/></svg> Generate lyrics</b><button id="lyrWizClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" style="margin-top:0">Configure the song; the AI (your Settings model — e.g. Gemini via OpenRouter) writes a structured lyric sheet in Pitch Studio's format (key, mode, tempo, sections, singers) that you can tweak, sync and reword. <b>Artist/song references are only used to infer a style — their names never appear in the output.</b></div>
     <div class="lyrwiz-grid">
       <label class="lw-full">What's the song about?<textarea id="lwTheme" rows="2" placeholder="e.g. shaking off a bad week and going out anyway"></textarea></label>
@@ -1673,7 +1805,7 @@
 <!-- Lyrics mulligan (reword selection → 6 variations) -->
 <div id="lyrMullModal" class="modal" style="display:none">
   <div class="modal-box"><div class="modal-inner">
-    <div class="modal-head"><b>✨ Reword selection</b><button id="lyrMullClose">✕</button></div>
+    <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-wand"/></svg> Reword selection</b><button id="lyrMullClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" style="margin-top:0">The AI rewrites just your selected lines in the context of the whole song and returns 6 options. Pick one to drop in, edit it first, or reprompt.</div>
     <label class="lw-full lm-lab">Selected<textarea id="lmSel" rows="3" readonly></textarea></label>
     <label class="lw-full lm-lab">What do you want changed? <span class="dim">(optional)</span><textarea id="lmComments" rows="2" placeholder="e.g. punchier, keep the rhyme, less cheesy"></textarea></label>
@@ -1688,11 +1820,11 @@
 <!-- Pitch-map editor (per-sound piano roll) -->
 <div id="pitchModal" class="modal" style="display:none">
   <div class="modal-box">
-    <div class="modal-head"><b id="pitchTitle">Pitch map</b><button id="pitchClose">✕</button></div>
+    <div class="modal-head"><b id="pitchTitle">Pitch map</b><button id="pitchClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="hint" id="pitchHint" style="margin-top:0">Click a step at a pitch to place a hit; click it again to remove it. Drag a hit up/down to retune it (it re-triggers as you move). One hit per step.</div>
     <div class="row" style="margin-bottom:8px">
       <div class="group" id="pitchModeGroup"><label>Scale lock</label><button id="pitchModeLock" class="mini" title="Snap drags to the current musical mode">Off</button></div>
-      <div class="group"><label>&nbsp;</label><button id="pitchPrevBtn">▶ Preview</button></div>
+      <div class="group"><label>&nbsp;</label><button id="pitchPrevBtn"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Preview</button></div>
       <div class="group"><label>&nbsp;</label><button id="pitchResetBtn">Reset pitches</button></div>
       <div class="spacer"></div>
     </div>
@@ -1710,24 +1842,24 @@
 <!-- Memo (annotated) editor modal -->
 <div id="memoModal" class="modal" style="display:none">
   <div class="modal-box memo-box">
-    <div class="modal-head"><b id="memoTitle">Memo</b>
+    <div class="modal-head editor-head"><b id="memoTitle">Memo</b>
       <input id="memoClipName" class="clip-name-in" placeholder="memo name…" title="Name this memo clip — shows on the timeline">
-      <button id="memoClose">✕</button></div>
+      <button id="memoClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="memo-sum" id="memoSummary"></div>
     <div class="row" style="margin-bottom:12px">
       <div class="group"><label for="memoKeySel">Analysis key</label><select id="memoKeySel"></select></div>
-      <div class="group"><label>&nbsp;</label><button id="memoReanalyze">↻ Re-analyze</button></div>
+      <div class="group"><label>&nbsp;</label><button id="memoReanalyze"><svg class="svi" aria-hidden="true"><use href="#i-rotate"/></svg> Re-analyze</button></div>
       <div class="group"><label>Downbeat</label><div class="tr-row"><button id="memoDbL" class="mini">◀</button><button id="memoDbR" class="mini">▶</button></div></div>
-      <div class="group"><label>&nbsp;</label><button id="memoPlayBtn">▶ Play memo</button></div>
+      <div class="group"><label>&nbsp;</label><button id="memoPlayBtn"><svg class="svi" aria-hidden="true"><use href="#i-play"/></svg> Play memo</button></div>
       <div class="group"><label>Zoom <span class="dim">— pinch or ctrl+scroll works too</span></label><div class="tr-row"><button id="memoZoomOut" class="mini">−</button><button id="memoZoomReset" class="mini" title="Back to 100% (fit)">100%</button><button id="memoZoomIn" class="mini">＋</button></div></div>
       <div class="spacer"></div>
       <div class="group"><label>&nbsp;</label><button id="memoUseKey" title="Set the project key & mode to this memo's key">Use key in project</button></div>
       <div class="group"><label>&nbsp;</label><button id="memoUseBpm" title="Set the project BPM to this memo's tracked tempo">Use BPM in project</button></div>
     </div>
     <div class="row" id="memoFlexRow" style="margin-bottom:12px; align-items:flex-end">
-      <div class="group"><label>Flex time <span class="dim">— warp the take onto the grid</span></label><button id="memoFlexBtn" title="Time-stretch this take so its tracked beats land on the project's tempo grid (pitch preserved)">🔀 Flex to grid</button></div>
+      <div class="group"><label>Flex time <span class="dim">— warp the take onto the grid</span></label><button id="memoFlexBtn" title="Time-stretch this take so its tracked beats land on the project's tempo grid (pitch preserved)"><svg class="svi" aria-hidden="true"><use href="#i-flex"/></svg> Flex to grid</button></div>
       <div class="group"><label for="memoFlexStrength">Strength <span class="readout" id="memoFlexStrengthOut">100%</span></label><input id="memoFlexStrength" type="range" min="0" max="1" step="0.05" value="1" title="100% snaps beats exactly to the grid · lower values keep some of the original feel"></div>
-      <div class="group"><label>&nbsp;</label><button id="memoFlexReset" class="mini" title="Remove flex — restore the original timing">↻ Unflex</button></div>
+      <div class="group"><label>&nbsp;</label><button id="memoFlexReset" class="mini" title="Remove flex — restore the original timing"><svg class="svi" aria-hidden="true"><use href="#i-rotate"/></svg> Unflex</button></div>
       <div class="group"><label>&nbsp;</label><span class="readout" id="memoFlexInfo" style="line-height:36px"></span></div>
     </div>
     <div class="memo-canvas-wrap"><canvas id="memoCanvas" height="260"></canvas></div>
@@ -1742,7 +1874,7 @@
     <div class="memo-chips" id="memoChips"></div>
     <h2 class="subhead">Lyrics</h2>
     <div class="row" style="margin-bottom:8px; align-items:flex-end">
-      <div class="group"><label>&nbsp;</label><button id="memoTranscribe" title="AI speech-to-text, run locally in your browser — nothing is uploaded">📝 Transcribe lyrics</button></div>
+      <div class="group"><label>&nbsp;</label><button id="memoTranscribe" title="AI speech-to-text, run locally in your browser — nothing is uploaded"><svg class="svi" aria-hidden="true"><use href="#i-file"/></svg> Transcribe lyrics</button></div>
       <div class="group"><label for="memoLangSel">Language</label><select id="memoLangSel" title="The language being sung/spoken. Forcing one language avoids garbled multilingual guesses — pick Auto only for mixed-language songs (e.g. Spanglish)"></select></div>
       <div class="group"><label for="memoModelSel">Model</label>
         <select id="memoModelSel" style="max-width:240px" title="Speech-to-text model. Recommended tiers are A/B-tested on real vocals (bigger = more accurate, one-time cached download). Experimental and custom entries let you trial other transformers.js-compatible models."></select>
@@ -1766,13 +1898,13 @@
 <!-- chord edit popup (opens above the memo modal, so it must out-stack it) -->
 <div id="chordPopup" class="popup" style="display:none; z-index:130">
   <label>Chord</label>
-  <div class="row" style="gap:6px;flex-wrap:nowrap"><select id="chordRootSel"></select><select id="chordQualSel"></select><button id="chordDel" class="mini" title="Remove this chord span">✕</button></div>
+  <div class="row" style="gap:6px;flex-wrap:nowrap"><select id="chordRootSel"></select><select id="chordQualSel"></select><button id="chordDel" class="mini" title="Remove this chord span"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
 </div>
 <div id="keyPopup" class="popup" style="display:none; z-index:130">
   <label>Key / mode change <span id="keyPopupAt" class="dim" style="font-weight:400"></span></label>
   <div class="row" style="gap:6px;flex-wrap:nowrap"><select id="keyPopRoot"></select><select id="keyPopMode"></select></div>
   <div class="ksug-mood-now" id="keyPopMood"></div>
-  <div class="row" style="gap:6px;margin-top:8px"><button id="keyPopSave" class="primary mini">✓ Save</button><button id="keyPopDel" class="mini" title="Remove this key change">🗑 Delete</button></div>
+  <div class="row" style="gap:6px;margin-top:8px"><button id="keyPopSave" class="primary mini">✓ Save</button><button id="keyPopDel" class="mini" title="Remove this key change"><svg class="svi" aria-hidden="true"><use href="#i-trash"/></svg> Delete</button></div>
   <div class="key-sugg-head">Smooth changes from <b id="keySuggFrom">—</b> <span class="dim">· click to apply</span></div>
   <div id="keySugg" class="key-sugg"></div>
 </div>
@@ -1808,17 +1940,17 @@
 <div id="structPopup" class="popup" style="display:none; z-index:140">
   <label>Song section <span id="structPopAt" class="dim" style="font-weight:400"></span></label>
   <div class="row" style="gap:6px;flex-wrap:nowrap;align-items:center"><select id="structType"></select><input id="structBars" type="number" min="1" max="128" style="width:60px"><span class="dim" style="font-size:11px">bars</span></div>
-  <div class="row" style="gap:6px;margin-top:8px"><button id="structSave" class="primary mini">✓ Save</button><button id="structDel" class="mini" title="Remove this section">🗑 Delete</button></div>
+  <div class="row" style="gap:6px;margin-top:8px"><button id="structSave" class="primary mini">✓ Save</button><button id="structDel" class="mini" title="Remove this section"><svg class="svi" aria-hidden="true"><use href="#i-trash"/></svg> Delete</button></div>
 </div>
 
 <!-- Sessions modal -->
 <div id="sessionModal" class="modal" style="display:none">
   <div class="modal-box">
-    <div class="modal-head"><b>Sessions</b><button id="modalClose">✕</button></div>
+    <div class="modal-head"><b>Sessions</b><button id="modalClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
     <div class="modal-save">
       <input id="sessLabel" type="text" placeholder="Session label" />
       <input id="sessDesc" type="text" placeholder="Description (optional)" />
-      <button id="sessSaveBtn" class="primary">💾 Save current</button>
+      <button id="sessSaveBtn" class="primary"><svg class="svi" aria-hidden="true"><use href="#i-save"/></svg> Save current</button>
     </div>
     <div class="modal-list" id="sessList"></div>
   </div>
@@ -1831,6 +1963,23 @@
 const APP_VERSION="2.0.0";
 document.getElementById("appVersion").textContent="v"+APP_VERSION;
 console.log("Pitch Studio v"+APP_VERSION+" — https://github.com/rawq-us/pitch-detector/releases");
+
+/* ===== Color themes — swap the :root semantic layer via <html data-theme>. Persisted. ===== */
+const THEMES = ["rack","classic","midnight"];        // "rack" = default (no data-theme attr)
+function setTheme(name){
+  name = THEMES.includes(name) ? name : "rack";
+  if (name === "rack") document.documentElement.removeAttribute("data-theme");
+  else document.documentElement.setAttribute("data-theme", name);
+  try { localStorage.setItem("ps.theme", name); } catch(_){}
+  const sel = document.getElementById("themeSel"); if (sel && sel.value !== name) sel.value = name;
+}
+function currentTheme(){ return document.documentElement.getAttribute("data-theme") || "rack"; }
+(function initTheme(){ let t="rack"; try { t = localStorage.getItem("ps.theme") || "rack"; } catch(_){} setTheme(t); })();
+/* Inline-icon helper — emits an <svg><use> referencing the sprite. cls adds modifier classes. */
+function icon(name, cls){ return '<svg class="svi'+(cls?' '+cls:'')+'" aria-hidden="true"><use href="#i-'+name+'"/></svg>'; }
+/* Layer type → sprite icon (color comes from --type-{type}; clip ⇄ icon share the hue). */
+const TYPE_ICON = { arp:"music", beat:"beat", midi:"keyboard", sampler:"beat", voice:"mic", memo:"wave" };
+function typeChip(type){ const ic=TYPE_ICON[type]||"music"; return '<span class="tico" title="'+type+'" style="color:var(--type-'+type+');background:color-mix(in srgb, var(--type-'+type+') 18%, transparent)">'+icon(ic)+'</span>'; }
 
 /* ============================== Music theory ============================== */
 const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
@@ -2508,7 +2657,7 @@ micBtn.addEventListener("click", async () => {
     micCtx = getCtx();
     const src = micCtx.createMediaStreamSource(micStream);
     analyser = micCtx.createAnalyser(); analyser.fftSize = 2048; src.connect(analyser);
-    micBtn.textContent="⏹ Stop mic"; micBtn.classList.remove("primary"); micBtn.classList.add("danger"); if(typeof syncTunerMic==="function") syncTunerMic();
+    micBtn.innerHTML=icon("stop"); micBtn.title="Stop mic"; micBtn.classList.remove("primary"); micBtn.classList.add("danger"); { const d=document.querySelector(".panel.detector"); if(d) d.classList.add("mic-live"); } if(typeof syncTunerMic==="function") syncTunerMic();
     statusEl.textContent="Listening… sing or play a note."; detectLoop();
   } catch(err){ statusEl.textContent="Mic access denied or unavailable: "+err.message; }
 });
@@ -2516,8 +2665,8 @@ function stopMic(){
   if (detectRAF) cancelAnimationFrame(detectRAF); detectRAF=null;
   if (micStream) micStream.getTracks().forEach(t=>t.stop());
   micStream=null; analyser=null;
-  micBtn.textContent="🎤 Enable mic"; micBtn.classList.add("primary"); micBtn.classList.remove("danger"); if(typeof syncTunerMic==="function") syncTunerMic(); if(typeof tunerLiveUpdate==="function") tunerLiveUpdate(null);
-  statusEl.textContent="Mic off."; noteBig.textContent="—"; freqOut.textContent="no signal"; needle.style.left="50%"; clearDetected();
+  micBtn.innerHTML=icon("mic"); micBtn.title="Enable mic — detect pitch"; micBtn.classList.add("primary"); micBtn.classList.remove("danger"); { const d=document.querySelector(".panel.detector"); if(d) d.classList.remove("mic-live"); } if(typeof syncTunerMic==="function") syncTunerMic(); if(typeof tunerLiveUpdate==="function") tunerLiveUpdate(null);
+  statusEl.textContent="Mic off"; noteBig.textContent="—"; freqOut.textContent="no signal"; needle.style.left="50%"; clearDetected();
 }
 const buf = new Float32Array(2048);
 function autoCorrelate(buffer, sampleRate){
@@ -2992,7 +3141,7 @@ function openBeatClip(track, clip){
   beatPitch={}; if(clip.pitch) Object.keys(clip.pitch).forEach(k=>beatPitch[k]=clip.pitch[k]);
   renderGrid(); updateBeatLen(); selectedTrackId=track.id; setBeatEditTarget(track, clip);
   document.getElementById("cemName").value=clip.name||"";
-  openSectionModal("beat", "🥁 Beat clip — "+(clip.name||track.name));
+  openSectionModal("beat", "Beat clip — "+(clip.name||track.name));
 }
 beatAddBtn.addEventListener("click",()=>{
   if (!beatGrid.some(row=>row.some(Boolean))){ flash(beatAddBtn,"Program some hits first"); return; }
@@ -3018,14 +3167,14 @@ let editingSampler=null;   // when set, the sampler editor saves back to this cl
 function setSamplerEditTarget(t,c){ editingSampler=(t&&c)?{track:t,clip:c}:null; const b=document.getElementById("sampAddBtn"); if(b){ b.textContent=editingSampler?"✓ Update clip":"＋ Timeline"; b.title=editingSampler?"Save this pattern back to this clip":"Add this pattern to a Sampler lane"; } }
 function openSamplerClip(track, clip){
   document.getElementById("cemName").value=clip.name||"";
-  if(clip.kind==="loop"){ setSamplerEditTarget(null); selectedTrackId=track.id; openSectionModal("sampler", "🔁 Sampler loop — "+(clip.name||track.name)); return; }
+  if(clip.kind==="loop"){ setSamplerEditTarget(null); selectedTrackId=track.id; openSectionModal("sampler", "Sampler loop — "+(clip.name||track.name)); return; }
   const cols=(clip.grid&&clip.grid[0])?clip.grid[0].length:sampStepsCount();
   samplerEdit.bars=Math.max(1, Math.round(cols/stepsPerBar())); if(sampBarsSel) sampBarsSel.value=String(samplerEdit.bars);
   sampEnsureGrid();
   samplerEdit.grid=samplerEdit.grid.map((row,r)=>{ const out=new Array(sampStepsCount()).fill(false); const src=clip.grid&&clip.grid[r]; if(src) for(let s=0;s<Math.min(src.length,out.length);s++) out[s]=!!src[s]; return out; });
   samplerEdit.pitch={}; if(clip.pitch) Object.keys(clip.pitch).forEach(k=>samplerEdit.pitch[k]=clip.pitch[k]);
   renderSampGrid(); updateSampLen(); selectedTrackId=track.id; setSamplerEditTarget(track, clip);
-  openSectionModal("sampler", "🎛 Sampler clip — "+(clip.name||track.name));
+  openSectionModal("sampler", "Sampler clip — "+(clip.name||track.name));
 }
 let sampPrev={ playing:false, step:0, timer:null };
 let sampDragIdx=-1, sampLoadIdx=-1;
@@ -3470,8 +3619,10 @@ function renderTimeline(){
   // loop band
   tlLoopBand.style.left=(origin+project.loop.start*PX_PER_SEC)+"px";
   tlLoopBand.style.width=((project.loop.end-project.loop.start)*PX_PER_SEC)+"px";
-  tlLoopBand.style.display = project.loopEnabled ? "block" : "none";
+  const loopFull = project.loop.start<=0.01 && project.loop.end>=project.lengthSec-0.01;   // whole song selected = nothing selected
+  tlLoopBand.style.display = (project.loopEnabled && project.loop.region && !loopFull) ? "block" : "none";
   loopReadout.textContent = fmtBars(project.loop.start)+" – "+fmtBars(project.loop.end);
+  if (typeof transport!=="undefined" && !transport.playing) positionPlayhead(null);   // start-line visible at rest
   // lanes + headers
   tlLanes.innerHTML=""; tlHeadCol.innerHTML="";
   const spacer=document.createElement("div"); spacer.className="tl-head rulerspace";
@@ -3483,7 +3634,7 @@ function renderTimeline(){
   const beatPx=bu*PX_PER_SEC, barPx=bpb*bu*PX_PER_SEC;
   project.tracks.forEach(track=>{
     const head=document.createElement("div"); head.className="tl-head "+track.type+(track.id===selectedTrackId?" selected":"")+(trackAudible(track)?"":" muted");
-    head.innerHTML='<div class="tname"><span class="badge '+track.type+'">'+track.type+'</span><span class="tnm" title="Double-click to rename this layer">'+escapeHtml(track.name)+'</span></div><div class="tl-head-acts"></div>';
+    head.innerHTML='<div class="tname">'+typeChip(track.type)+'<span class="tnm" title="Double-click to rename this layer">'+escapeHtml(track.name)+'</span></div><div class="tl-head-acts"></div>';
     const tname=head.querySelector(".tname"), acts=head.querySelector(".tl-head-acts");
     tname.querySelector(".tnm").addEventListener("dblclick",(e)=>{ e.stopPropagation(); renameTrack(track); });
     // live level meter (item 7): a slim vertical bar on the head's right edge; the viz loop drives ._meterFill
@@ -3495,12 +3646,15 @@ function renderTimeline(){
     met.addEventListener("click",(e)=>e.stopPropagation());
     met.addEventListener("change",(e)=>{ e.stopPropagation(); if(met.value){ const [n,d]=met.value.split("/").map(Number); track.meter={num:n,den:d}; } else delete track.meter; renderTimeline(); scheduleAutosave(); });
     tname.appendChild(met);
-    // every action is a consistent chip button; icon-only only where the icon is unambiguous (🗑)
-    const mkBtn=(txt,title,cls,fn)=>{ const b=document.createElement("button"); b.className="thd-btn"+(cls?" "+cls:""); b.textContent=txt; b.title=title; b.addEventListener("click",(e)=>{ e.stopPropagation(); fn(); }); acts.appendChild(b); return b; };
+    // every action is a consistent chip button; icon-only where the icon is unambiguous (trash, sliders)
+    const mkBtn=(html,title,cls,fn)=>{ const b=document.createElement("button"); b.className="thd-btn"+(cls?" "+cls:""); b.innerHTML=html; b.title=title; b.addEventListener("click",(e)=>{ e.stopPropagation(); fn(); }); acts.appendChild(b); return b; };
     mkBtn("FX","Track FX & level","",()=>openFxModal(track));
-    mkBtn(track._autoParam?("◆ "+AUTO_PARAMS[track._autoParam].label):"Auto", "Automation lane — click to cycle off → volume → pan → cutoff, then click the lane to add points (drag to shape, right-click to delete)", track._autoParam?"on":"", ()=>{ const order=[null,"volume","pan","cutoff"]; track._autoParam=order[(order.indexOf(track._autoParam)+1)%order.length]; renderTimeline(); });
-    mkBtn("M", track.muted?"Muted — click to unmute":"Mute this layer", "mute"+(track.muted?" on":""), ()=>commit(track.muted?"unmute layer":"mute layer",()=>{ track.muted=!track.muted; applyTrackMuteSolo(); renderTimeline(); scheduleAutosave(); }));
-    mkBtn("S", track.soloed?"Soloed — click to unsolo":"Solo this layer (silences the others)", "solo"+(track.soloed?" on":""), ()=>commit(track.soloed?"unsolo layer":"solo layer",()=>{ track.soloed=!track.soloed; applyTrackMuteSolo(); renderTimeline(); scheduleAutosave(); }));
+    mkBtn(icon("sliders")+(track._autoParam?(" "+AUTO_PARAMS[track._autoParam].label):""), "Automation lane — click to cycle off → volume → pan → cutoff, then click the lane to add points (drag to shape, right-click to delete)", track._autoParam?"on":"", ()=>{ const order=[null,"volume","pan","cutoff"]; track._autoParam=order[(order.indexOf(track._autoParam)+1)%order.length]; renderTimeline(); });
+    // M/S as one fused segment (mute = amber, solo = cyan)
+    const msSeg=document.createElement("div"); msSeg.className="seg ms-seg"; acts.appendChild(msSeg);
+    const mkSeg=(txt,title,cls,fn)=>{ const b=document.createElement("button"); if(cls) b.className=cls; b.textContent=txt; b.title=title; b.addEventListener("click",(e)=>{ e.stopPropagation(); fn(); }); msSeg.appendChild(b); return b; };
+    mkSeg("M", track.muted?"Muted — click to unmute":"Mute this layer", track.muted?"on-mute":"", ()=>commit(track.muted?"unmute layer":"mute layer",()=>{ track.muted=!track.muted; applyTrackMuteSolo(); renderTimeline(); scheduleAutosave(); }));
+    mkSeg("S", track.soloed?"Soloed — click to unsolo":"Solo this layer (silences the others)", track.soloed?"on-solo":"", ()=>commit(track.soloed?"unsolo layer":"solo layer",()=>{ track.soloed=!track.soloed; applyTrackMuteSolo(); renderTimeline(); scheduleAutosave(); }));
     if (track.type==="voice"||track.type==="memo"){
       const isRec = track.type==="voice" ? (recording && recTrack===track) : (memoRec && memoRec.track===track);
       mkBtn(isRec?"Stop":"Rec", track.type==="voice"?"Record a voice clip into this layer":"Record a memo — the session length follows the recording", "rec"+(isRec?" recording":""), ()=>{ track.type==="voice"?toggleVoiceRec(track):toggleMemoRec(track); });
@@ -3508,7 +3662,7 @@ function renderTimeline(){
     if (track.type==="memo") mkBtn("Import","Import an audio file (WAV/MP3/M4A/OGG…) as a memo and analyze it","",()=>memoImportTo(track));
     if (track.type==="sampler") mkBtn("Pads","Open the Sample-beat editor to load pads & program patterns","",()=>{ const s=document.querySelector('.csec[data-key="sampler"]'); if(s){ setCollapsed(s,false); saveLayout(); s.scrollIntoView({behavior:"smooth",block:"start"}); } });
     if (track.type==="voice") mkBtn("→ Memo","Convert this voice layer to an annotated memo (chords · notes · tempo · lyrics)","",()=>convertVoiceTrack(track));
-    mkBtn("Delete","Delete this layer and its clips","danger",()=>{ if(!confirm("Delete the \""+track.name+"\" layer"+(track.clips.length?(" and its "+track.clips.length+" clip(s)"):"")+"?")) return; commit("delete layer",()=>{ project.tracks=project.tracks.filter(t=>t.id!==track.id); if (selectedTrackId===track.id) selectedTrackId=project.tracks[0]?.id||null; renderTimeline(); }); });
+    mkBtn(icon("trash"),"Delete this layer and its clips","danger icon-only",()=>{ if(!confirm("Delete the \""+track.name+"\" layer"+(track.clips.length?(" and its "+track.clips.length+" clip(s)"):"")+"?")) return; commit("delete layer",()=>{ project.tracks=project.tracks.filter(t=>t.id!==track.id); if (selectedTrackId===track.id) selectedTrackId=project.tracks[0]?.id||null; renderTimeline(); }); });
     head.addEventListener("click",()=>{ selectedTrackId=track.id; renderTimeline(); });
     tlHeadCol.appendChild(head);
 
@@ -3516,7 +3670,7 @@ function renderTimeline(){
     // bar/beat guides at THIS layer's meter (polymeter layers show a brighter bar line so the
     // different cadence — and where it reconverges with the global grid — reads at a glance)
     const tBeatPx=trackBeatSec(track)*PX_PER_SEC, tBarPx=trackMeter(track).num*tBeatPx, tBarColor=track.meter?"#5b6b8c":"#3a4254";
-    lane.style.backgroundImage="repeating-linear-gradient(90deg, transparent, transparent "+(tBeatPx-1)+"px, #20242f "+(tBeatPx-1)+"px, #20242f "+tBeatPx+"px), repeating-linear-gradient(90deg, transparent, transparent "+(tBarPx-1)+"px, "+tBarColor+" "+(tBarPx-1)+"px, "+tBarColor+" "+tBarPx+"px)";
+    lane.style.backgroundImage="repeating-linear-gradient(90deg, transparent, transparent "+(tBeatPx-1)+"px, var(--line) "+(tBeatPx-1)+"px, var(--line) "+tBeatPx+"px), repeating-linear-gradient(90deg, transparent, transparent "+(tBarPx-1)+"px, "+tBarColor+" "+(tBarPx-1)+"px, "+tBarColor+" "+tBarPx+"px)";
     lane.style.backgroundPositionX=origin+"px";
     track.clips.forEach(clip=>{
       const dur=clipDuration(track,clip);
@@ -3529,12 +3683,12 @@ function renderTimeline(){
         if (track.type==="arp"){ title="Arp"; meta=clip.steps.filter(s=>!s.rest).length+" notes"; loopBadge='<div class="cloop">'+(clip.loopFill?'∞ fill':'⟳ '+(clip.lengthBeats||naturalBeats(track,clip)))+'</div>'; }
         else if (track.type==="beat"){ title="Beat"; meta=clip.grid.flat().filter(Boolean).length+" hits"; loopBadge='<div class="cloop">'+(clip.loopFill?'∞ fill':'⟳ '+(clip.lengthBeats||naturalBeats(track,clip)))+'</div>'; }
         else if (track.type==="sampler"){
-          if (clip.kind==="loop"){ const pad=(project.samplerKit||[])[clip.pad]; title="🔁 Loop"; meta=(pad?(pad.name||("Pad "+(clip.pad+1))):"—"); }
-          else { title="🎛 Sampler"; meta=(clip.grid?clip.grid.flat().filter(Boolean).length:0)+" hits"; }
+          if (clip.kind==="loop"){ const pad=(project.samplerKit||[])[clip.pad]; title="Loop"; meta=(pad?(pad.name||("Pad "+(clip.pad+1))):"—"); }
+          else { title="Sampler"; meta=(clip.grid?clip.grid.flat().filter(Boolean).length:0)+" hits"; }
           loopBadge='<div class="cloop">'+(clip.loopFill?'∞ fill':'⟳ '+(clip.lengthBeats||naturalBeats(track,clip)))+'</div>';
         }
-        else if (track.type==="midi"){ title="🎹 MIDI"; meta=((clip.notes||[]).length)+" notes"; loopBadge='<div class="cloop">'+(clip.loopFill?'∞ fill':'⟳ '+(clip.lengthBeats||naturalBeats(track,clip)))+'</div>'; }
-        else { title="🎙 Voice"; meta=(clip.audioDur||0).toFixed(1)+"s"+(clip.buffer?"":" …"); }
+        else if (track.type==="midi"){ title="MIDI"; meta=((clip.notes||[]).length)+" notes"; loopBadge='<div class="cloop">'+(clip.loopFill?'∞ fill':'⟳ '+(clip.lengthBeats||naturalBeats(track,clip)))+'</div>'; }
+        else { title="Voice"; meta=(clip.audioDur||0).toFixed(1)+"s"+(clip.buffer?"":" …"); }
         el.innerHTML='<div class="ctitle">'+(clip.name?escapeHtml(clip.name):title)+'</div><div class="cmeta">'+meta+'</div><div class="cdel">✕</div><div class="cresize" title="Drag the edge to resize"></div>'+loopBadge;
         const cwPx=Math.max(16, Math.round(dur*PX_PER_SEC-2));
         const cv=document.createElement("canvas"); cv.className="cwave"; cv.width=Math.min(16000,cwPx); cv.height=46;
@@ -3657,13 +3811,13 @@ bindClipNameInput(document.getElementById("cemName"), ()=>(editingBeat&&editingB
 function openClipMenu(track, clip, x, y, atSec){
   closeClipMenu();
   const m=document.createElement("div"); m.className="clip-menu"; clipMenuEl=m;
-  const add=(label,fn)=>{ const b=document.createElement("button"); b.textContent=label; b.addEventListener("click",(e)=>{ e.stopPropagation(); closeClipMenu(); fn(); }); m.appendChild(b); };
-  add(clip.name?"✎ Rename…":"✎ Add label…", ()=>renameClip(track, clip));
-  if(track.type==="midi"||track.type==="voice"||track.type==="memo") add("✂ Split here", ()=>splitClipAt(track, clip, atSec));
-  add("⧉ Duplicate", ()=>duplicateClip(track, clip));
-  add("📋 Copy", ()=>copyClip(track, clip));
-  if(clipboard && clipboard.type===track.type) add("📎 Paste here", ()=>pasteClipAt(track, atSec));
-  add("🗑 Delete", ()=>commit("delete clip",()=>{ track.clips=track.clips.filter(c=>c.id!==clip.id); renderTimeline(); }));
+  const add=(label,fn)=>{ const b=document.createElement("button"); b.innerHTML=label; b.addEventListener("click",(e)=>{ e.stopPropagation(); closeClipMenu(); fn(); }); m.appendChild(b); };
+  add(clip.name?(icon("edit")+" Rename…"):(icon("edit")+" Add label…"), ()=>renameClip(track, clip));
+  if(track.type==="midi"||track.type==="voice"||track.type==="memo") add(icon("cut")+" Split here", ()=>splitClipAt(track, clip, atSec));
+  add(icon("copy")+" Duplicate", ()=>duplicateClip(track, clip));
+  add(icon("copy")+" Copy", ()=>copyClip(track, clip));
+  if(clipboard && clipboard.type===track.type) add(icon("clipboard")+" Paste here", ()=>pasteClipAt(track, atSec));
+  add(icon("trash")+" Delete", ()=>commit("delete clip",()=>{ track.clips=track.clips.filter(c=>c.id!==clip.id); renderTimeline(); }));
   document.body.appendChild(m);
   m.style.left=Math.min(x, window.innerWidth-170)+"px"; m.style.top=Math.min(y, window.innerHeight-m.offsetHeight-8)+"px";
 }
@@ -3873,7 +4027,7 @@ function updateCollabUI(){
   const open=rtcOpenPeers().length, live=open>0;
   const people=collab.roster.length ? collab.roster.slice() : [{id:collab.selfId,name:collab.selfName||"You",self:true}].concat(rtcOpenPeers().map(p=>({id:p.id,name:p.name||"peer"})));
   const btn=document.getElementById("collabBtn");
-  if(btn){ btn.classList.toggle("connected", live); btn.innerHTML = live ? ('<span class="collab-dot"></span> Live · '+people.length) : "👥 Collab"; btn.title = live ? "Live session ("+people.length+") — click to manage or invite more" : "Live collaborate — connect peers, no server"; }
+  if(btn){ btn.classList.toggle("connected", live); btn.innerHTML = live ? ('<span class="collab-dot"></span> Live · '+people.length) : (icon("users")+" Collab"); btn.title = live ? "Live session ("+people.length+") — click to manage or invite more" : "Live collaborate — connect peers, no server"; }
   const list=document.getElementById("collabRoster");
   if(list) list.innerHTML = people.map(p=>'<span class="collab-peer"><span class="collab-dot"></span>'+escapeHtml(p.name||"peer")+(p.self?" (you)":"")+'</span>').join("");
 }
@@ -4070,7 +4224,7 @@ async function rtcJoin(input){
     const url=buildSignalUrl(signalBaseUrl(),"reply", await packSignal(peer.pc.localDescription));
     showSignalOut("reply", url); collabStep("join");
     let copied=false; try{ await navigator.clipboard.writeText(url); copied=true; }catch(e){}
-    rtcStatus(copied?"📋 Reply copied — send it to your host.":"Send your reply link back to your host."); }
+    rtcStatus(copied?"Reply copied — send it to your host.":"Send your reply link back to your host."); }
   catch(e){ rtcStatus("Couldn't join: "+(e.message||e)); }
 }
 // clicked an invite link → auto-open collab in join mode and generate the reply
@@ -4081,7 +4235,7 @@ function checkInviteUrl(){
   collab.joinedViaLink=true;
   m.style.display="flex";
   collabStep("join");   // we already have the invite — go straight to "send your reply back", no chooser/paste
-  rtcStatus("🔗 Joining — preparing your reply…");
+  rtcStatus("Joining — preparing your reply…");
   rtcJoin(location.href);
   try{ history.replaceState(null,"",location.pathname+location.search); }catch(e){}   // don't re-trigger on refresh
 }
@@ -4125,16 +4279,22 @@ function rtcTeardown(msg){
 
 /* cycle region select on the ruler */
 let loopDrag=null;
-tlRuler.addEventListener("pointerdown",(e)=>{ const rect=tlRuler.getBoundingClientRect(); loopDrag={ anchor: clamp(snapSec((e.clientX-rect.left-originPx())/PX_PER_SEC),0,project.lengthSec) }; tlRuler.setPointerCapture?.(e.pointerId); });
+tlRuler.addEventListener("pointerdown",(e)=>{ const rect=tlRuler.getBoundingClientRect(); loopDrag={ anchor: clamp(snapSec((e.clientX-rect.left-originPx())/PX_PER_SEC),0,project.lengthSec), startX:e.clientX, moved:false }; tlRuler.setPointerCapture?.(e.pointerId); });
 tlRuler.addEventListener("pointermove",(e)=>{
   if (!loopDrag) return;
+  if (!loopDrag.moved && Math.abs(e.clientX-loopDrag.startX)<4) return;   // tiny move = still a click
+  loopDrag.moved=true;
   const rect=tlRuler.getBoundingClientRect();
   const sec=clamp(snapSec((e.clientX-rect.left-originPx())/PX_PER_SEC),0,project.lengthSec);
   project.loop.start=Math.min(loopDrag.anchor,sec); project.loop.end=Math.max(loopDrag.anchor,sec);
   if (project.loop.end-project.loop.start < 0.05) project.loop.end=project.loop.start+beatUnitSec();
-  project.loopEnabled=true; updateLoopButtons(); renderTimeline();
+  project.loop.region=true; project.loopEnabled=true; updateLoopButtons(); renderTimeline();
 });
-tlRuler.addEventListener("pointerup",()=>{ loopDrag=null; if (transport.playing){ transportStop(); transportPlay(); } });
+tlRuler.addEventListener("pointerup",()=>{
+  const d=loopDrag; loopDrag=null;
+  if (d && !d.moved){ project.loop.start=d.anchor; project.loop.end=project.lengthSec; project.loop.region=false; updateLoopButtons(); renderTimeline(); positionPlayhead(null); }   // a click → move the start-line
+  if (transport.playing){ transportStop(); transportPlay(); }
+});
 
 /* loop-length popup */
 const loopPopup=document.getElementById("loopPopup"), loopPopupInput=document.getElementById("loopPopupInput");
@@ -4221,7 +4381,7 @@ function transportPlay(){
   // count-in metronome: one click per beat, accent on each bar downbeat
   if (ci>0){ const bu=beatUnitSec(), bpb=beatsPerBar(), n=project.countInBars*bpb; for(let i=0;i<n;i++) playClick(startCtx+i*bu, (i%bpb)===0); }
   transport.timer=setInterval(transportScheduler,25); transport.raf=requestAnimationFrame(transportTick);
-  tlPlayhead.style.display="block"; playBtn.textContent="■ Stop"; playBtn.classList.remove("primary"); playBtn.classList.add("danger");
+  tlPlayhead.style.display="block"; playBtn.innerHTML=icon("stop"); playBtn.classList.remove("primary"); playBtn.classList.add("danger");
   if(typeof rtcSendTransport==="function") rtcSendTransport("play", transport.loopStart);
 }
 function transportScheduler(){
@@ -4258,7 +4418,7 @@ function transportTick(){
   }
   transport.raf=requestAnimationFrame(transportTick);
 }
-function positionPlayhead(pos){ if (pos==null){ if (!transport.playing){ tlPlayhead.style.display="none"; return; } pos=transport.loopStart; } tlPlayhead.style.left=(originPx()+pos*PX_PER_SEC)+"px"; }
+function positionPlayhead(pos){ if(!tlPlayhead) return; if (pos==null){ pos = transport.playing ? transport.loopStart : ((project.loop&&project.loop.start)||0); } tlPlayhead.style.display="block"; tlPlayhead.style.left=(originPx()+pos*PX_PER_SEC)+"px"; }
 // Current insertion point in timeline seconds: the live playhead while playing, else the cycle-region start.
 function playheadSec(){
   if(transport.playing){ const ctx=getCtx(), elapsed=ctx.currentTime-transport.musicCtx; if(elapsed>=0) return transport.loopStart + (elapsed % transport.loopLen); }
@@ -4267,14 +4427,14 @@ function playheadSec(){
 function transportStop(){
   transport.playing=false;
   if (transport.timer) clearInterval(transport.timer); if (transport.raf) cancelAnimationFrame(transport.raf);
-  transport.timer=transport.raf=null; tlPlayhead.style.display="none";
+  transport.timer=transport.raf=null; positionPlayhead(null);
   if (typeof keyFollowReset==="function") keyFollowReset();   // back to the global key
   // audio clips (voice/memo) are long-running buffer sources — kill any that are still sounding
   transport.srcs.forEach(s=>{ try { s.onended=null; s.stop(); } catch(_){} });
   transport.srcs.clear();
   // release any automation override back to the static fader/centre so a stopped track sits at its set level
   project.tracks.forEach(t=>{ const ch=t._chain; if(!ch) return; if(t.automation&&t.automation.volume&&t.automation.volume.length) ch.level.gain.value=(t.fx||fxDefaults()).level; if(ch.pan && t.automation&&t.automation.pan&&t.automation.pan.length) ch.pan.pan.value=0; });
-  playBtn.textContent="▶ Play"; playBtn.classList.add("primary"); playBtn.classList.remove("danger");
+  playBtn.innerHTML=icon("play"); playBtn.classList.add("primary"); playBtn.classList.remove("danger");
   if(typeof rtcSendTransport==="function") rtcSendTransport("stop");
 }
 // Follow the playhead: drive each automated track's level/pan from its lane (live transport only).
@@ -4290,10 +4450,10 @@ function applyLiveAutomation(posSec){
 /* ============================== Timeline controls ============================== */
 const bpmInput=document.getElementById("bpmInput"), tsSel=document.getElementById("tsSel"), lenInput=document.getElementById("lenInput"),
       playBtn=document.getElementById("playBtn"), loopBtn=document.getElementById("loopBtn");
-function updateLoopButtons(){ loopBtn.classList.toggle("on",project.loopEnabled); loopBtn.textContent="🔁 Loop: "+(project.loopEnabled?"on":"off"); }
+function updateLoopButtons(){ loopBtn.classList.toggle("on",project.loopEnabled); loopBtn.innerHTML=icon("loop"); loopBtn.title="Loop "+(project.loopEnabled?"on — click to turn off":"off — click to turn on"); }
 // changing tempo / meter keeps the song the same number of BARS (seconds are derived) — the
 // bar-centric model: you compose in bars, not seconds
-bpmInput.addEventListener("input",()=>{ const bars=projectBars(); project.bpm=clamp(parseFloat(bpmInput.value)||90,20,400); updateMsReadout(); updateBeatLen(); applyDelaySync(); setLength(bars*barSec()); if (transport.playing){ transportStop(); transportPlay(); } });
+bpmInput.addEventListener("input",()=>{ const bars=projectBars(); project.bpm=clamp(parseFloat(bpmInput.value)||90,20,400); updateMsReadout(); updateBeatLen(); applyDelaySync(); setLength(bars*barSec()); if (transport.playing){ transportStop(); transportPlay(); } scheduleRewarp(); });
 tsSel.addEventListener("change",()=>{ const bars=projectBars(); const [n,d]=tsSel.value.split("/").map(Number); project.timeSig={num:n,den:d}; setBeatBars(beatBars); setLength(bars*barSec()); if (transport.playing){ transportStop(); transportPlay(); } });
 lenInput.addEventListener("input",()=>{ lenInput.value = lenInput.value.replace(/[^0-9]/g,""); });
 lenInput.addEventListener("change",()=>{ setLengthBars(parseInt(lenInput.value||"0",10)||8); });
@@ -4331,7 +4491,7 @@ function addLayer(type){
 (function wireAddLayer(){
   const modal=document.getElementById("addLayerModal"), grid=document.getElementById("layerGrid");
   LAYER_TYPES.forEach(L=>{ const card=document.createElement("button"); card.className="layer-card"; card.dataset.type=L.type;
-    card.innerHTML='<span class="lc-ico">'+L.icon+'</span><span class="lc-body"><span class="lc-name">'+L.name+'</span><span class="lc-desc">'+L.desc+'</span></span>';
+    card.innerHTML='<span class="lc-ico" style="color:var(--type-'+L.type+')">'+icon(TYPE_ICON[L.type]||"music")+'</span><span class="lc-body"><span class="lc-name">'+L.name+'</span><span class="lc-desc">'+L.desc+'</span></span>';
     card.addEventListener("click",()=>{ modal.style.display="none"; addLayer(L.type); });
     grid.appendChild(card);
   });
@@ -4663,7 +4823,7 @@ function drawClipPreview(canvas, track, clip, durSec){
   }
 }
 function buildMemoClipEl(el, track, clip, dur){
-  el.innerHTML='<div class="m-chords"></div><canvas height="56"></canvas><div class="m-lyrics"></div><div class="m-edit" title="Open the memo editor">✎ memo</div><div class="cdel">✕</div>'+(clip.analyzing?'<div class="m-busy">analyzing…</div>':'');
+  el.innerHTML='<div class="m-chords"></div><canvas height="56"></canvas><div class="m-lyrics"></div><div class="m-edit" title="Open the memo editor"><svg class="svi" aria-hidden="true"><use href="#i-edit"/></svg> memo</div><div class="cdel">✕</div>'+(clip.analyzing?'<div class="m-busy">analyzing…</div>':'');
   const wPx=Math.max(16, Math.round(dur*PX_PER_SEC-2));
   const cv=el.querySelector("canvas"); cv.width=Math.min(16000,wPx); cv.height=56; cv.style.width=wPx+"px";
   if (clip.buffer) drawMemoWave(cv, clip);
@@ -4872,7 +5032,7 @@ document.getElementById("memoUseKey").addEventListener("click",()=>{
 });
 document.getElementById("memoUseBpm").addEventListener("click",()=>{
   const a=memoModalClip&&memoModalClip.analysis; if (!a||!a.bpm) return;
-  project.bpm=clamp(Math.round(a.bpm),20,400); bpmInput.value=project.bpm;
+  project.bpm=clamp(Math.round(a.bpm),20,400); bpmInput.value=project.bpm; scheduleRewarp();
   updateMsReadout(); updateBeatLen(); renderTimeline();
   flash(document.getElementById("memoUseBpm"),"✓ "+project.bpm+" BPM");
 });
@@ -4892,7 +5052,7 @@ function syncMemoFlex(){
   if (!btn) return;
   const flexed=!!clip.warp;
   btn.disabled=!memoFlexable(clip);
-  btn.textContent=flexed?"🔀 Re-flex to grid":"🔀 Flex to grid";
+  btn.innerHTML=icon("flex")+(flexed?" Re-flex to grid":" Flex to grid");
   reset.style.display=flexed?"":"none";
   if (flexed && clip.warp.strength!=null) slider.value=String(clip.warp.strength);
   out.textContent=Math.round(+slider.value*100)+"%";
@@ -5764,6 +5924,21 @@ function bakeWarp(clip){
   clip.warpedBuffer = applyWarpToBuffer(getCtx(), clip.buffer, clip.warp);
   clip.warpDur = clip.warpedBuffer ? clip.warpedBuffer.length / clip.warpedBuffer.sampleRate : null;
 }
+// When the project tempo changes, re-warp every flexed clip onto the NEW grid so the audio
+// keeps following the beat. Needs the detected beats (memo clips). Debounced — re-baking is heavy.
+let _rewarpTimer=null;
+function rewarpFlexedToTempo(){
+  let any=false;
+  (project.tracks||[]).forEach(t=>{ (t.clips||[]).forEach(c=>{
+    if (c.warp && c.buffer && c.analysis && c.analysis.beats && c.analysis.beats.length>=2 && Math.abs((c.warp.bpm||0)-project.bpm)>0.1){
+      const strength = c.warp.strength!=null ? c.warp.strength : 1;
+      c.warp = { anchors: flexAnchorsToGrid(c.analysis.beats.map(Number), { bpm:project.bpm, dur:c.buffer.duration, strength }), strength, bpm:project.bpm };
+      bakeWarp(c); any=true;
+    }
+  }); });
+  if (any){ if(typeof renderTimeline==="function") renderTimeline(); if (transport.playing){ transportStop(); transportPlay(); } if(typeof scheduleAutosave==="function") scheduleAutosave(); }
+}
+function scheduleRewarp(){ if(_rewarpTimer) clearTimeout(_rewarpTimer); _rewarpTimer=setTimeout(rewarpFlexedToTempo, 350); }
 
 /* ---- the DSP analysis worker (runs as a Blob worker; everything below is self-contained) ---- */
 function memoWorkerMain(){
@@ -6138,7 +6313,7 @@ async function doExportStems(){
   }
   exportBtn.textContent=old; exportBtn.disabled=false;
 }
-function flash(btn, msg){ const old=btn.textContent; btn.textContent=msg; btn.classList.add("danger"); setTimeout(()=>{ btn.textContent=old; btn.classList.remove("danger"); },1100); }
+function flash(btn, msg){ const old=btn.innerHTML; btn.textContent=msg; btn.classList.add("danger"); setTimeout(()=>{ btn.innerHTML=old; btn.classList.remove("danger"); },1100); }
 
 /* ============================== Song package export ============================== */
 // Encode a render to MP3 via WebCodecs when the browser supports it (frames concatenate
@@ -7074,6 +7249,7 @@ function resetAppSettings(){
   location.reload();
 }
 document.getElementById("settingsResetLayout").addEventListener("click",resetAppSettings);
+{ const ts=document.getElementById("themeSel"); if(ts){ ts.value=currentTheme(); ts.addEventListener("change",()=>setTheme(ts.value)); } }
 document.getElementById("settingsTest").addEventListener("click",async()=>{
   const cfg=readSettingsCfg(), st=document.getElementById("settingsStatus"), btn=document.getElementById("settingsTest");
   if(!cfg.key){ st.textContent="Enter your API key first."; return; }
@@ -7148,7 +7324,7 @@ async function aiChat(cfg, idea){
 function firstDrumVoice(group){ const norm={clap:"snare",openhat:"hat",closedhat:"hat",hihat:"hat",hats:"hat",cymbal:"hat",percussion:"perc"}; const g=norm[group]||group; const i=DRUM_GROUPS.indexOf(g); return i>=0?i:DRUM_GROUPS.indexOf("snare"); }
 function applyProjectSpec(spec){
   if (!spec||typeof spec!=="object") throw new Error("No spec");
-  if (spec.bpm){ project.bpm=clamp(Math.round(spec.bpm),20,300); bpmInput.value=project.bpm; }
+  if (spec.bpm){ project.bpm=clamp(Math.round(spec.bpm),20,300); bpmInput.value=project.bpm; scheduleRewarp(); }
   if (spec.key && spec.key.root!=null){ const r=NOTE_NAMES.indexOf(String(spec.key.root).replace("b","#").trim()); if (r>=0) rootSel.value=String(r); if (spec.key.mode && SCALES[spec.key.mode]) modeSel.value=spec.key.mode; applyScaleHighlight(); }
   if (spec.lengthBars){ setLength(Math.max(barSec(), Math.round(spec.lengthBars)*barSec())); }
   const made=[];
@@ -7167,7 +7343,7 @@ function applyProjectOps(ops){
   const WAVES=["sine","triangle","square","sawtooth"];
   ops.forEach(op=>{
     try { switch(op&&op.op){
-      case "setTempo": if(op.bpm){ project.bpm=clamp(Math.round(op.bpm),20,300); bpmInput.value=project.bpm; n++; } break;
+      case "setTempo": if(op.bpm){ project.bpm=clamp(Math.round(op.bpm),20,300); bpmInput.value=project.bpm; scheduleRewarp(); n++; } break;
       case "setKey": { const r=NOTE_NAMES.indexOf(String(op.root||"").replace("b","#").trim()); if(r>=0) rootSel.value=String(r); if(op.mode&&SCALES[op.mode]) modeSel.value=op.mode; applyScaleHighlight(); n++; } break;
       case "setLength": if(op.bars){ setLength(Math.max(barSec(), Math.round(op.bars)*barSec())); n++; } break;
       case "clearType": if(op.type){ project.tracks=project.tracks.filter(t=>t.type!==op.type); n++; } break;
@@ -7655,7 +7831,7 @@ function renderKeyLane(W){
   const origin=originPx(), g=globalKey();
   const head=document.createElement("div"); head.className="tl-head key-head";
   head.innerHTML='<div class="tname"><span class="badge keymap">key</span>Key / mode</div>';
-  const addBtn=document.createElement("button"); addBtn.className="key-add"; addBtn.textContent="＋ key"; addBtn.title="Add a key/mode change (you can also right-click the lane, or drag a block's left edge)";
+  const addBtn=document.createElement("button"); addBtn.className="key-add"; addBtn.innerHTML=icon("plus")+" key"; addBtn.title="Add a key/mode change (you can also right-click the lane, or drag a block's left edge)";
   addBtn.addEventListener("click",()=>addKeyChangeAt(keyAddDefaultBeat())); head.appendChild(addBtn);
   tlHeadCol.appendChild(head);
 
@@ -7719,26 +7895,33 @@ function structAdd(type){
   return sec;
 }
 function lyrHasSections(){ return (typeof lyricsState!=="undefined") && lyricsState.doc && (lyricsState.doc.sections||[]).length>0; }
-function structFromLyrBtn(){ const b=document.createElement("button"); b.id="structFromLyrBtn"; b.className="struct-act-btn"; b.textContent="↑ from lyrics"; b.title="Infer the song structure from the lyric sections ([Verse 1], [Chorus], [guitar solo]…)"; b.addEventListener("click",()=>structFromLyrics()); return b; }
+function structFromLyrBtn(){ const b=document.createElement("button"); b.id="structFromLyrBtn"; b.className="key-add"; b.innerHTML=icon("arrow-up")+" from lyrics"; b.title="Infer the song structure from the lyric sections ([Verse 1], [Chorus], [guitar solo]…)"; b.addEventListener("click",(e)=>{ e.stopPropagation(); structFromLyrics(); }); return b; }
+// Section overview as colored jump-dots — click a dot to scroll the timeline to that section. No words.
+function scrollTimelineToBeat(beat){
+  const sc=document.getElementById("tlScroll"); if(!sc) return;
+  const x=(typeof originPx==="function"?originPx():0)+beat*beatUnitSec()*PX_PER_SEC;
+  sc.scrollTo({ left: Math.max(0, x-40), behavior:"smooth" });
+}
 function renderStructSummary(){
   const el=document.getElementById("structSummary"); if(!el) return; el.innerHTML="";
-  const secs=structSorted();
-  if(!secs.length){
-    const hint=document.createElement("span"); hint.className="dim"; hint.style.fontSize="11px";
-    hint.textContent=lyrHasSections()?"Structure follows your lyrics —":"＋ add Intro / Verse / Chorus… in the Structure lane below";
-    el.appendChild(hint); if(lyrHasSections()) el.appendChild(structFromLyrBtn()); return;
-  }
-  const lab=document.createElement("span"); lab.className="ss-sum-lab"; lab.textContent="Structure"; el.appendChild(lab);
-  secs.forEach(s=>{ const c=document.createElement("span"); c.className="ss-sum-chip"; c.style.background=(SECTION_TYPES[s.type]||{}).color||"#888"; c.textContent=structLabel(s); el.appendChild(c); });
-  const bars=document.createElement("span"); bars.className="dim"; bars.style.fontSize="10px"; bars.textContent="· "+Math.round(structEndBeat()/beatsPerBar())+" bars"; el.appendChild(bars);
-  if(lyrHasSections()) el.appendChild(structFromLyrBtn());   // editing the structure on the timeline already syncs to the lyrics (no "to lyrics" button needed)
+  const secs=structSorted(); if(!secs.length) return;
+  const lab=document.createElement("span"); lab.className="ss-lab"; lab.textContent="Structure"; el.appendChild(lab);
+  secs.forEach(s=>{
+    const d=document.createElement("button"); d.type="button"; d.className="ss-dot";
+    d.style.background=(SECTION_TYPES[s.type]||{}).color||"#888";
+    d.title=structLabel(s)+" · bar "+(Math.round(s.beat/beatsPerBar())+1)+" — jump here";
+    d.addEventListener("click",(e)=>{ e.stopPropagation(); scrollTimelineToBeat(s.beat); });
+    el.appendChild(d);
+  });
+  const bars=document.createElement("span"); bars.className="ss-bars-count"; bars.textContent=Math.round(structEndBeat()/beatsPerBar())+" bars"; el.appendChild(bars);
 }
 function renderStructureLane(W){
   if(!tlLanes||!tlHeadCol) return; const origin=originPx();
   const head=document.createElement("div"); head.className="tl-head struct-head";
   head.innerHTML='<div class="tname"><span class="badge struct">song</span>Structure</div>';
-  const add=document.createElement("button"); add.className="key-add"; add.textContent="＋ section"; add.title="Add a song section (Intro / Verse / Chorus / Bridge / Solo / Outro)";
+  const add=document.createElement("button"); add.className="key-add"; add.innerHTML=icon("plus")+" section"; add.title="Add a song section (Intro / Verse / Chorus / Bridge / Solo / Outro)";
   add.addEventListener("click",(e)=>{ e.stopPropagation(); openStructAddMenu(add); }); head.appendChild(add);
+  if (typeof lyrHasSections==="function" && lyrHasSections()) head.appendChild(structFromLyrBtn());   // "from lyrics" lives on the Structure lane header, not the transport bar
   tlHeadCol.appendChild(head);
   const lane=document.createElement("div"); lane.className="tl-lane struct-lane"; lane.style.width=W+"px";
   const barPx=beatsPerBar()*beatUnitSec()*PX_PER_SEC;
@@ -7845,7 +8028,7 @@ function renderLyricsLane(W){
   tlHeadCol.appendChild(head);
   const lane=document.createElement("div"); lane.className="tl-lane lyrics-lane"; lane.style.width=W+"px";
   const bu=beatUnitSec(), beatPx=bu*PX_PER_SEC, barPx=beatsPerBar()*bu*PX_PER_SEC;
-  lane.style.backgroundImage="repeating-linear-gradient(90deg, transparent, transparent "+(beatPx-1)+"px, #20242f "+(beatPx-1)+"px, #20242f "+beatPx+"px), repeating-linear-gradient(90deg, transparent, transparent "+(barPx-1)+"px, #3a4254 "+(barPx-1)+"px, #3a4254 "+barPx+"px)";
+  lane.style.backgroundImage="repeating-linear-gradient(90deg, transparent, transparent "+(beatPx-1)+"px, var(--line) "+(beatPx-1)+"px, var(--line) "+beatPx+"px), repeating-linear-gradient(90deg, transparent, transparent "+(barPx-1)+"px, #3a4254 "+(barPx-1)+"px, #3a4254 "+barPx+"px)";
   lane.style.backgroundPositionX=origin+"px";
   const total=Math.max(1,lines.length), loopDur=Math.max(1,project.lengthSec);
   lines.forEach((ln,i)=>{
@@ -7970,7 +8153,7 @@ function buildOscUI(){
   synthParams.oscs.forEach((o,i)=>{
     const row=document.createElement("div"); row.className="osc-row on"; row.style.borderLeftColor=oscColor(i);
     const wave = '<select data-osc="'+i+'" data-k="wave">'+["sine","triangle","square","sawtooth"].map(w=>'<option value="'+w+'"'+(o.wave===w?" selected":"")+'>'+w+'</option>').join("")+'</select>';
-    const rm = i===0 ? '' : '<button class="osc-rm" data-osc="'+i+'" title="Remove this oscillator">✕</button>';
+    const rm = i===0 ? '' : '<button class="osc-rm" data-osc="'+i+'" title="Remove this oscillator"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button>';
     row.innerHTML =
       '<span class="osc-name" style="color:'+oscColor(i)+'">OSC '+(i+1)+'</span>'+ wave +
       '<label class="osc-knob">Oct <input type="number" data-osc="'+i+'" data-k="octave" min="-3" max="3" step="1" value="'+(o.octave||0)+'"></label>'+
@@ -8017,8 +8200,8 @@ kbTransBtn.addEventListener("click",()=>setKbMode("transpose"));
 (function wireScaleLock(){
   const b=document.getElementById("kbScaleLockBtn"); if(!b) return;
   try { if (localStorage.getItem("ps_kb_scalelock")==="0") kbScaleLock=false; } catch(_){}
-  b.classList.toggle("seg-on", kbScaleLock); b.textContent = kbScaleLock ? "🎵 In-key only" : "🎹 All keys";
-  b.addEventListener("click",()=>{ kbScaleLock=!kbScaleLock; try { localStorage.setItem("ps_kb_scalelock", kbScaleLock?"1":"0"); } catch(_){} if(typeof syncInKeyBtns==="function") syncInKeyBtns(); else { b.classList.toggle("seg-on",kbScaleLock); b.textContent=kbScaleLock?"🎵 In-key only":"🎹 All keys"; } });
+  b.classList.toggle("seg-on", kbScaleLock); b.innerHTML = kbScaleLock ? (icon("music")+" In-key only") : (icon("keyboard")+" All keys");
+  b.addEventListener("click",()=>{ kbScaleLock=!kbScaleLock; try { localStorage.setItem("ps_kb_scalelock", kbScaleLock?"1":"0"); } catch(_){} if(typeof syncInKeyBtns==="function") syncInKeyBtns(); else { b.classList.toggle("seg-on",kbScaleLock); b.innerHTML=kbScaleLock?(icon("music")+" In-key only"):(icon("keyboard")+" All keys"); } });
 })();
 document.getElementById("trMinusOct").addEventListener("click",()=>nudgeTranspose(-12));
 document.getElementById("trMinusW").addEventListener("click",()=>nudgeTranspose(-2));
@@ -8163,7 +8346,7 @@ function startTunerDrone(midi){
   g.connect(ctx.destination);   // straight to output so the reference is always audible regardless of master level
   tunerDrone={ctx,oscs,g,midi};
 }
-function syncTunerMic(){ const b=document.getElementById("tunerMicBtn"); if(!b) return; const on=!!(micStream&&micStream.active); b.textContent=on?"⏹ Stop mic":"🎤 Enable mic"; b.classList.toggle("on",on); }
+function syncTunerMic(){ const b=document.getElementById("tunerMicBtn"); if(!b) return; const on=!!(micStream&&micStream.active); b.innerHTML=on?(icon("stop")+" Stop mic"):(icon("mic")+" Enable mic"); b.classList.toggle("on",on); }
 function tunerLiveUpdate(midiFloat, held){
   if(!tunerOpen) return; const meter=document.getElementById("tunerMeter"); if(!meter) return;
   const note=document.getElementById("tmNote"), tgt=document.getElementById("tmTarget"), needle=document.getElementById("tmNeedle"), centsEl=document.getElementById("tmCents");
@@ -8542,7 +8725,7 @@ function renderInstViz(containerId, type){
       lane.appendChild(blk);
     });
     row.appendChild(lane);
-    const del=document.createElement("button"); del.className="inst-viz-del"; del.textContent="🗑"; del.title="Delete this layer";
+    const del=document.createElement("button"); del.className="inst-viz-del"; del.innerHTML=icon("trash"); del.title="Delete this layer";
     del.addEventListener("click",(e)=>{ e.stopPropagation();
       if(!confirm('Delete the "'+t.name+'" layer'+(t.clips.length?(" and its "+t.clips.length+" clip(s)"):"")+"?")) return;
       project.tracks=project.tracks.filter(x=>x.id!==t.id);
@@ -8697,7 +8880,7 @@ function midiAddKeyChange(){
   openKeyPopup(reg, blk||document.getElementById("midiAddKeyBtn"));
 }
 function midiZoom(factor){ MR.BEAT_PX=clamp(Math.round(MR.BEAT_PX*factor), 22, 200); if(midiEd){ renderMidiRoll(); renderMidiCtrl(); } }
-function syncInKeyBtns(){ const v=!!kbScaleLock; const mb=document.getElementById("midiInKeyBtn"); if(mb){ mb.classList.toggle("on",v); mb.textContent=v?"🎵 In-key only":"🎹 All keys"; } const fb=document.getElementById("kbScaleLockBtn"); if(fb){ fb.classList.toggle("seg-on",v); fb.textContent=v?"🎵 In-key only":"🎹 All keys"; } }
+function syncInKeyBtns(){ const v=!!kbScaleLock; const mb=document.getElementById("midiInKeyBtn"); if(mb){ mb.classList.toggle("on",v); mb.innerHTML=v?(icon("music")+" In-key only"):(icon("keyboard")+" All keys"); } const fb=document.getElementById("kbScaleLockBtn"); if(fb){ fb.classList.toggle("seg-on",v); fb.innerHTML=v?(icon("music")+" In-key only"):(icon("keyboard")+" All keys"); } }
 (function wireMidiInKey(){ const b=document.getElementById("midiInKeyBtn"); if(b) b.addEventListener("click",()=>{ kbScaleLock=!kbScaleLock; try{localStorage.setItem("ps_kb_scalelock",kbScaleLock?"1":"0");}catch(_){} syncInKeyBtns(); if(midiEd) renderMidiRoll(); }); })();
 (function wireEditorKeySelectors(){
   const mr=document.getElementById("midiKeyRoot"), mm=document.getElementById("midiKeyMode");
@@ -8815,7 +8998,7 @@ function applySectionLayout(layout){
   const collapsed=(layout&&layout.collapsed)?layout.collapsed:DEFAULT_COLLAPSED;
   document.querySelectorAll(".csec").forEach(s=>setCollapsed(s, collapsed.includes(s.dataset.key)));
 }
-function setCollapsed(sec, c){ sec.classList.toggle("collapsed",c); const b=sec.querySelector(":scope > .sec-head > .sec-toggle:not(.sec-pop)"); if(b){ b.textContent=c?"+":"–"; b.title=c?"Expand":"Minimize"; } }
+function setCollapsed(sec, c){ sec.classList.toggle("collapsed",c); const b=sec.querySelector(":scope > .sec-head > .sec-toggle:not(.sec-pop)"); if(b){ b.innerHTML=c?icon("chev-right"):icon("chev-down"); b.title=c?"Expand":"Minimize"; } }
 let dragSec=null;
 
 /* ----- Pop sections out to their own windows (multi-monitor) -----
@@ -8865,8 +9048,8 @@ function makeCollapsible(sec){
   const pop=document.createElement("button"); pop.className="sec-toggle sec-pop"; pop.title="Pop out into its own window (multi-monitor)";
   pop.innerHTML='<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><rect x="8.5" y="2.5" width="13" height="13" rx="2.5"></rect><rect x="2.5" y="8.5" width="13" height="13" rx="2.5" fill="var(--panel-2)"></rect></svg>';
   pop.addEventListener("click",(e)=>{ e.stopPropagation(); popOutSection(sec); });
-  const btn=document.createElement("button"); btn.className="sec-toggle"; btn.textContent="–"; btn.title="Minimize";
-  btn.addEventListener("click",(e)=>{ e.stopPropagation(); const c=sec.classList.toggle("collapsed"); btn.textContent=c?"+":"–"; btn.title=c?"Expand":"Minimize"; saveLayout(); });
+  const btn=document.createElement("button"); btn.className="sec-toggle"; btn.innerHTML=icon("chev-down"); btn.title="Minimize";
+  btn.addEventListener("click",(e)=>{ e.stopPropagation(); const c=sec.classList.toggle("collapsed"); btn.innerHTML=c?icon("chev-right"):icon("chev-down"); btn.title=c?"Expand":"Minimize"; saveLayout(); });
   head.appendChild(pop); head.appendChild(btn); sec.appendChild(head); sec.appendChild(body);
   head.addEventListener("dragstart",(e)=>{ dragSec=sec; sec.classList.add("dragging"); e.dataTransfer.effectAllowed="move"; try{ e.dataTransfer.setData("text/plain", sec.dataset.key||""); }catch(_){} });
   head.addEventListener("dragend",()=>{ sec.classList.remove("dragging"); dragSec=null; saveLayout(); });
