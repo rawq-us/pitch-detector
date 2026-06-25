@@ -1613,7 +1613,7 @@
 <div id="aiModal" class="modal" style="display:none">
   <div class="modal-box" style="max-width:680px">
     <div class="modal-head"><b><svg class="svi" aria-hidden="true"><use href="#i-robot"/></svg> AI Composer</b><button id="aiModalClose"><svg class="svi" aria-hidden="true"><use href="#i-x"/></svg></button></div>
-    <div class="hint" style="margin-top:0">Describe what you want — start a new idea, or <b>edit what you already have</b> ("make the beat busier", "add a bassline in the key", "use my Kick &amp; Snare pads for a trap pattern", "switch to D minor"). The model is sent a summary of your <b>current project</b> (tempo, key, tracks, loaded sampler pad names, lyrics) and replies with edit operations the app applies — building isolated stems with this app's own synth, drum & sampler engine. Bring your own API key — stored only in this browser. The LLM composes/edits; it does not synthesize audio (your recorded/sampled audio is summarized, never uploaded). Optional: an audio-generation endpoint can import a generated stem.</div>
+    <div class="hint" style="margin-top:0">Describe what you want — start a new idea, or <b>edit what you already have</b> ("make the beat busier", "add a bassline in the key", "use my Kick &amp; Snare pads for a trap pattern", "switch to D minor"). The model is sent a summary of your <b>current project</b> (tempo, key &amp; key changes, song structure, the notes in your MIDI layers, the key’s diatonic chords, loaded sampler pad names, lyrics) and replies with edit operations the app applies that <b>build the song layer by layer</b> — chord beds, basslines and arps voiced <b>in your key</b>, melodies placed on the grid, plus beats and sampler patterns — building isolated stems with this app's own synth, drum & sampler engine. Bring your own API key — stored only in this browser. The LLM composes/edits; it does not synthesize audio (your recorded/sampled audio is summarized, never uploaded). Optional: an audio-generation endpoint can import a generated stem.</div>
     <div class="ai-cfg-line">
       <span id="aiCfgSummary" class="dim">No API key set — add one in Settings.</span>
       <button id="aiOpenSettings" class="mini">⚙ Settings</button>
@@ -1645,7 +1645,7 @@
     <div class="row knobrow" style="gap:12px">
       <div class="group" style="width:160px"><label for="aiProvider">Provider</label>
         <select id="aiProvider"><option value="openrouter">OpenRouter</option><option value="huggingface">Hugging Face</option><option value="custom">Custom (OpenAI-compatible)</option></select></div>
-      <div class="group" style="flex:1"><label for="aiModel">Model</label><input id="aiModel" type="text" placeholder="e.g. anthropic/claude-3.5-sonnet"></div>
+      <div class="group" style="flex:1"><label for="aiModel">Model</label><input id="aiModel" type="text" placeholder="e.g. anthropic/claude-sonnet-4.6 (or claude-opus-4.8 for best results)"></div>
     </div>
     <div class="group" id="aiBaseRow" style="display:none"><label for="aiBaseUrl">Base URL (chat completions)</label><input id="aiBaseUrl" type="text" placeholder="https://your-host/v1/chat/completions" style="width:100%"></div>
     <div class="group"><label for="aiKey">API key <span class="dim">— stored in this browser only</span></label><input id="aiKey" type="password" placeholder="sk-…" style="width:100%" autocomplete="off"></div>
@@ -7079,7 +7079,7 @@ document.getElementById("songExportBtn").addEventListener("click",()=>{
    stems are separated by construction. Keys live only in localStorage. The LLM composes structure
    + lyrics; it does not synthesize audio (an optional audio endpoint can import a generated stem). */
 const aiModal=document.getElementById("aiModal");
-const AI_DEFAULT_MODELS={ openrouter:"anthropic/claude-3.5-sonnet", huggingface:"meta-llama/Llama-3.3-70B-Instruct", custom:"" };
+const AI_DEFAULT_MODELS={ openrouter:"anthropic/claude-sonnet-4.6", huggingface:"meta-llama/Llama-3.3-70B-Instruct", custom:"" };
 function aiLoadCfg(){ try { return JSON.parse(localStorage.getItem("ps_ai_cfg")||"{}"); } catch(e){ return {}; } }
 function aiSaveCfg(cfg){ try { localStorage.setItem("ps_ai_cfg", JSON.stringify(cfg)); } catch(e){} }
 function aiEndpoint(provider, baseUrl){
