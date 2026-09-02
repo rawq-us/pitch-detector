@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MP3 Metadata Editor</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f0f0f;
+    color: #e0e0e0;
+    min-height: 100vh;
+  }
+  header {
+    background: #1a1a2e;
+    border-bottom: 1px solid #333;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  header h1 { font-size: 20px; font-weight: 600; color: #fff; }
+  .upload-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: calc(100vh - 60px);
+    padding: 40px;
+  }
+  .upload-zone.hidden { display: none; }
+  .drop-area {
+    border: 2px dashed #555;
+    border-radius: 16px;
+    padding: 60px 80px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: #1a1a1a;
+    max-width: 500px;
+  }
+  .drop-area:hover, .drop-area.dragover { border-color: #6c63ff; background: #1a1a2e; }
+  .drop-area svg { margin-bottom: 16px; }
+  .drop-area p { font-size: 16px; color: #aaa; margin-top: 8px; }
+  .drop-area .browse { color: #6c63ff; text-decoration: underline; cursor: pointer; }
+  .editor { display: none; }
+  .editor.visible { display: flex; flex-direction: column; min-height: calc(100vh - 60px); }
+  .toolbar {
+    display: flex; align-items: center; gap: 12px;
+    padding: 12px 24px; background: #161616; border-bottom: 1px solid #2a2a2a; flex-wrap: wrap;
+  }
+  .toolbar .filename { font-size: 14px; color: #aaa; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .btn { padding: 8px 20px; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.15s; }
+  .btn-primary { background: #6c63ff; color: #fff; }
+  .btn-primary:hover { background: #5a52e0; }
+  .btn-secondary { background: #2a2a2a; color: #ccc; }
+  .btn-secondary:hover { background: #333; }
+  .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 0; flex: 1; overflow: auto; }
+  @media (max-width: 900px) { .panels { grid-template-columns: 1fr; } }
+  .panel { padding: 24px; overflow-y: auto; }
+  .panel-current { background: #141414; border-right: 1px solid #2a2a2a; }
+  .panel-new { background: #0f0f0f; }
+  .panel-header { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 1px solid #2a2a2a; }
+  .panel-header h2 { font-size: 16px; font-weight: 600; }
+  .panel-header .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; font-weight: 500; }
+  .badge-readonly { background: #2a2a2a; color: #888; }
+  .badge-editable { background: #1a3a1a; color: #4ade80; }
+  .field-group { margin-bottom: 16px; }
+  .field-group label { display: block; font-size: 12px; font-weight: 500; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+  .field-value { font-size: 14px; padding: 8px 12px; background: #1a1a1a; border-radius: 6px; min-height: 36px; display: flex; align-items: center; color: #ccc; word-break: break-word; }
+  .field-value.empty { color: #555; font-style: italic; }
+  input[type="text"], input[type="number"], select, textarea {
+    width: 100%; padding: 8px 12px; background: #1e1e1e; border: 1px solid #333;
+    border-radius: 6px; color: #e0e0e0; font-size: 14px; font-family: inherit; transition: border-color 0.15s;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: #6c63ff; }
+  textarea { resize: vertical; min-height: 60px; }
+  .artwork-section { margin-bottom: 20px; }
+  .artwork-container {
+    width: 200px; height: 200px; border-radius: 8px; overflow: hidden;
+    background: #1a1a1a; border: 1px solid #2a2a2a; display: flex; align-items: center; justify-content: center;
+  }
+  .artwork-container img { width: 100%; height: 100%; object-fit: cover; }
+  .artwork-placeholder { color: #555; font-size: 13px; text-align: center; padding: 20px; }
+  .artwork-upload { margin-top: 8px; }
+  .artwork-upload label.btn { display: inline-block; }
+  .artwork-upload input[type="file"] { display: none; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .genre-suggestions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+  .genre-chip {
+    font-size: 11px; padding: 2px 8px; background: #2a2a2a; border-radius: 10px;
+    cursor: pointer; transition: all 0.15s; border: 1px solid transparent;
+  }
+  .genre-chip:hover { border-color: #6c63ff; color: #fff; }
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
+    background: #1a3a1a; color: #4ade80; border: 1px solid #2a5a2a; border-radius: 8px;
+    font-size: 14px; z-index: 100; animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s; pointer-events: none;
+  }
+  @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+</style>
+</head>
+<body>
+
+<header>
+  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6c63ff" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9 8l6 4-6 4V8z" fill="#6c63ff"/></svg>
+  <h1>MP3 Metadata Editor</h1>
+</header>
+
+<div class="upload-zone" id="uploadZone">
+  <div class="drop-area" id="dropArea">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#6c63ff" stroke-width="1.5">
+      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/>
+    </svg>
+    <p>Drag & drop your MP3 file here</p>
+    <p>or <span class="browse" id="browseBtn">browse files</span></p>
+  </div>
+  <input type="file" id="fileInput" accept=".mp3,audio/mpeg" style="display:none">
+</div>
+
+<div class="editor" id="editor">
+  <div class="toolbar">
+    <span class="filename" id="fileName"></span>
+    <button class="btn btn-secondary" id="resetBtn">Load Different File</button>
+    <button class="btn btn-primary" id="saveBtn1">Save MP3</button>
+  </div>
+
+  <div class="panels">
+    <!-- CURRENT METADATA -->
+    <div class="panel panel-current">
+      <div class="panel-header">
+        <h2>Current Metadata</h2>
+        <span class="badge badge-readonly">Read Only</span>
+      </div>
+      <div class="artwork-section">
+        <label style="font-size:12px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;display:block;">Album Artwork</label>
+        <div class="artwork-container" id="currentArtwork"><div class="artwork-placeholder">No artwork</div></div>
+      </div>
+      <div class="field-group"><label>Title</label><div class="field-value" id="cur_title"></div></div>
+      <div class="field-group"><label>Artist</label><div class="field-value" id="cur_artist"></div></div>
+      <div class="field-group"><label>Album</label><div class="field-value" id="cur_album"></div></div>
+      <div class="row">
+        <div class="field-group"><label>Track Number</label><div class="field-value" id="cur_track"></div></div>
+        <div class="field-group"><label>Year</label><div class="field-value" id="cur_year"></div></div>
+      </div>
+      <div class="field-group"><label>Genre</label><div class="field-value" id="cur_genre"></div></div>
+      <div class="row">
+        <div class="field-group"><label>Composer</label><div class="field-value" id="cur_composer"></div></div>
+        <div class="field-group"><label>Album Artist</label><div class="field-value" id="cur_albumArtist"></div></div>
+      </div>
+      <div class="field-group"><label>Publisher / Label</label><div class="field-value" id="cur_publisher"></div></div>
+      <div class="row">
+        <div class="field-group"><label>BPM</label><div class="field-value" id="cur_bpm"></div></div>
+        <div class="field-group"><label>Key</label><div class="field-value" id="cur_key"></div></div>
+      </div>
+      <div class="field-group"><label>ISRC</label><div class="field-value" id="cur_isrc"></div></div>
+      <div class="field-group"><label>Lyrics</label><div class="field-value" id="cur_lyrics"></div></div>
+      <div class="field-group"><label>Comment</label><div class="field-value" id="cur_comment"></div></div>
+      <div class="field-group"><label>Copyright</label><div class="field-value" id="cur_copyright"></div></div>
+      <div class="field-group"><label>Encoded By</label><div class="field-value" id="cur_encodedBy"></div></div>
+      <div class="field-group"><label>URL</label><div class="field-value" id="cur_url"></div></div>
+    </div>
+
+    <!-- NEW METADATA -->
+    <div class="panel panel-new">
+      <div class="panel-header">
+        <h2>New Metadata</h2>
+        <span class="badge badge-editable">Editable</span>
+      </div>
+      <div class="artwork-section">
+        <label style="font-size:12px;font-weight:500;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;display:block;">Album Artwork</label>
+        <div class="artwork-container" id="newArtwork"><div class="artwork-placeholder">No artwork — add one below</div></div>
+        <div class="artwork-upload">
+          <label class="btn btn-secondary" for="artworkInput">Choose Image</label>
+          <input type="file" id="artworkInput" accept="image/jpeg,image/png,image/webp">
+          <button class="btn btn-secondary" id="removeArtBtn" style="margin-left:4px;" disabled>Remove</button>
+          <button class="btn btn-secondary" id="pasteUrlBtn" style="margin-left:4px;">Paste URL</button>
+        </div>
+      </div>
+      <div class="field-group"><label>Title</label><input type="text" id="new_title" placeholder="Song title"></div>
+      <div class="field-group"><label>Artist</label><input type="text" id="new_artist" placeholder="Performing artist"></div>
+      <div class="field-group"><label>Album</label><input type="text" id="new_album" placeholder="Album name"></div>
+      <div class="row">
+        <div class="field-group"><label>Track Number</label><input type="text" id="new_track" placeholder="e.g. 3 or 3/12"></div>
+        <div class="field-group"><label>Year</label><input type="number" id="new_year" placeholder="2024" min="1900" max="2099"></div>
+      </div>
+      <div class="field-group">
+        <label>Genre</label>
+        <input type="text" id="new_genre" placeholder="Genre">
+        <div class="genre-suggestions" id="genreChips">
+          <span class="genre-chip">Pop</span><span class="genre-chip">Rock</span>
+          <span class="genre-chip">Hip-Hop</span><span class="genre-chip">R&B</span>
+          <span class="genre-chip">Electronic</span><span class="genre-chip">Jazz</span>
+          <span class="genre-chip">Classical</span><span class="genre-chip">Country</span>
+          <span class="genre-chip">Latin</span><span class="genre-chip">Reggae</span>
+          <span class="genre-chip">Blues</span><span class="genre-chip">Folk</span>
+          <span class="genre-chip">Metal</span><span class="genre-chip">Punk</span>
+          <span class="genre-chip">Indie</span><span class="genre-chip">Soul</span>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field-group"><label>Composer / Writer</label><input type="text" id="new_composer" placeholder="Song writer(s)"></div>
+        <div class="field-group"><label>Album Artist</label><input type="text" id="new_albumArtist" placeholder="Album artist"></div>
+      </div>
+      <div class="field-group"><label>Publisher / Label</label><input type="text" id="new_publisher" placeholder="Record label or publisher"></div>
+      <div class="row">
+        <div class="field-group"><label>BPM</label><input type="number" id="new_bpm" placeholder="120" min="1" max="999"></div>
+        <div class="field-group"><label>Key</label><input type="text" id="new_key" placeholder="e.g. C major, Am"></div>
+      </div>
+      <div class="field-group"><label>ISRC</label><input type="text" id="new_isrc" placeholder="International Standard Recording Code"></div>
+      <div class="field-group"><label>Lyrics</label><textarea id="new_lyrics" placeholder="Song lyrics" rows="4"></textarea></div>
+      <div class="field-group"><label>Comment</label><textarea id="new_comment" placeholder="Comments" rows="2"></textarea></div>
+      <div class="field-group"><label>Copyright</label><input type="text" id="new_copyright" placeholder="Copyright info"></div>
+      <div class="field-group"><label>Encoded By</label><input type="text" id="new_encodedBy" placeholder="Encoder / Producer"></div>
+      <div class="field-group"><label>URL</label><input type="text" id="new_url" placeholder="https://..."></div>
+      <div style="margin-top:24px;"><button class="btn btn-primary" id="saveBtn2" style="width:100%;">Save MP3 with New Metadata</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// browser-id3-writer v4.4.0 (UMD) - https://github.com/egoroof/browser-id3-writer
+!function(e,t){"object"==typeof exports&&"undefined"!=typeof module?module.exports=t():"function"==typeof define&&define.amd?define(t):(e=e||self).ID3Writer=t()}(this,function(){"use strict";function a(e){return String(e).split("").map(function(e){return e.charCodeAt(0)})}function o(e){return new Uint8Array(a(e))}function u(e){var t=new Uint8Array(2*e.length);return new Uint16Array(t.buffer).set(a(e)),t}return function(){var e=t.prototype;function t(e){if(!(e&&"object"==typeof e&&"byteLength"in e))throw new Error("First argument should be an instance of ArrayBuffer or Buffer");this.arrayBuffer=e,this.padding=4096,this.frames=[],this.url=""}return e._setIntegerFrame=function(e,t){var a=parseInt(t,10);this.frames.push({name:e,value:a,size:11+a.toString().length})},e._setStringFrame=function(e,t){var a=t.toString();this.frames.push({name:e,value:a,size:13+2*a.length})},e._setPictureFrame=function(e,t,a,r){var n,s,i,c=function(e){if(!e||!e.length)return null;if(255===e[0]&&216===e[1]&&255===e[2])return"image/jpeg";if(137===e[0]&&80===e[1]&&78===e[2]&&71===e[3])return"image/png";if(71===e[0]&&73===e[1]&&70===e[2])return"image/gif";if(87===e[8]&&69===e[9]&&66===e[10]&&80===e[11])return"image/webp";var t=73===e[0]&&73===e[1]&&42===e[2]&&0===e[3],a=77===e[0]&&77===e[1]&&0===e[2]&&42===e[3];return t||a?"image/tiff":66===e[0]&&77===e[1]?"image/bmp":0===e[0]&&0===e[1]&&1===e[2]&&0===e[3]?"image/x-icon":null}(new Uint8Array(t)),o=a.toString();if(!c)throw new Error("Unknown picture MIME type");a||(r=!1),this.frames.push({name:"APIC",value:t,pictureType:e,mimeType:c,useUnicodeEncoding:r,description:o,size:(n=t.byteLength,s=c.length,i=o.length,11+s+1+1+(r?2+2*(i+1):i+1)+n)})},e._setLyricsFrame=function(e,t,a){var r,n,s=e.split("").map(function(e){return e.charCodeAt(0)}),i=t.toString(),c=a.toString();this.frames.push({name:"USLT",value:c,language:s,description:i,size:(r=i.length,n=c.length,16+2*r+2+2+2*n)})},e._setCommentFrame=function(e,t,a){var r,n,s=e.split("").map(function(e){return e.charCodeAt(0)}),i=t.toString(),c=a.toString();this.frames.push({name:"COMM",value:c,language:s,description:i,size:(r=i.length,n=c.length,16+2*r+2+2+2*n)})},e._setPrivateFrame=function(e,t){var a,r,n=e.toString();this.frames.push({name:"PRIV",value:t,id:n,size:(a=n.length,r=t.byteLength,10+a+1+r)})},e._setUserStringFrame=function(e,t){var a,r,n=e.toString(),s=t.toString();this.frames.push({name:"TXXX",description:n,value:s,size:(a=n.length,r=s.length,13+2*a+2+2+2*r)})},e._setUrlLinkFrame=function(e,t){var a=t.toString();this.frames.push({name:e,value:a,size:10+a.length})},e.setFrame=function(e,t){switch(e){case"TPE1":case"TCOM":case"TCON":if(!Array.isArray(t))throw new Error(e+" frame value should be an array of strings");var a="TCON"===e?";":"/",r=t.join(a);this._setStringFrame(e,r);break;case"TLAN":case"TIT1":case"TIT2":case"TIT3":case"TALB":case"TPE2":case"TPE3":case"TPE4":case"TRCK":case"TPOS":case"TMED":case"TPUB":case"TCOP":case"TKEY":case"TEXT":case"TSRC":this._setStringFrame(e,t);break;case"TBPM":case"TLEN":case"TDAT":case"TYER":this._setIntegerFrame(e,t);break;case"USLT":if(t.language=t.language||"eng",!("object"==typeof t&&"description"in t&&"lyrics"in t))throw new Error("USLT frame value should be an object with keys description and lyrics");if(t.language&&!t.language.match(/[a-z]{3}/i))throw new Error("Language must be coded following the ISO 639-2 standards");this._setLyricsFrame(t.language,t.description,t.lyrics);break;case"APIC":if(!("object"==typeof t&&"type"in t&&"data"in t&&"description"in t))throw new Error("APIC frame value should be an object with keys type, data and description");if(t.type<0||20<t.type)throw new Error("Incorrect APIC frame picture type");this._setPictureFrame(t.type,t.data,t.description,!!t.useUnicodeEncoding);break;case"TXXX":if(!("object"==typeof t&&"description"in t&&"value"in t))throw new Error("TXXX frame value should be an object with keys description and value");this._setUserStringFrame(t.description,t.value);break;case"WCOM":case"WCOP":case"WOAF":case"WOAR":case"WOAS":case"WORS":case"WPAY":case"WPUB":this._setUrlLinkFrame(e,t);break;case"COMM":if(t.language=t.language||"eng",!("object"==typeof t&&"description"in t&&"text"in t))throw new Error("COMM frame value should be an object with keys description and text");if(t.language&&!t.language.match(/[a-z]{3}/i))throw new Error("Language must be coded following the ISO 639-2 standards");this._setCommentFrame(t.language,t.description,t.text);break;case"PRIV":if(!("object"==typeof t&&"id"in t&&"data"in t))throw new Error("PRIV frame value should be an object with keys id and data");this._setPrivateFrame(t.id,t.data);break;default:throw new Error("Unsupported frame "+e)}return this},e.removeTag=function(){if(!(this.arrayBuffer.byteLength<10)){var e,t,a=new Uint8Array(this.arrayBuffer),r=a[3],n=((e=[a[6],a[7],a[8],a[9]])[0]<<21)+(e[1]<<14)+(e[2]<<7)+e[3]+10;if(!(73!==(t=a)[0]||68!==t[1]||51!==t[2]||r<2||4<r))this.arrayBuffer=new Uint8Array(a.subarray(n)).buffer}},e.addTag=function(){this.removeTag();var e,t,r=[255,254],a=10+this.frames.reduce(function(e,t){return e+t.size},0)+this.padding,n=new ArrayBuffer(this.arrayBuffer.byteLength+a),s=new Uint8Array(n),i=0,c=[];return c=[73,68,51,3],s.set(c,i),i+=c.length,i++,i++,c=[(e=a-10)>>>21&(t=127),e>>>14&t,e>>>7&t,e&t],s.set(c,i),i+=c.length,this.frames.forEach(function(e){var t,a;switch(c=o(e.name),s.set(c,i),i+=c.length,t=e.size-10,c=[t>>>24&(a=255),t>>>16&a,t>>>8&a,t&a],s.set(c,i),i+=c.length,i+=2,e.name){case"WCOM":case"WCOP":case"WOAF":case"WOAR":case"WOAS":case"WORS":case"WPAY":case"WPUB":c=o(e.value),s.set(c,i),i+=c.length;break;case"TPE1":case"TCOM":case"TCON":case"TLAN":case"TIT1":case"TIT2":case"TIT3":case"TALB":case"TPE2":case"TPE3":case"TPE4":case"TRCK":case"TPOS":case"TKEY":case"TMED":case"TPUB":case"TCOP":case"TEXT":case"TSRC":c=[1].concat(r),s.set(c,i),i+=c.length,c=u(e.value),s.set(c,i),i+=c.length;break;case"TXXX":case"USLT":case"COMM":c=[1],"USLT"!==e.name&&"COMM"!==e.name||(c=c.concat(e.language)),c=c.concat(r),s.set(c,i),i+=c.length,c=u(e.description),s.set(c,i),i+=c.length,c=[0,0].concat(r),s.set(c,i),i+=c.length,c=u(e.value),s.set(c,i),i+=c.length;break;case"TBPM":case"TLEN":case"TDAT":case"TYER":i++,c=o(e.value),s.set(c,i),i+=c.length;break;case"PRIV":c=o(e.id),s.set(c,i),i+=c.length,i++,s.set(new Uint8Array(e.value),i),i+=e.value.byteLength;break;case"APIC":c=[e.useUnicodeEncoding?1:0],s.set(c,i),i+=c.length,c=o(e.mimeType),s.set(c,i),i+=c.length,c=[0,e.pictureType],s.set(c,i),i+=c.length,e.useUnicodeEncoding?(c=[].concat(r),s.set(c,i),i+=c.length,c=u(e.description),s.set(c,i),i+=c.length,i+=2):(c=o(e.description),s.set(c,i),i+=c.length,i++),s.set(new Uint8Array(e.value),i),i+=e.value.byteLength}}),i+=this.padding,s.set(new Uint8Array(this.arrayBuffer),i),this.arrayBuffer=n},e.getBlob=function(){return new Blob([this.arrayBuffer],{type:"audio/mpeg"})},e.getURL=function(){return this.url||(this.url=URL.createObjectURL(this.getBlob())),this.url},e.revokeURL=function(){URL.revokeObjectURL(this.url)},t}()});
+// End of browser-id3-writer
+
+// --- ID3v2 Reader ---
+class ID3Reader {
+  constructor(buf) {
+    this.buf = new Uint8Array(buf);
+    this.tags = {};
+    this.artwork = null;
+  }
+  readUTF8(o, l) { return new TextDecoder('utf-8').decode(this.buf.slice(o, o + l)); }
+  readTextFrame(offset, size) {
+    const enc = this.buf[offset];
+    const raw = this.buf.slice(offset + 1, offset + size);
+    let text;
+    if (enc === 0) {
+      text = '';
+      for (let i = 0; i < raw.length; i++) { if (raw[i] === 0) break; text += String.fromCharCode(raw[i]); }
+    } else if (enc === 1) {
+      const slice = raw;
+      if (slice.length >= 2 && slice[0] === 0xFF && slice[1] === 0xFE)
+        text = new TextDecoder('utf-16le').decode(slice.slice(2));
+      else if (slice.length >= 2 && slice[0] === 0xFE && slice[1] === 0xFF)
+        text = new TextDecoder('utf-16be').decode(slice.slice(2));
+      else text = new TextDecoder('utf-16le').decode(slice);
+    } else if (enc === 2) {
+      text = new TextDecoder('utf-16be').decode(raw);
+    } else {
+      text = new TextDecoder('utf-8').decode(raw);
+    }
+    return text.replace(/\0+$/, '');
+  }
+  readCommentFrame(offset, size) {
+    const enc = this.buf[offset];
+    let pos = offset + 4;
+    if (enc === 0 || enc === 3) {
+      while (pos < offset + size && this.buf[pos] !== 0) pos++;
+      pos++;
+      return new TextDecoder(enc === 3 ? 'utf-8' : 'iso-8859-1').decode(this.buf.slice(pos, offset + size)).replace(/\0+$/, '');
+    } else {
+      while (pos < offset + size - 1) { if (this.buf[pos] === 0 && this.buf[pos+1] === 0) { pos += 2; break; } pos += 2; }
+      const slice = this.buf.slice(pos, offset + size);
+      if (slice.length >= 2 && slice[0] === 0xFF && slice[1] === 0xFE)
+        return new TextDecoder('utf-16le').decode(slice.slice(2));
+      return new TextDecoder('utf-16le').decode(slice);
+    }
+  }
+  readAPIC(offset, size) {
+    const enc = this.buf[offset];
+    let pos = offset + 1;
+    let mime = '';
+    while (pos < offset + size && this.buf[pos] !== 0) { mime += String.fromCharCode(this.buf[pos]); pos++; }
+    pos++;
+    pos++; // picture type
+    if (enc === 0 || enc === 3) { while (pos < offset + size && this.buf[pos] !== 0) pos++; pos++; }
+    else { while (pos < offset + size - 1) { if (this.buf[pos] === 0 && this.buf[pos+1] === 0) { pos += 2; break; } pos += 2; } }
+    const data = this.buf.slice(pos, offset + size);
+    if (!mime || mime === 'image/') {
+      if (data[0] === 0xFF && data[1] === 0xD8) mime = 'image/jpeg';
+      else if (data[0] === 0x89 && data[1] === 0x50) mime = 'image/png';
+    }
+    return { mime, data };
+  }
+  syncsafe(o) { return ((this.buf[o]&0x7F)<<21)|((this.buf[o+1]&0x7F)<<14)|((this.buf[o+2]&0x7F)<<7)|(this.buf[o+3]&0x7F); }
+  normalInt(o) { return (this.buf[o]<<24)|(this.buf[o+1]<<16)|(this.buf[o+2]<<8)|this.buf[o+3]; }
+  parse() {
+    if (this.readUTF8(0, 3) !== 'ID3') return this;
+    const ver = this.buf[3];
+    const flags = this.buf[5];
+    const tagSize = this.syncsafe(6);
+    let off = 10;
+    if (flags & 0x40) off += this.syncsafe(off);
+    const end = 10 + tagSize;
+    const MAP = {
+      'TIT2':'title','TPE1':'artist','TALB':'album','TRCK':'track','TYER':'year','TDRC':'year',
+      'TCON':'genre','TCOM':'composer','TPE2':'albumArtist','TPUB':'publisher','TBPM':'bpm',
+      'TKEY':'key','TSRC':'isrc','TCOP':'copyright','TENC':'encodedBy','WOAR':'url','WXXX':'url',
+    };
+    while (off < end - 10) {
+      const id = this.readUTF8(off, 4);
+      if (id.charCodeAt(0) === 0) break;
+      const sz = ver === 4 ? this.syncsafe(off + 4) : this.normalInt(off + 4);
+      off += 10;
+      if (sz <= 0 || off + sz > end) break;
+      try {
+        if (id === 'APIC') this.artwork = this.readAPIC(off, sz);
+        else if (id === 'COMM') this.tags.comment = this.readCommentFrame(off, sz);
+        else if (id === 'USLT') this.tags.lyrics = this.readCommentFrame(off, sz);
+        else if (MAP[id]) this.tags[MAP[id]] = this.readTextFrame(off, sz);
+      } catch(e) {}
+      off += sz;
+    }
+    if (this.tags.genre) this.tags.genre = this.tags.genre.replace(/^\(\d+\)/, '').trim() || this.tags.genre;
+    return this;
+  }
+}
+
+// --- State ---
+let originalArrayBuffer = null;
+let originalFileName = '';
+let newArtworkArrayBuffer = null;
+
+// --- Helpers ---
+const $ = id => document.getElementById(id);
+const val = id => ($('new_' + id).value || '').trim();
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+
+function stripID3v2(buf) {
+  const b = new Uint8Array(buf);
+  if (b.length >= 10 && b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33) {
+    const size = ((b[6]&0x7F)<<21)|((b[7]&0x7F)<<14)|((b[8]&0x7F)<<7)|(b[9]&0x7F);
+    return buf.slice(10 + size);
+  }
+  return buf;
+}
+
+// --- Load file ---
+function loadFile(file) {
+  if (!file || !file.name.toLowerCase().endsWith('.mp3')) { alert('Please select an MP3 file.'); return; }
+  originalFileName = file.name;
+  $('fileName').textContent = file.name + ' (' + (file.size / 1048576).toFixed(1) + ' MB)';
+  const reader = new FileReader();
+  reader.onload = e => {
+    originalArrayBuffer = e.target.result;
+    parseAndDisplay(originalArrayBuffer);
+    $('uploadZone').classList.add('hidden');
+    $('editor').classList.add('visible');
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseAndDisplay(buf) {
+  const parser = new ID3Reader(buf.slice(0)).parse();
+  const tags = parser.tags;
+  const fields = ['title','artist','album','track','year','genre','composer','albumArtist','publisher','bpm','key','isrc','lyrics','comment','copyright','encodedBy','url'];
+  fields.forEach(f => {
+    const el = $('cur_' + f);
+    const v = tags[f] || '';
+    el.textContent = v || '(empty)';
+    el.classList.toggle('empty', !v);
+  });
+  // current artwork
+  const curArt = $('currentArtwork');
+  if (parser.artwork && parser.artwork.data.length > 0) {
+    const blob = new Blob([parser.artwork.data], { type: parser.artwork.mime || 'image/jpeg' });
+    curArt.innerHTML = '<img src="' + URL.createObjectURL(blob) + '" alt="Album art">';
+  } else {
+    curArt.innerHTML = '<div class="artwork-placeholder">No artwork</div>';
+  }
+  // populate new panel
+  fields.forEach(f => { const el = $('new_' + f); if (el) el.value = tags[f] || ''; });
+  // copy artwork to new panel
+  if (parser.artwork && parser.artwork.data.length > 0) {
+    newArtworkArrayBuffer = parser.artwork.data.buffer.slice(
+      parser.artwork.data.byteOffset, parser.artwork.data.byteOffset + parser.artwork.data.byteLength
+    );
+    const blob = new Blob([newArtworkArrayBuffer], { type: parser.artwork.mime || 'image/jpeg' });
+    $('newArtwork').innerHTML = '<img src="' + URL.createObjectURL(blob) + '" alt="New artwork">';
+    $('removeArtBtn').disabled = false;
+  } else {
+    newArtworkArrayBuffer = null;
+    $('newArtwork').innerHTML = '<div class="artwork-placeholder">No artwork — add one below</div>';
+    $('removeArtBtn').disabled = true;
+  }
+}
+
+function resetEditor() {
+  originalArrayBuffer = null;
+  newArtworkArrayBuffer = null;
+  $('fileInput').value = '';
+  $('editor').classList.remove('visible');
+  $('uploadZone').classList.remove('hidden');
+}
+
+function saveFile() {
+  if (!originalArrayBuffer) return;
+  const writer = new ID3Writer(stripID3v2(originalArrayBuffer));
+  if (val('title')) writer.setFrame('TIT2', val('title'));
+  if (val('artist')) writer.setFrame('TPE1', [val('artist')]);
+  if (val('album')) writer.setFrame('TALB', val('album'));
+  if (val('track')) writer.setFrame('TRCK', val('track'));
+  if (val('year')) writer.setFrame('TYER', parseInt(val('year')) || undefined);
+  if (val('genre')) writer.setFrame('TCON', [val('genre')]);
+  if (val('composer')) writer.setFrame('TCOM', [val('composer')]);
+  if (val('albumArtist')) writer.setFrame('TPE2', val('albumArtist'));
+  if (val('publisher')) writer.setFrame('TPUB', val('publisher'));
+  if (val('bpm')) writer.setFrame('TBPM', parseInt(val('bpm')) || undefined);
+  if (val('key')) writer.setFrame('TKEY', val('key'));
+  if (val('isrc')) writer.setFrame('TSRC', val('isrc'));
+  if (val('copyright')) writer.setFrame('TCOP', val('copyright'));
+  if (val('encodedBy')) writer.setFrame('TENC', val('encodedBy'));
+  if (val('lyrics')) writer.setFrame('USLT', { description: '', lyrics: val('lyrics'), language: 'eng' });
+  if (val('comment')) writer.setFrame('COMM', { description: '', text: val('comment'), language: 'eng' });
+  if (val('url')) writer.setFrame('WXXX', { description: '', value: val('url') });
+  if (newArtworkArrayBuffer) {
+    writer.setFrame('APIC', { type: 3, data: newArtworkArrayBuffer, description: '', useUnicodeEncoding: false });
+  }
+  writer.addTag();
+  const blob = writer.getBlob();
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = originalFileName.replace(/\.mp3$/i, '') + '_tagged.mp3';
+  a.click();
+  showToast('MP3 saved with new metadata!');
+}
+
+// --- Event listeners ---
+$('fileInput').addEventListener('change', e => { if (e.target.files[0]) loadFile(e.target.files[0]); });
+$('browseBtn').addEventListener('click', () => $('fileInput').click());
+$('dropArea').addEventListener('dragover', e => { e.preventDefault(); $('dropArea').classList.add('dragover'); });
+$('dropArea').addEventListener('dragleave', () => $('dropArea').classList.remove('dragover'));
+$('dropArea').addEventListener('drop', e => { e.preventDefault(); $('dropArea').classList.remove('dragover'); if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+$('resetBtn').addEventListener('click', resetEditor);
+$('saveBtn1').addEventListener('click', saveFile);
+$('saveBtn2').addEventListener('click', saveFile);
+$('removeArtBtn').addEventListener('click', () => {
+  newArtworkArrayBuffer = null;
+  $('newArtwork').innerHTML = '<div class="artwork-placeholder">No artwork — add one below</div>';
+  $('removeArtBtn').disabled = true;
+});
+$('pasteUrlBtn').addEventListener('click', () => {
+  const url = prompt('Enter image URL:');
+  if (!url) return;
+  fetch(url).then(r => {
+    if (!r.ok) throw new Error('Failed');
+    const ct = r.headers.get('content-type') || 'image/jpeg';
+    return r.arrayBuffer().then(ab => ({ ab, ct }));
+  }).then(({ ab, ct }) => {
+    newArtworkArrayBuffer = ab;
+    const blob = new Blob([ab], { type: ct.split(';')[0] });
+    $('newArtwork').innerHTML = '<img src="' + URL.createObjectURL(blob) + '" alt="New artwork">';
+    $('removeArtBtn').disabled = false;
+  }).catch(e => alert('Could not load image: ' + e.message));
+});
+$('artworkInput').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    newArtworkArrayBuffer = ev.target.result;
+    const blob = new Blob([newArtworkArrayBuffer], { type: file.type || 'image/jpeg' });
+    $('newArtwork').innerHTML = '<img src="' + URL.createObjectURL(blob) + '" alt="New artwork">';
+    $('removeArtBtn').disabled = false;
+  };
+  reader.readAsArrayBuffer(file);
+});
+$('genreChips').addEventListener('click', e => {
+  if (e.target.classList.contains('genre-chip')) $('new_genre').value = e.target.textContent;
+});
+</script>
+</body>
+</html>
